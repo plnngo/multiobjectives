@@ -14,6 +14,9 @@ import org.orekit.frames.TopocentricFrame;
 import org.orekit.propagation.SpacecraftState;
 import org.orekit.propagation.analytical.tle.TLE;
 import org.orekit.propagation.analytical.tle.TLEPropagator;
+import org.orekit.propagation.events.EclipseDetector;
+import org.orekit.propagation.events.EventsLogger;
+import org.orekit.propagation.events.handlers.ContinueOnEvent;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
@@ -75,15 +78,33 @@ public class SpatialDensityModel {
      */
     protected int[][] createDensityModel(List<TLE> tleSeries, AbsoluteDate startObs, AbsoluteDate endObs){
 
+        // Get celestial bodies
+        CelestialBody sun = CelestialBodyFactory.getSun();
+        OneAxisEllipsoid obateEarth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                                           Constants.WGS84_EARTH_FLATTENING,
+                                                           FramesFactory.getITRF(IERSConventions.IERS_2010,
+                                                                                 true));
+
         // Zero out position of Moon
         zeroOutRegionMoonInDensityModel(startObs, endObs);
         
 
-
         // Propagate TLE series to reference epoch
         for(TLE tle : tleSeries) {
+            EventsLogger logger = new EventsLogger();
+
+            // set up eclipse detector
+            EclipseDetector detector = new EclipseDetector(sun, Constants.SUN_RADIUS, obateEarth)
+                                            .withMaxCheck(60.0)
+                                            .withThreshold(1.0e-3)
+                                            .withHandler(new ContinueOnEvent<>())
+                                            .withUmbra();
+
             TLEPropagator propagator = TLEPropagator.selectExtrapolator(tle);
+            propagator.addEventDetector(logger.monitorDetector(null));
             SpacecraftState finalState = propagator.propagate(epoch);       // state in TEME
+
+
             PVCoordinates pvTeme = finalState.getPVCoordinates();
             PVCoordinates pvTopoHorizon = finalState.getFrame()
                                                     .getTransformTo(this.topoHorizon, epoch)
@@ -103,11 +124,20 @@ public class SpatialDensityModel {
             int row = indices[0];
             int col = indices[1];
 
-            // Increment number of object at corresponding patch position in spatial density model
-            densityModel[row][col]++;
+            // Check if spacecraft is inside earth shadow
+            if (detector.g(finalState)<0.0){
+                // object entered earth shadow
+                densityModel[row][col] = -1;
+            } else {
+                // object outside earth shadow
+                // Increment number of object at corresponding patch position in spatial density model
+                densityModel[row][col]++;
+            }
+
         }
         return densityModel;
     }
+
 
     private void zeroOutRegionMoonInDensityModel(AbsoluteDate startObs, AbsoluteDate endObs) {
 

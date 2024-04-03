@@ -142,7 +142,7 @@ public class AngularDirection {
      * 
      * @return                      Angular distance in [rad] to Moon.
      */
-    protected static double computeAngularDistMoon(AbsoluteDate date, Frame frame, 
+    public static double computeAngularDistMoon(AbsoluteDate date, Frame frame, 
                                                    AngularDirection pos) {
         CelestialBody moon = CelestialBodyFactory.getMoon();
         double moonRa = moon.getPVCoordinates(date, frame)
