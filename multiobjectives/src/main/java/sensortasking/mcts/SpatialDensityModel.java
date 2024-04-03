@@ -22,6 +22,8 @@ import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
 import org.orekit.utils.PVCoordinates;
 
+import ssa.sensortasking.Tasking;
+
 public class SpatialDensityModel {
 
     /** Reference sensor. */
@@ -124,9 +126,9 @@ public class SpatialDensityModel {
             int row = indices[0];
             int col = indices[1];
 
-            // Check if spacecraft is inside earth shadow
-            if (detector.g(finalState)<0.0){
-                // object entered earth shadow
+            // Check if spacecraft is inside earth shadow or outside favourble solar phase angle condition
+            if (detector.g(finalState)<0.0 || !Tasking.checkSolarPhaseCondition(epoch, azEl)){
+                // object entered earth shadow or its phase angle is too large
                 densityModel[row][col] = -1;
             } else {
                 // object outside earth shadow

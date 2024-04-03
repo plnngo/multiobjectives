@@ -624,7 +624,7 @@ public class Tasking {
      * 
      * @return                  true when min. modified solar phase angle is exceeded, else false.
      */
-    protected static boolean checkSolarPhaseCondition(AbsoluteDate date, AngularDirection pos) {
+    public static boolean checkSolarPhaseCondition(AbsoluteDate date, AngularDirection pos) {
                                              
         AngularDirection sunDir = getSunDir(pos.getFrame(), date);
         double solarPhaseModified = sunDir.getEnclosedAngle(pos);
