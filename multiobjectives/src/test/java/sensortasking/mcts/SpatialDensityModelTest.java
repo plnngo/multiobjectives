@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.hipparchus.util.FastMath;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.orekit.bodies.GeodeticPoint;
@@ -49,7 +50,7 @@ public class SpatialDensityModelTest {
     }
 
     @Test
-    public void testCreateDensityModel() {
+    public void testDimensionsDensityModel() {
         TLE test = new TLE("1 55586U 23020T   23336.86136309  .00002085  00000-0  16934-3 0  9990", 
                            "2 55586  43.0014 182.7273 0001366 277.9331  82.1357 15.02547145 44391");
         List<TLE> tleSeries = new ArrayList<TLE>();
@@ -58,7 +59,13 @@ public class SpatialDensityModelTest {
         AbsoluteDate referenceEpoch = new AbsoluteDate(test.getDate(), 86400.);
 
         SpatialDensityModel density = new SpatialDensityModel(sensor, referenceEpoch);
-        //density.createDensityModel(tleSeries);
+        int[][] model = density.getDensityModel();
+
+        // Assign expected dimensions
+        int expectedNumElPatches = 145;     // number of rows in density model
+        int expectedNumAzPatches = 494;     // number of columns in density model
+        Assert.assertEquals(expectedNumElPatches, model.length);
+        Assert.assertEquals(expectedNumAzPatches, model[0].length);
     }
     
 }
