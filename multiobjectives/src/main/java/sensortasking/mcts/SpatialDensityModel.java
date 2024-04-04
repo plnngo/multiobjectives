@@ -22,7 +22,7 @@ import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
 import org.orekit.utils.PVCoordinates;
 
-import ssa.sensortasking.Tasking;
+import sensortasking.stripescanning.Tasking;
 
 public class SpatialDensityModel {
 
@@ -67,16 +67,17 @@ public class SpatialDensityModel {
         
         this.densityModel = new int[numPatchesEl][numPatchesAz];
     }
-
     
     /**
      * Generate density model of space environment with respect to {@link #sensor} and 
      * {@link #epoch}. 
      * 
      * @param tleSeries         Series of TLEs related to objects in space environment.
-     * @param startObs
-     * @param endObs
-     * @return
+     * @param startObs          Epoch at the start of the observation campaign. Necessary in order
+     *                          to avoid looking at the moon during the entire observation interval.
+     * @param endObs            Epoch at the end of the observation campaign. Necessary in order
+     *                          to avoid looking at the moon during the entire observation interval.
+     * @return                  2D integer array representing spatial density model. 
      */
     protected int[][] createDensityModel(List<TLE> tleSeries, AbsoluteDate startObs, AbsoluteDate endObs){
 
@@ -89,7 +90,6 @@ public class SpatialDensityModel {
 
         // Zero out position of Moon
         zeroOutRegionMoonInDensityModel(startObs, endObs);
-        
 
         // Propagate TLE series to reference epoch
         for(TLE tle : tleSeries) {
@@ -135,7 +135,6 @@ public class SpatialDensityModel {
                 // Increment number of object at corresponding patch position in spatial density model
                 densityModel[row][col]++;
             }
-
         }
         return densityModel;
     }

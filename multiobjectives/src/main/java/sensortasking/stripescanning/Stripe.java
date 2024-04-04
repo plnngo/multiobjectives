@@ -1,4 +1,4 @@
-package ssa.sensortasking;
+package sensortasking.stripescanning;
 
 import org.hipparchus.util.FastMath;
 import org.orekit.frames.Frame;

@@ -1,4 +1,4 @@
-package ssa.sensortasking;
+package sensortasking.stripescanning;
 
 public enum StripeType {
 

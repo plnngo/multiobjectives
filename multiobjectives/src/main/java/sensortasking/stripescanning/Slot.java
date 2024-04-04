@@ -1,4 +1,4 @@
-package ssa.sensortasking;
+package sensortasking.stripescanning;
 
 import org.orekit.time.AbsoluteDate;
 

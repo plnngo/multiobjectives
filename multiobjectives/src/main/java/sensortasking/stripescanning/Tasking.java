@@ -1,4 +1,4 @@
-package ssa.sensortasking;
+package sensortasking.stripescanning;
 
 import java.util.ArrayList;
 import java.util.Arrays;
