@@ -68,4 +68,18 @@ public class SpatialDensityModelTest {
         Assert.assertEquals(expectedNumAzPatches, model[0].length);
     }
     
+    @Test
+    public void testCreateDensityModel(){
+
+        TLE test = new TLE("1 55586U 23020T   23336.86136309  .00002085  00000-0  16934-3 0  9990", 
+                           "2 55586  43.0014 182.7273 0001366 277.9331  82.1357 15.02547145 44391");
+        List<TLE> tleSeries = new ArrayList<TLE>();
+        tleSeries.add(test);
+
+        AbsoluteDate referenceEpoch = new AbsoluteDate(test.getDate(), 86400.);
+
+        SpatialDensityModel density = new SpatialDensityModel(sensor, referenceEpoch);
+        density.createDensityModel(tleSeries, test.getDate(), referenceEpoch.shiftedBy(43200.));
+
+    }
 }

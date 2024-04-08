@@ -91,7 +91,7 @@ public class SpatialDensityModel {
                                                                                  true));
 
         // Zero out position of Moon
-        zeroOutRegionMoonInDensityModel(startObs, endObs);
+        //zeroOutRegionMoonInDensityModel(startObs, endObs);
 
         // Propagate TLE series to reference epoch
         for(TLE tle : tleSeries) {
