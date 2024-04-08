@@ -1,6 +1,21 @@
 package data;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.ConnectException;
+import java.net.CookieHandler;
+import java.net.CookieManager;
+import java.net.CookiePolicy;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Objects;
+
+import javax.net.ssl.HttpsURLConnection;
 
 public class SpaceTrackLoader {
 
@@ -127,5 +142,70 @@ public class SpaceTrackLoader {
         query +="/format/xml";
 
         return query;
+    }
+
+     /**
+     * Connect to space-track in order to download TLEs according to {@link #query}}.           
+     */
+    public void download(final String query, final Path filepath, final String username, final String password) {
+
+        try {
+
+            final String baseURL = "https://www.space-track.org";
+            final String authPath = "/ajaxauth/login";
+
+            final CookieManager manager = new CookieManager();
+            manager.setCookiePolicy(CookiePolicy.ACCEPT_ALL);
+            CookieHandler.setDefault(manager);
+
+            URL url = new URL(baseURL + authPath);
+            final HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
+            conn.setDoOutput(true);
+            conn.setRequestMethod("POST");
+            
+            // Set proxy if FHR network blocks access
+            OutputStream os;
+            final String input = "identity=" + username + "&password=" + password;
+            try {
+                os = conn.getOutputStream();
+                os.write(input.getBytes());
+                os.flush();
+                os.close();
+
+            } catch(ConnectException exp) {
+                os = conn.getOutputStream();
+                os.write(input.getBytes());
+                os.flush();
+                os.close();
+            }
+            
+            BufferedReader br = new BufferedReader(new InputStreamReader((conn.getInputStream())));
+
+            String output;
+            System.out.print("Downloading TLE from space-track.org... ");
+
+            url = new URL(baseURL + query);
+            br = new BufferedReader(new InputStreamReader((url.openStream())));
+
+            try (BufferedWriter writer = Files.newBufferedWriter(filepath, StandardCharsets.UTF_8)) {
+
+                while ((output = br.readLine()) != null) {
+                    writer.write(output + "\n");
+                }
+
+            } catch (final IOException x) {
+                System.err.format("IOException: %s%n", x);
+            }
+
+            url = new URL(baseURL + "/ajaxauth/logout");
+            br = new BufferedReader(new InputStreamReader((url.openStream())));
+            conn.disconnect();
+
+            System.out.println("finished.");
+
+        } catch (final Exception e) {
+
+            e.printStackTrace();
+        }
     }
 }

@@ -70,5 +70,4 @@ public class SpaceTrackLoaderTest {
         // Assert
         org.junit.Assert.assertEquals(expectedQuery, actualQuery);
     }
-    
 }
