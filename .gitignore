@@ -6,3 +6,6 @@ target/test-classes/sensortasking/mcts/
 # ignore files related to surefire-reports
 target/surefire-reports/
 target/maven-status/
+
+#ignor output files
+src/test/java/output

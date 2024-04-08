@@ -1,6 +1,12 @@
 package data;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.util.AbstractMap.SimpleEntry;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -69,5 +75,18 @@ public class SpaceTrackLoaderTest {
 
         // Assert
         org.junit.Assert.assertEquals(expectedQuery, actualQuery);
+    }
+
+    @Test
+    public void testDownload() throws IOException{
+        String query = "/basicspacedata/query/class/gp/MEAN_MOTION/0.99--1.01/INCLINATION/%3C5/"
+                        + "ECCENTRICITY/%3C0.01/RA_OF_ASC_NODE///%3E45/MEAN_ANOMALY/80--100/"
+                        + "orderby/EPOCH%20asc/format/xml";
+
+        Path filepath = FileSystems.getDefault().getPath("src/test/java/output/TestFile.xml");
+
+        String username = "p.l.n.ngo@tudelft.nl";
+        String password = "Z317d1l474710n!";
+        SpaceTrackLoader.download(query, filepath, username, password);
     }
 }

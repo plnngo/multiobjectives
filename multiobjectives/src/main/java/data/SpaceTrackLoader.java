@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.AbstractMap.SimpleEntry;
 
 import javax.net.ssl.HttpsURLConnection;
 
@@ -147,7 +148,7 @@ public class SpaceTrackLoader {
      /**
      * Connect to space-track in order to download TLEs according to {@link #query}}.           
      */
-    public void download(final String query, final Path filepath, final String username, final String password) {
+    public static void download(final String query, final Path filepath, final String username, final String password) {
 
         try {
 
@@ -207,5 +208,24 @@ public class SpaceTrackLoader {
 
             e.printStackTrace();
         }
+    }
+
+    public static SimpleEntry<String, String> requestUsernameAndPassword() throws IOException{
+
+        System.out.println("Enter space-track username: ");
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+
+        String username = reader.readLine();
+        System.out.println("Enter space-track password: ");
+        String password = reader.readLine();
+
+
+        return new SimpleEntry<String,String>(username, password);
+    }
+
+    public static void main(String[] args) throws IOException {
+        SimpleEntry<String,String> credentials = requestUsernameAndPassword();
+        System.out.println(credentials.getKey());
+        System.out.println(credentials.getValue());
     }
 }
