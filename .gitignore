@@ -9,3 +9,4 @@ target/maven-status/
 
 #ignor output files
 multiobjectives/src/test/java/output/
+multiobjectives/target/test-classes/output/
