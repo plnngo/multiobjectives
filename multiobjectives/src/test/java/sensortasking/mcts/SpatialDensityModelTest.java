@@ -25,7 +25,7 @@ public class SpatialDensityModelTest {
 
         // Load orekit data
         String workingDir = System.getProperty("user.dir");
-        String orekitDataDir = "\\src\\test\\java\\sensortasking\\mcts\\resources\\orekit-data";
+        String orekitDataDir = "\\src\\test\\java\\resources\\orekit-data";
         File orekitData = new File(workingDir + orekitDataDir);
         DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
         manager.addProvider(new DirectoryCrawler(orekitData));
