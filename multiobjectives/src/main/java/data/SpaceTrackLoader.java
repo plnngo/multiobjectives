@@ -18,6 +18,11 @@ import java.util.AbstractMap.SimpleEntry;
 
 import javax.net.ssl.HttpsURLConnection;
 
+import org.orekit.data.DataSource;
+import org.orekit.files.ccsds.ndm.ParserBuilder;
+import org.orekit.files.ccsds.ndm.odm.omm.OmmParser;
+import org.orekit.utils.Constants;
+
 public class SpaceTrackLoader {
 
     /**
@@ -81,7 +86,7 @@ public class SpaceTrackLoader {
                                      final String limitMeanMotion, final String limitEcc, 
                                      final String limitInc, final String limitRaan, 
                                      final String limitArgPerigee, final String limitMeanAnomaly,
-                                     final String limitEpoch){
+                                     final String limitEpoch, final String format){
 
         String query = "/basicspacedata/query/class/gp";
 
@@ -140,7 +145,7 @@ public class SpaceTrackLoader {
         }
 
         // Build format query
-        query +="/format/xml";
+        query +="/format/" + format;
 
         return query;
     }
@@ -210,6 +215,13 @@ public class SpaceTrackLoader {
         }
     }
 
+    public void parseOmm(String pathOmm){
+
+        final DataSource source = new DataSource(pathOmm, () -> getClass().getResourceAsStream(pathOmm));
+        OmmParser parser = new ParserBuilder().withMu(Constants.IERS2010_EARTH_MU).buildOmmParser();
+        parser.parseMessage(source);
+    }
+
     public static SimpleEntry<String, String> requestUsernameAndPassword() throws IOException{
 
         System.out.println("Enter space-track username: ");
@@ -224,8 +236,9 @@ public class SpaceTrackLoader {
     }
 
     public static void main(String[] args) throws IOException {
-        SimpleEntry<String,String> credentials = requestUsernameAndPassword();
-        System.out.println(credentials.getKey());
-        System.out.println(credentials.getValue());
+        System.out.println(System.getProperty("user.dir"));
+        SpaceTrackLoader test = new SpaceTrackLoader();
+        
+        test.parseOmm("TestFile.xml");
     }
 }

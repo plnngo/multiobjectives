@@ -36,17 +36,18 @@ public class SpaceTrackLoaderTest {
         boolean sortByEpoch = true;
         String limitInc = "";
         String limitEpoch = ">now-30";
+        String format = "xml";
 
         String actualQuery = 
             SpaceTrackLoader.buildOmmQuery(noradId, sortByEpoch, null, null, 
-                                           limitInc, null, null, null, limitEpoch);
+                                           limitInc, null, null, null, limitEpoch, format);
 
         // Build expected query string
         String expectedQuery = "/basicspacedata/query/class/gp" +  "/NORAD_CAT_ID/" 
                                 + Integer.toString(noradId[0]) + "," + Integer.toString(noradId[1])
                                 + "/orderby/" + "EPOCH%20ASC"
                                 + "/EPOCH/" + limitEpoch 
-                                + "/format/xml";
+                                + "/format/" + format;
 
         // Assert
         org.junit.Assert.assertEquals(expectedQuery, actualQuery);
@@ -60,10 +61,11 @@ public class SpaceTrackLoaderTest {
         String limitMeanMotion = "0.99--1.01";
         String limitRaan = ">45";
         String limitMeanAnomaly = "80--100";
+        String format = "xml";
 
         String actualQuery = 
         SpaceTrackLoader.buildOmmQuery(null, sortByEpoch, limitMeanMotion, limitEcc, limitInc, 
-                                       limitRaan, null, limitMeanAnomaly, null);
+                                       limitRaan, null, limitMeanAnomaly, null, format);
 
         String expectedQuery = "/basicspacedata/query/class/gp/orderby/EPOCH%20ASC"
                                 + "/MEAN_MOTION/" + limitMeanMotion
@@ -81,9 +83,9 @@ public class SpaceTrackLoaderTest {
     public void testDownload() throws IOException{
         String query = "/basicspacedata/query/class/gp/MEAN_MOTION/0.99--1.01/INCLINATION/%3C5/"
                         + "ECCENTRICITY/%3C0.01/RA_OF_ASC_NODE///%3E45/MEAN_ANOMALY/80--100/"
-                        + "orderby/EPOCH%20asc/format/xml";
+                        + "orderby/EPOCH%20asc/format/tle";
 
-        Path filepath = FileSystems.getDefault().getPath("src/test/java/output/TestFile.xml");
+        Path filepath = FileSystems.getDefault().getPath("src/test/java/output/TestFile.tle");
 
         String username = "p.l.n.ngo@tudelft.nl";
         String password = "Z317d1l474710n!";
