@@ -91,7 +91,7 @@ public class SpatialDensityModel {
                                                                                  true));
 
         // Zero out position of Moon
-        //zeroOutRegionMoonInDensityModel(startObs, endObs);
+        zeroOutRegionMoonInDensityModel(startObs, endObs);
 
         // Propagate TLE series to reference epoch
         for(TLE tle : tleSeries) {
@@ -142,7 +142,7 @@ public class SpatialDensityModel {
     }
 
 
-    private void zeroOutRegionMoonInDensityModel(AbsoluteDate startObs, AbsoluteDate endObs) {
+    protected void zeroOutRegionMoonInDensityModel(AbsoluteDate startObs, AbsoluteDate endObs) {
 
         // Build moon
         CelestialBody moon = CelestialBodyFactory.getMoon();
@@ -212,7 +212,7 @@ public class SpatialDensityModel {
      * @param angles            Angular position of the space object.
      * @return
      */
-    private int[] angularDirectionToGridPosition(AngularDirection angles) {
+    protected int[] angularDirectionToGridPosition(AngularDirection angles) {
         double azimuth = angles.getAngle1();
         double elevation =  angles.getAngle2();
 
@@ -223,7 +223,7 @@ public class SpatialDensityModel {
         int col = (int) FastMath.round(azimuth/widthFov);
 
         // Throw error if frame of angles is not the same as of the spatial density model
-        if (!angles.getFrame().equals(topoHorizon)) {
+        if (!angles.getFrame().getName().equals(topoHorizon.getName())) {
             throw new IllegalArgumentException("Angular position is not defined in topocentric horizon frame.");
         }
         return new int[]{row, col};
