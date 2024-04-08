@@ -8,4 +8,4 @@ target/surefire-reports/
 target/maven-status/
 
 #ignor output files
-src/test/java/output/
+multiobjectives/src/test/java/output/
