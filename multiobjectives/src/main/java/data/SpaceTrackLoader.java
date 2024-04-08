@@ -70,7 +70,7 @@ public class SpaceTrackLoader {
         String query = "/basicspacedata/query/class/gp";
 
         // Build Norad ID query (remove last comma)
-        if (noradId.length != 0) {
+        if (Objects.nonNull(noradId) && noradId.length != 0) {
             String noradIdQuery = "";
             for (int i = 0; i<noradId.length; i++) {
                 noradIdQuery = noradIdQuery + String.valueOf(noradId[i]) + ",";
