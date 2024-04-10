@@ -1,5 +1,8 @@
 package sensortasking.mcts;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.List;
 
 import org.hipparchus.analysis.polynomials.PolynomialFunction;
@@ -21,6 +24,8 @@ import org.orekit.time.AbsoluteDate;
 import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
 import org.orekit.utils.PVCoordinates;
+
+import com.opencsv.CSVWriter;
 
 import lombok.Getter;
 import sensortasking.stripescanning.Tasking;
@@ -120,9 +125,7 @@ public class SpatialDensityModel {
             AngularDirection azEl = new AngularDirection(topoHorizon, 
                                                          new double[]{azimuth, elevation}, 
                                                          AngleType.AZEL);
-                                                    
-            
-
+      
             // Extract indices in spatial density 2D array
             int[] indices = angularDirectionToGridPosition(azEl);
             int row = indices[0];
@@ -141,7 +144,6 @@ public class SpatialDensityModel {
         return densityModel;
     }
 
-
     protected void zeroOutRegionMoonInDensityModel(AbsoluteDate startObs, AbsoluteDate endObs) {
 
         // Build moon
@@ -155,12 +157,14 @@ public class SpatialDensityModel {
         double moonElStart = moon.getPVCoordinates(startObs, topoHorizon).getPosition().getDelta();
         AngularDirection moonAzElStart = new AngularDirection(topoHorizon, new double[]{moonAzStart, moonElStart}, AngleType.AZEL);
         int[] moonRowColStart = angularDirectionToGridPosition(moonAzElStart);
+        System.out.println(FastMath.toDegrees(moonAzStart));
 
         // Get row and col position of Moon at the end of observation campaign
         double moonAzEnd = moon.getPVCoordinates(endObs, topoHorizon).getPosition().getAlpha();
         double moonElEnd = moon.getPVCoordinates(endObs, topoHorizon).getPosition().getDelta();
         AngularDirection moonAzElEnd = new AngularDirection(topoHorizon, new double[]{moonAzEnd, moonElEnd}, AngleType.AZEL);
         int[] moonRowColEnd = angularDirectionToGridPosition(moonAzElEnd);
+        System.out.println(FastMath.toDegrees(moonAzEnd));
 
         // Construct line connecting start with end
         int rowStart = moonRowColStart[0];
@@ -168,21 +172,39 @@ public class SpatialDensityModel {
         int rowEnd = moonRowColEnd[0];
         int colEnd = moonRowColEnd[1];
 
-        double slope = (rowEnd - rowStart)/(colEnd - colStart);
-        double intercept = (colEnd*rowStart - colStart*rowEnd)/(colEnd - colStart);
+        // scan through the grid from low to high azimuth in the for loop
+        int lowCol = colStart;
+        int rowOfLowCol = rowStart;
+        int highCol = colEnd;
+        int rowOfHighCol = rowEnd;
+        if (colStart>colEnd){
+            lowCol = colEnd;
+            rowOfLowCol = rowEnd;
+            highCol = colStart;
+            rowOfHighCol = rowStart;
+        }
+
+        double slope = (double)(rowEnd - rowStart)/(double)(colEnd - colStart);
+        double intercept = (double)(colEnd*rowStart - colStart*rowEnd)/(double)(colEnd - colStart);
         PolynomialFunction line = new PolynomialFunction(new double[]{intercept, slope});
 
         // Zero out region between start and end
-        for(int c=moonRowColStart[1]; c<=moonRowColEnd[1]; c++){
+        for(int c=lowCol; c<=highCol; c++){
 
             // compute row coordinate along the line connecting start and end
             int r = (int) FastMath.round(line.value(c));
-            densityModel[r][c] = -1;        // zero out patch
-
+            if (r>=0){
+                densityModel[r][c] = -1;        // zero out patch if moon is in field of regard
+            }
+            
             // Zero out 10 deg above and below line
-            for(int offset=0; offset<halfMoonDist; offset++){
-                densityModel[r+offset][c] = -1;
-                densityModel[r-offset][c] = -1;
+            for(int offset=1; offset<halfMoonDist; offset++){
+                if (r+offset>=0) {
+                    densityModel[r+offset][c] = -1; // zero out patch if moon is in field of regard
+                }
+                if (r-offset>=0) {
+                    densityModel[r-offset][c] = -1; // zero out patch if moon is in field of regard
+                }
             }
         }
 
@@ -195,16 +217,22 @@ public class SpatialDensityModel {
             int rEnd = (int) line.value(cEnd);
 
             // Zero out 10 deg above and below line
-            for(int rowOffset=0; rowOffset<halfMoonDist; rowOffset++){
-                densityModel[rStart+rowOffset][cStart] = -1;
-                densityModel[rStart-rowOffset][cStart] = -1;
-
-                densityModel[rEnd+rowOffset][cEnd] = -1;
-                densityModel[rEnd-rowOffset][cEnd] = -1;
+            for(int rowOffset=1; rowOffset<halfMoonDist; rowOffset++){
+                if (rStart+rowOffset>=0){
+                    densityModel[rStart+rowOffset][cStart] = -1;
+                }
+                if (rStart-rowOffset >= 0){
+                    densityModel[rStart-rowOffset][cStart] = -1;
+                }
+                if (rEnd+rowOffset >= 0) {
+                    densityModel[rEnd+rowOffset][cEnd] = -1;
+                }     
+                if (rEnd-rowOffset >= 0) {
+                    densityModel[rEnd-rowOffset][cEnd] = -1;
+                }               
             }
         }
     }
-
 
     /**
      * Retrieve position of the field whose angular position is the closest to {@code angles}.
@@ -228,5 +256,38 @@ public class SpatialDensityModel {
         }
         return new int[]{row, col};
     }
+
+    public void writeDataLineByLine(String filePath) { 
+    // first create file object for file placed at location 
+    // specified by filepath 
+    File file = new File(filePath); 
+    try { 
+        // create FileWriter object with file as parameter 
+        FileWriter outputfile = new FileWriter(file); 
+  
+        // create CSVWriter object filewriter object as parameter 
+        CSVWriter writer = new CSVWriter(outputfile); 
+  
+        // adding header to csv 
+        String[] header = { "Row/ elevation patch", "Col/ Azimuth Patch", "Zeroed" }; 
+        writer.writeNext(header); 
+  
+        // add data to csv 
+        for (int r=0; r<this.densityModel.length; r++){
+            for (int c=0; c<this.densityModel[0].length; c++){
+                String[] data = {Integer.toString(r), Integer.toString(c), 
+                                 Integer.toString(this.densityModel[r][c])};
+                writer.writeNext(data);
+            }
+
+        }  
+        // closing writer connection 
+        writer.close(); 
+    } 
+    catch (IOException e) { 
+        // TODO Auto-generated catch block 
+        e.printStackTrace(); 
+    } 
+} 
     
 }

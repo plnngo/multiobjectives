@@ -110,6 +110,7 @@ public class SpatialDensityModelTest {
         AbsoluteDate date = new AbsoluteDate(start, 5*60*60);   // reference date: 5 hours after start date
         SpatialDensityModel densityModel = new SpatialDensityModel(sensor, date);
         densityModel.zeroOutRegionMoonInDensityModel(start, end);
+        densityModel.writeDataLineByLine("TestDensityModel.csv");
     }
 
     @Test
