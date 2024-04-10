@@ -209,15 +209,15 @@ public class SpatialDensityModel {
         }
 
         // Zero out boundary region outside start and end --> start and end mark mid position of moon
-        for(int colOffset=0; colOffset<halfMoonDist; colOffset++) {
+        for(int colOffset=1; colOffset<halfMoonDist; colOffset++) {
 
-            int cStart = moonRowColStart[1] - colOffset;
-            int cEnd = moonRowColEnd[1] + colOffset;
+            int cStart = lowCol - colOffset;
+            int cEnd = highCol + colOffset;
             int rStart = (int) line.value(cStart);
             int rEnd = (int) line.value(cEnd);
 
             // Zero out 10 deg above and below line
-            for(int rowOffset=1; rowOffset<halfMoonDist; rowOffset++){
+            for(int rowOffset=0; rowOffset<halfMoonDist; rowOffset++){
                 if (rStart+rowOffset>=0){
                     densityModel[rStart+rowOffset][cStart] = -1;
                 }
