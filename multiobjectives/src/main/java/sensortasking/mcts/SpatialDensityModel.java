@@ -144,7 +144,7 @@ public class SpatialDensityModel {
         return densityModel;
     }
 
-    protected void zeroOutRegionMoonInDensityModel(AbsoluteDate startObs, AbsoluteDate endObs) {
+    protected int[][] zeroOutRegionMoonInDensityModel(AbsoluteDate startObs, AbsoluteDate endObs) {
 
         // Build moon
         CelestialBody moon = CelestialBodyFactory.getMoon();
@@ -232,6 +232,7 @@ public class SpatialDensityModel {
                 }               
             }
         }
+        return densityModel;
     }
 
     /**

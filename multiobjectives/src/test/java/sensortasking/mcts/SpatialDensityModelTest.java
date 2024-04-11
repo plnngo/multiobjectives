@@ -104,13 +104,34 @@ public class SpatialDensityModelTest {
 
     @Test
     public void testZeroOutRegionMoonInDensityModel(){
-        
-        AbsoluteDate start = new AbsoluteDate(2024, 4, 24, 1, 7, 0, TimeScalesFactory.getUTC());
-        AbsoluteDate end = new AbsoluteDate(2024, 4, 24, 11, 19, 0, TimeScalesFactory.getUTC());
+        //Day of full moon
+        AbsoluteDate start = new AbsoluteDate(2024, 4, 24, 1, 4, 0, TimeScalesFactory.getUTC());
+        AbsoluteDate end = new AbsoluteDate(2024, 4, 24, 11, 35, 0, TimeScalesFactory.getUTC());
+/*         AbsoluteDate start = new AbsoluteDate(2024, 4, 15, 17, 11, 0, TimeScalesFactory.getUTC());
+        AbsoluteDate end = new AbsoluteDate(2024, 4, 16, 8, 28, 0, TimeScalesFactory.getUTC()); */
         AbsoluteDate date = new AbsoluteDate(start, 5*60*60);   // reference date: 5 hours after start date
         SpatialDensityModel densityModel = new SpatialDensityModel(sensor, date);
-        densityModel.zeroOutRegionMoonInDensityModel(start, end);
-        densityModel.writeDataLineByLine("TestDensityModel.csv");
+        int[][] moonZeroedOut = densityModel.zeroOutRegionMoonInDensityModel(start, end);
+
+        // Check if following patches are zeroed out
+        int row = 0;
+        for (int col=271; col<=423; col++) {
+            Assert.assertEquals(-1, moonZeroedOut[row][col]);
+        }
+        int col = 271;
+        for (row=0; row<=21; row++) {
+            Assert.assertEquals(-1, moonZeroedOut[row][col]);
+        }
+        Assert.assertEquals(-1, moonZeroedOut[21][273]);
+        Assert.assertEquals(-1, moonZeroedOut[20][280]);
+        Assert.assertEquals(-1, moonZeroedOut[12][339]);
+        Assert.assertEquals(-1, moonZeroedOut[1][416]);
+
+        // Check if following patches are not zeroed out
+        Assert.assertEquals(0, moonZeroedOut[2][410]);
+        Assert.assertEquals(0, moonZeroedOut[8][368]);
+        Assert.assertEquals(0, moonZeroedOut[22][271]);
+        //densityModel.writeDataLineByLine("TestDensityModel.csv");
     }
 
     @Test
