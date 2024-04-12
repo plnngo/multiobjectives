@@ -4,13 +4,18 @@ import java.util.InputMismatchException;
 
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.util.FastMath;
+import org.orekit.bodies.BodyShape;
 import org.orekit.bodies.GeodeticPoint;
+import org.orekit.bodies.OneAxisEllipsoid;
 import org.orekit.frames.Frame;
 import org.orekit.frames.FramesFactory;
+import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
+import org.orekit.propagation.SpacecraftState;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
+import org.orekit.utils.PVCoordinates;
 
 import lombok.Getter;
 
@@ -44,6 +49,9 @@ public class Sensor {
     /** Checker if slew velocity incorporates slew and settling time. */
     private boolean slewVelInclSensorSettle;
 
+    /** Topocentric horizon frame. */
+    private Frame topoHorizon;
+
     /**
      * Constructor. 
      * Slewing and setting time is already incorprated in slew velocity parameter.
@@ -66,7 +74,14 @@ public class Sensor {
         this.readoutT = readoutT;
         this.slewVel = slewVel;    
         this.elevCutOff = elevCutOff; 
-        this.slewVelInclSensorSettle = true;             
+        this.slewVelInclSensorSettle = true;   
+        
+        // Set up topocentric horizon frame 
+        Frame earthFrame = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                               Constants.WGS84_EARTH_FLATTENING,
+                                               earthFrame);
+        this.topoHorizon = new TopocentricFrame(earth, this.position, "Topocentric-Horizon");
     }
 
     /**
@@ -94,6 +109,13 @@ public class Sensor {
         this.elevCutOff = elevCutOff;     
         this.settlingT = settlingT;      
         this.slewVelInclSensorSettle = false;   
+
+        // Set up topocentric horizon frame 
+        Frame earthFrame = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                               Constants.WGS84_EARTH_FLATTENING,
+                                               earthFrame);
+        this.topoHorizon = new TopocentricFrame(earth, this.position, "Topocentric-Horizon");
     }
 
     /**
@@ -218,5 +240,20 @@ public class Sensor {
         double zEcef = (S + alt) * FastMath.sin(lat);
 
         return new Vector3D(xEcef, yEcef, zEcef);
+    }
+
+    public AngularDirection mapSpacecraftStateToFieldOfRegard(SpacecraftState state, AbsoluteDate epoch) {
+        PVCoordinates pvTeme = state.getPVCoordinates();
+        PVCoordinates pvTopoHorizon = state.getFrame()
+                                                .getTransformTo(this.topoHorizon, epoch)
+                                                .transformPVCoordinates(pvTeme);
+
+        // Extract angular position of space object 
+        double azimuth = pvTopoHorizon.getPosition().getAlpha();        // between -Pi and +Pi
+        double elevation = pvTopoHorizon.getPosition().getDelta();      // between -Pi/2 and +Pi/2
+        AngularDirection azEl = new AngularDirection(topoHorizon, 
+                                                        new double[]{azimuth, elevation}, 
+                                                        AngleType.AZEL);
+        return azEl;
     }
 }
