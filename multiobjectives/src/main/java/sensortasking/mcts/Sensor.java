@@ -50,7 +50,7 @@ public class Sensor {
     private boolean slewVelInclSensorSettle;
 
     /** Topocentric horizon frame. */
-    private Frame topoHorizon;
+    private TopocentricFrame topoHorizon;
 
     /**
      * Constructor. 

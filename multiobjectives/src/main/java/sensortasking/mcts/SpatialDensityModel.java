@@ -58,11 +58,12 @@ public class SpatialDensityModel {
         this.epoch = epoch;
 
         // Set up topocentric horizon frame 
-        Frame earthFrame = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+/*         Frame earthFrame = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
         BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
                                                Constants.WGS84_EARTH_FLATTENING,
                                                earthFrame);
-        this.topoHorizon = new TopocentricFrame(earth, sensor.getPosition(), "station");
+        this.topoHorizon = new TopocentricFrame(earth, sensor.getPosition(), "station"); */
+        this.topoHorizon = sensor.getTopoHorizon();
 
         // Discretise sensor's field of regard
         double height = sensor.getFov().getHeight();        // in [rad]
@@ -110,11 +111,13 @@ public class SpatialDensityModel {
                                             .withUmbra();
 
             TLEPropagator propagator = TLEPropagator.selectExtrapolator(tle);
-            propagator.addEventDetector(logger.monitorDetector(null));
+            propagator.addEventDetector(logger.monitorDetector(detector));
             SpacecraftState finalState = propagator.propagate(epoch);       // state in TEME
+            AngularDirection azEl = sensor.mapSpacecraftStateToFieldOfRegard(finalState, epoch);
+            System.out.println("Azimuth " + FastMath.toDegrees(azEl.getAngle1()) + " [deg] -- " + azEl.getAngle1() + " [rad]");
+            System.out.println("Elevation " + FastMath.toDegrees(azEl.getAngle2())+ " [deg] -- " + azEl.getAngle2() + " [rad]");
 
-
-            PVCoordinates pvTeme = finalState.getPVCoordinates();
+/*             PVCoordinates pvTeme = finalState.getPVCoordinates();
             PVCoordinates pvTopoHorizon = finalState.getFrame()
                                                     .getTransformTo(this.topoHorizon, epoch)
                                                     .transformPVCoordinates(pvTeme);
@@ -124,12 +127,16 @@ public class SpatialDensityModel {
             double elevation = pvTopoHorizon.getPosition().getDelta();      // between -Pi/2 and +Pi/2
             AngularDirection azEl = new AngularDirection(topoHorizon, 
                                                          new double[]{azimuth, elevation}, 
-                                                         AngleType.AZEL);
+                                                         AngleType.AZEL); */
       
             // Extract indices in spatial density 2D array
             int[] indices = angularDirectionToGridPosition(azEl);
             int row = indices[0];
             int col = indices[1];
+
+            // Check conditions
+            boolean goodIllumination = Tasking.checkSolarPhaseCondition(epoch, azEl);
+            boolean inEarthShadow = detector.g(finalState)<0.0;
 
             // Check if spacecraft is inside earth shadow or outside favourble solar phase angle condition
             if (detector.g(finalState)<0.0 || !Tasking.checkSolarPhaseCondition(epoch, azEl)){
@@ -174,14 +181,10 @@ public class SpatialDensityModel {
 
         // scan through the grid from low to high azimuth in the for loop
         int lowCol = colStart;
-        int rowOfLowCol = rowStart;
         int highCol = colEnd;
-        int rowOfHighCol = rowEnd;
         if (colStart>colEnd){
             lowCol = colEnd;
-            rowOfLowCol = rowEnd;
             highCol = colStart;
-            rowOfHighCol = rowStart;
         }
 
         double slope = (double)(rowEnd - rowStart)/(double)(colEnd - colStart);
