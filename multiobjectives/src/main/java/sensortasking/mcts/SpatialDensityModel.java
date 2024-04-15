@@ -85,9 +85,12 @@ public class SpatialDensityModel {
      *                          to avoid looking at the moon during the entire observation interval.
      * @param endObs            Epoch at the end of the observation campaign. Necessary in order
      *                          to avoid looking at the moon during the entire observation interval.
+     * @param zeroOutUnfavCond  True if patches under unfavourable condition shall be zeroed out, 
+     *                          i.e. considers moon location, earth shadow and solar phase angle.
      * @return                  2D integer array representing spatial density model. 
      */
-    protected int[][] createDensityModel(List<TLE> tleSeries, AbsoluteDate startObs, AbsoluteDate endObs){
+    protected int[][] createDensityModel(List<TLE> tleSeries, AbsoluteDate startObs, 
+        AbsoluteDate endObs, boolean zeroOutUnfavCond){
 
         // Get celestial bodies
         CelestialBody sun = CelestialBodyFactory.getSun();
@@ -97,7 +100,10 @@ public class SpatialDensityModel {
                                                                                  true));
 
         // Zero out position of Moon
-        zeroOutRegionMoonInDensityModel(startObs, endObs);
+        if (zeroOutUnfavCond) {
+            zeroOutRegionMoonInDensityModel(startObs, endObs);
+        }
+        
 
         // Propagate TLE series to reference epoch
         for(TLE tle : tleSeries) {
@@ -139,11 +145,15 @@ public class SpatialDensityModel {
             boolean inEarthShadow = detector.g(finalState)<0.0;
 
             // Check if spacecraft is inside earth shadow or outside favourble solar phase angle condition
-            if (detector.g(finalState)<0.0 || !Tasking.checkSolarPhaseCondition(epoch, azEl)){
+            if (row<0 || col<0 || row>=this.densityModel.length || col>=this.densityModel[0].length){
+                // space object is outside field of regard
+                System.out.println("skip");
+                continue;
+            } else if (zeroOutUnfavCond && 
+                (detector.g(finalState)<0.0 || !Tasking.checkSolarPhaseCondition(epoch, azEl))){
                 // object entered earth shadow or its phase angle is too large
                 densityModel[row][col] = -1;
             } else {
-                // object outside earth shadow
                 // Increment number of object at corresponding patch position in spatial density model
                 densityModel[row][col]++;
             }
