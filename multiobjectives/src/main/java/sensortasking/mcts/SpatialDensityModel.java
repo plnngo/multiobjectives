@@ -7,11 +7,9 @@ import java.util.List;
 
 import org.hipparchus.analysis.polynomials.PolynomialFunction;
 import org.hipparchus.util.FastMath;
-import org.orekit.bodies.BodyShape;
 import org.orekit.bodies.CelestialBody;
 import org.orekit.bodies.CelestialBodyFactory;
 import org.orekit.bodies.OneAxisEllipsoid;
-import org.orekit.frames.Frame;
 import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
 import org.orekit.propagation.SpacecraftState;
@@ -23,7 +21,6 @@ import org.orekit.propagation.events.handlers.ContinueOnEvent;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
-import org.orekit.utils.PVCoordinates;
 
 import com.opencsv.CSVWriter;
 

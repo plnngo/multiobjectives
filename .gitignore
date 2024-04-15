@@ -3,6 +3,7 @@ target/classes/sensortasking/mcts/
 target/test-classes/sensortasking/mcts/
 *.class
 *.m
+*.csv
 
 # ignore files related to surefire-reports
 target/surefire-reports/
