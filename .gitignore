@@ -12,3 +12,8 @@ target/maven-status/
 #ignor output files
 multiobjectives/src/test/java/output/
 multiobjectives/target/test-classes/output/
+multiobjectives/target/test-classes/resources/test-data/CatalogueHighOrbits_16042024.tle
+multiobjectives/target/test-classes/resources/test-data/Catalogue_16042024.tle
+multiobjectives/src/test/java/resources/test-data/CatalogueHighOrbits_16042024.tle
+multiobjectives/src/test/java/resources/test-data/Catalogue_16042024.tle
+multiobjectives/plotSpatialDensityModel.asv

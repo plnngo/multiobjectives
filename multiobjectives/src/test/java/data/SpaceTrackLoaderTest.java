@@ -88,4 +88,15 @@ public class SpaceTrackLoaderTest {
         String password = "Z317d1l474710n!";
         SpaceTrackLoader.download(query, filepath, username, password);
     }
+
+    @Test
+    public void testDownload2(){
+        String query = "/basicspacedata/query/class/gp/orderby/NORAD_CAT_ID,EPOCH/format/tle";
+        Path filepath = FileSystems.getDefault().getPath("src/test/java/output/Catalogue_16042024.tle");
+
+        String username = "p.l.n.ngo@tudelft.nl";
+        String password = "Z317d1l474710n!";
+        SpaceTrackLoader.download(query, filepath, username, password);
+    }
+
 }

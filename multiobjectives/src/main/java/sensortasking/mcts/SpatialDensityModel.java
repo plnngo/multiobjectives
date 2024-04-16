@@ -10,6 +10,7 @@ import org.hipparchus.util.FastMath;
 import org.orekit.bodies.CelestialBody;
 import org.orekit.bodies.CelestialBodyFactory;
 import org.orekit.bodies.OneAxisEllipsoid;
+import org.orekit.errors.OrekitException;
 import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
 import org.orekit.propagation.SpacecraftState;
@@ -115,7 +116,14 @@ public class SpatialDensityModel {
 
             TLEPropagator propagator = TLEPropagator.selectExtrapolator(tle);
             propagator.addEventDetector(logger.monitorDetector(detector));
-            SpacecraftState finalState = propagator.propagate(epoch);       // state in TEME
+            SpacecraftState finalState = null;
+            try {
+                finalState = propagator.propagate(epoch);       // state in TEME                
+            } catch (OrekitException e) {
+                System.out.println("Exception!");
+                continue;
+            }
+            
             AngularDirection azEl = sensor.mapSpacecraftStateToFieldOfRegard(finalState, epoch);
             System.out.println("Azimuth " + FastMath.toDegrees(azEl.getAngle1()) + " [deg] -- " + azEl.getAngle1() + " [rad]");
             System.out.println("Elevation " + FastMath.toDegrees(azEl.getAngle2())+ " [deg] -- " + azEl.getAngle2() + " [rad]");

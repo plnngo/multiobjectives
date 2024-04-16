@@ -2,6 +2,7 @@ package sensortasking.mcts;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -154,11 +155,14 @@ public class SpatialDensityModelTest {
         //Day of full moon
         AbsoluteDate start = new AbsoluteDate(2024, 4, 24, 1, 4, 0, TimeScalesFactory.getUTC());
         AbsoluteDate end = new AbsoluteDate(2024, 4, 24, 11, 35, 0, TimeScalesFactory.getUTC());
+/*         AbsoluteDate start = new AbsoluteDate(2024, 4, 12, 0, 54, 0, TimeScalesFactory.getUTC());
+        AbsoluteDate end = new AbsoluteDate(2024, 4, 12, 11, 51, 0, TimeScalesFactory.getUTC()); */
 /*         AbsoluteDate start = new AbsoluteDate(2024, 4, 15, 17, 11, 0, TimeScalesFactory.getUTC());
         AbsoluteDate end = new AbsoluteDate(2024, 4, 16, 8, 28, 0, TimeScalesFactory.getUTC()); */
         AbsoluteDate date = new AbsoluteDate(start, 5*60*60);   // reference date: 5 hours after start date
         SpatialDensityModel densityModel = new SpatialDensityModel(sensor, date);
         int[][] moonZeroedOut = densityModel.zeroOutRegionMoonInDensityModel(start, end);
+        //densityModel.writeDataLineByLine("TestMoonModel12_04_2024.csv");
 
         // Check if following patches are zeroed out
         int row = 0;
@@ -178,7 +182,7 @@ public class SpatialDensityModelTest {
         Assert.assertEquals(0, moonZeroedOut[2][410]);
         Assert.assertEquals(0, moonZeroedOut[8][368]);
         Assert.assertEquals(0, moonZeroedOut[22][271]);
-        //densityModel.writeDataLineByLine("TestDensityModel.csv");
+        
     }
 
     @Test
@@ -192,5 +196,45 @@ public class SpatialDensityModelTest {
         
         int[] actual = density.angularDirectionToGridPosition(objectTopoHorizon);
         Assert.assertArrayEquals(new int[]{119, 68}, actual);
+    }
+
+    @Test
+    public void testCreateDensityModel2() {
+
+        String workingDir = System.getProperty("user.dir");
+        String fakeTleDataDir = "\\src\\test\\java\\resources\\test-data\\Catalogue_16042024.tle";
+        File testData = new File(workingDir + fakeTleDataDir);
+        BufferedReader reader;
+        List<TLE> tleSeries = new ArrayList<TLE>();
+        try {
+            reader = new BufferedReader(new FileReader(testData));
+            
+            String current = "";
+            while((current = reader.readLine())!=null){
+                System.out.println(current);
+                try{
+                    tleSeries.add(new TLE(current, reader.readLine()));
+                } catch (NumberFormatException e) {
+                    // TODO Auto-generated catch block
+                    continue;
+                }
+            }
+            reader.close();
+
+            
+        } catch (FileNotFoundException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+                
+        AbsoluteDate sunset = new AbsoluteDate(2024, 4, 18, 0, 59, 0, TimeScalesFactory.getUTC());
+        AbsoluteDate sunrise = new AbsoluteDate(2024, 4, 18, 11, 43, 0, TimeScalesFactory.getUTC());
+        AbsoluteDate date = new AbsoluteDate(2024, 4, 18, 2, 29, 30, TimeScalesFactory.getUTC());
+        SpatialDensityModel model = new SpatialDensityModel(sensor, date);
+        int[][] spatialDensity = model.createDensityModel(tleSeries, sunset, sunrise, true);
+        model.writeDataLineByLine("TestDensityModelHighOrbitsVisibilityCond18_04_2024.csv");
     }
 }
