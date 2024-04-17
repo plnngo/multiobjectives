@@ -1,5 +1,8 @@
 package sensortasking.mcts;
 
+import lombok.Getter;
+
+@Getter
 public class ChanceNode extends Node{
 
     /** Micro action realised as pointing direction. */
@@ -7,5 +10,4 @@ public class ChanceNode extends Node{
 
     /** Macro Action realised as tasking objective. */
     MacroAction macro;
-    
 }

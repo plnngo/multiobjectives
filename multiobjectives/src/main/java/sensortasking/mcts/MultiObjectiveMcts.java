@@ -63,6 +63,17 @@ public class MultiObjectiveMcts {
         return episode;
     }
 
+    public void expand(){
+
+        // Sample a macro action
+        MacroAction objective = null;
+        ChanceNode microAction = objective.setMicroAction();
+
+        AngularDirection pointing = microAction.getMicro();
+
+
+    }
+
     protected Node selectChild(Node current) {
         double maxUct = Double.NEGATIVE_INFINITY;
         Node potentiallySelected = null;
