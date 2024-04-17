@@ -8,14 +8,14 @@ import lombok.Getter;
 public class Node {
 
     /** Parent node. */
-    Node parent;
+    private Node parent;
 
     /** Child nodes. */
-    List<Node> children;
+    private List<Node> children;
 
     /** Number of visits. */
-    int numVisits;
+    private int numVisits;
 
     /** Utility value. */
-    double utility;
+    private double utility;
 }

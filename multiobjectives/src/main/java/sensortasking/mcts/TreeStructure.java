@@ -1,9 +1,13 @@
 package sensortasking.mcts;
 
+import lombok.Getter;
+
+@Getter
 public class TreeStructure {
 
     /** Root node. */
     Node root;
+
 
     public int distanceFromRoot(Node descendant) {
 
