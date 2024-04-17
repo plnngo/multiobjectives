@@ -91,7 +91,7 @@ public class SpaceTrackLoaderTest {
 
     @Test
     public void testDownload2(){
-        String query = "/basicspacedata/query/class/gp/orderby/NORAD_CAT_ID,EPOCH/format/tle";
+        String query = "/basicspacedata/query/class/gp/INCLINATION/60--100/EPOCH/>now-1/MEAN_MOTION/>11.25/ECCENTRICITY/<0.25/OBJECT_TYPE/payload/orderby/NORAD_CAT_ID,EPOCH/format/tle";
         Path filepath = FileSystems.getDefault().getPath("src/test/java/output/Catalogue_16042024.tle");
 
         String username = "p.l.n.ngo@tudelft.nl";
