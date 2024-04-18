@@ -11,16 +11,16 @@ public class TreeStructure {
 
     public int distanceFromRoot(Node descendant) {
 
-        int distcance = 0;
+        int distance = 0;
         Node ancestor = descendant.getParent(); 
 
         // Travel up the tree until root is reached
         while(!ancestor.equals(this.root)) {
-            distcance ++;
+            distance ++;
             ancestor = descendant.getParent(); 
         }
 
-        return distcance;
+        return distance;
     }
     
 }

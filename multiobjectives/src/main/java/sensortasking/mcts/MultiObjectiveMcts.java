@@ -64,7 +64,7 @@ public class MultiObjectiveMcts {
         return episode;
     }
 
-    public Node expand(Node leaf){
+    public Node expand(List<Node> episode, Node leaf){
 
         // Sample a macro action
         MacroAction objective = null;
@@ -74,13 +74,50 @@ public class MultiObjectiveMcts {
         Map.Entry<Outcome, Double> outcomeReward = objective.sampleOutcome();
         double utility = objective.getUtility();
         Node nextChance = new ChanceNode(objective, microAction, leaf, 1, outcomeReward);
-        Node nextDecision = new DecisionNode(1, outcomeReward);
+        Node nextDecision = new DecisionNode(0, utility, outcomeReward);
 
         // Extend the tree by new decision and chance nodes
         nextDecision.setChild(nextChance);
         leaf.setChild(nextDecision);
 
+        // Extend episode by new decision and chance nodes too
+        episode.add(nextDecision);
+        episode.add(nextChance);
+
+
         return leaf;
+    }
+
+    public List<Node> simulate(Node leaf) {
+
+        // Declare output
+        List<Node> episode = new ArrayList<Node>();
+        episode.add(leaf);
+
+        Node current = leaf;
+        AbsoluteDate currentEpoch = leaf.getEpoch();
+
+        while(currentEpoch.compareTo(this.endCampaign) <= 0) {
+            current = expand(episode, current);
+            episode.add(current);
+            currentEpoch = current.getEpoch();
+        }
+        return episode;
+    }
+
+    public void backpropagate(List<Node> selected, Node last) {
+
+        // Search for corresponding node in tree
+        Node findCurrent = this.initial;
+        for (int i=1; i<selected.size(); i++) {
+            int ancestorIndex = findCurrent.getChildren().indexOf(selected.get(i));
+            findCurrent = findCurrent.getChildren().get(ancestorIndex);
+
+            // Update status of ancestor node
+            findCurrent.incrementNumVisits();
+            double updatedUtility = findCurrent.getUtility() + last.getUtility();
+            findCurrent.setUtility(updatedUtility);
+        }
     }
 
     protected Node selectChild(Node current) {
@@ -101,5 +138,26 @@ public class MultiObjectiveMcts {
         }
         return potentiallySelected;
     }
-    
+
+        
+    public static void main(String[] args) {
+        List<Node> test = new ArrayList<Node>();
+        Node decision = new Node();
+        decision.setUtility(9);
+        Node chance = new Node();
+        decision.setChild(chance);
+        chance.setUtility(7);
+        test.add(decision);
+        test.add(chance);
+        System.out.println("Utility of initial chance node: " + chance.getUtility());
+
+        //Extract node
+        Node extractedChance = test.get(1);
+        extractedChance.setUtility(10);
+        System.out.println("Utility of extracted chance node:" + extractedChance.getUtility());
+
+        for(Node node : test) {
+            System.out.println("Utilities in tree: " + node.getUtility());
+        }
+    }
 }
