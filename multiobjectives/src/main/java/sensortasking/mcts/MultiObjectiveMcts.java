@@ -2,6 +2,7 @@ package sensortasking.mcts;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import org.hipparchus.util.FastMath;
@@ -63,15 +64,23 @@ public class MultiObjectiveMcts {
         return episode;
     }
 
-    public void expand(){
+    public Node expand(Node leaf){
 
         // Sample a macro action
         MacroAction objective = null;
         ChanceNode microAction = objective.setMicroAction();
 
         AngularDirection pointing = microAction.getMicro();
+        Map.Entry<Outcome, Double> outcomeReward = objective.sampleOutcome();
+        double utility = objective.getUtility();
+        Node nextChance = new ChanceNode(objective, microAction, leaf, 1, outcomeReward);
+        Node nextDecision = new DecisionNode(1, outcomeReward);
 
+        // Extend the tree by new decision and chance nodes
+        nextDecision.setChild(nextChance);
+        leaf.setChild(nextDecision);
 
+        return leaf;
     }
 
     protected Node selectChild(Node current) {

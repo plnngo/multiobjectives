@@ -1,5 +1,6 @@
 package sensortasking.mcts;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import lombok.Getter;
@@ -11,11 +12,15 @@ public class Node {
     private Node parent;
 
     /** Child nodes. */
-    private List<Node> children;
+    private List<Node> children = new ArrayList<Node>();
 
     /** Number of visits. */
     private int numVisits;
 
     /** Utility value. */
     private double utility;
+
+    public void setChild(Node child) {
+        children.add(child);
+    }
 }
