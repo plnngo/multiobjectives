@@ -1,9 +1,8 @@
 package sensortasking.mcts;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
 
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.orekit.data.DataContext;
@@ -25,12 +24,25 @@ public class MultiObjectiveMctsTest {
     @Test
     public void testSelectChild() {
 
-        List<Node> children = new ArrayList<Node>();
+        Node parent = new Node();
+        parent.setUtility(50);
+        parent.setNumVisits(9);
+
         int[] numVisits = new int[]{3, 6, 1, 7, 8, 3, 2, 1, 1, 9};
         for(int i=0; i<numVisits.length; i++){
             double utility = i * 10;
             Node child = new Node();
+            child.setUtility(utility);
+            child.setNumVisits(numVisits[i]);
+
+            parent.setChild(child);
         }
+
+        Node actuallySelected = MultiObjectiveMcts.selectChild(parent);
+
+        // Last child is expected to reveal largest UCB because of its large utility value
+        Node expectedlySelected = parent.getChildren().get(numVisits.length - 1);
+        Assert.assertEquals(expectedlySelected, actuallySelected);
 
     }
 }

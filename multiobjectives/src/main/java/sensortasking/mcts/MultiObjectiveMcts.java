@@ -26,7 +26,7 @@ public class MultiObjectiveMcts {
     final AbsoluteDate endCampaign;
 
     /** Tuning parameter fur UCB */
-    final double C = 2;
+    final static double C = 2;
 
     /** Basic constructor.
      * 
@@ -137,7 +137,7 @@ public class MultiObjectiveMcts {
      * @param current
      * @return
      */
-    protected Node selectChild(Node current) {
+    protected static Node selectChild(Node current) {
         double maxUcb = Double.NEGATIVE_INFINITY;
         Node potentiallySelected = null;
         double nP = current.getNumVisits();
