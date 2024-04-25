@@ -7,7 +7,7 @@ import lombok.Getter;
 @Getter
 public class ChanceNode extends Node{
 
-    public ChanceNode(MacroAction objective, ChanceNode microAction, Node leaf, int i,
+    public ChanceNode(MacroAction objective, ChanceNode microAction, Node leaf, 
             Entry<Outcome, Double> outcomeReward) {
         //TODO Auto-generated constructor stub
     }

@@ -78,8 +78,8 @@ public class MultiObjectiveMcts {
         AngularDirection pointing = microAction.getMicro();
         Map.Entry<Outcome, Double> outcomeReward = objective.sampleOutcome();
         double utility = objective.getUtility();
-        Node nextChance = new ChanceNode(objective, microAction, leaf, 1, outcomeReward);
-        Node nextDecision = new DecisionNode(0, utility, outcomeReward);
+        Node nextChance = new ChanceNode(objective, microAction, leaf, outcomeReward);
+        Node nextDecision = new DecisionNode(utility, outcomeReward);
 
         // Extend the tree by new decision and chance nodes
         nextDecision.setChild(nextChance);
@@ -138,7 +138,7 @@ public class MultiObjectiveMcts {
      * @return
      */
     protected Node selectChild(Node current) {
-        double maxUct = Double.NEGATIVE_INFINITY;
+        double maxUcb = Double.NEGATIVE_INFINITY;
         Node potentiallySelected = null;
         double nP = current.getNumVisits();
 
@@ -149,9 +149,9 @@ public class MultiObjectiveMcts {
             double ucb = v + C * FastMath.sqrt(FastMath.log(nP)/n);
 
             // search for child that maximises UCB
-            if (ucb>maxUct) {
+            if (ucb>maxUcb) {
                 potentiallySelected = child;
-                maxUct = ucb;
+                maxUcb = ucb;
             }
         }
         return potentiallySelected;

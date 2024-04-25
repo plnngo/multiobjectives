@@ -11,13 +11,13 @@ import lombok.Getter;
 public class Node {
 
     /** Parent node. */
-    private Node parent;
+    protected Node parent;
 
     /** Child nodes. */
-    private List<Node> children = new ArrayList<Node>();
+    protected List<Node> children = new ArrayList<Node>();
 
     /** Number of visits. */
-    private int numVisits;
+    private int numVisits = 1;
 
     /** Utility value. */
     private double utility;
@@ -45,5 +45,9 @@ public class Node {
 
     public void setUtility(double value){
         this.utility = value;
+    }
+
+    public void setNumVisits(int numVisits) {
+        this.numVisits = numVisits;
     }
 }

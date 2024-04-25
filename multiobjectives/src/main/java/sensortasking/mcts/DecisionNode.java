@@ -4,7 +4,7 @@ import java.util.Map.Entry;
 
 public class DecisionNode extends Node{
 
-    public DecisionNode(int i, double utility, Entry<Outcome, Double> outcomeReward) {
+    public DecisionNode(double utility, Entry<Outcome, Double> outcomeReward) {
         //TODO Auto-generated constructor stub
     }
 
