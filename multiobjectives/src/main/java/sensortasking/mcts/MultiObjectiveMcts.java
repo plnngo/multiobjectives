@@ -46,14 +46,19 @@ public class MultiObjectiveMcts {
 
     }
 
+    /**
+     * 
+     * @return
+     */
     public List<Node> select() {
 
         // Declare output
         List<Node> episode = new ArrayList<Node>();
 
         Node current = this.descisionTree.getRoot();
-        List<Node> children = current.getChildren();
         episode.add(current);
+        List<Node> children = current.getChildren();
+        
         while(!children.isEmpty() || !Objects.isNull(children)) {
 
             // travers the tree until a leaf node is reached
@@ -105,6 +110,13 @@ public class MultiObjectiveMcts {
         return episode;
     }
 
+    /**
+     * Update the state of every parent node along the episode from the initial node down to the 
+     * newest expanded node.
+     * 
+     * @param selected          List of nodes that has been filled by calling {@link #select()}.
+     * @param last              Newest expanded node.
+     */
     public void backpropagate(List<Node> selected, Node last) {
 
         // Search for corresponding node in tree
@@ -120,6 +132,11 @@ public class MultiObjectiveMcts {
         }
     }
 
+    /**
+     * 
+     * @param current
+     * @return
+     */
     protected Node selectChild(Node current) {
         double maxUct = Double.NEGATIVE_INFINITY;
         Node potentiallySelected = null;
@@ -134,6 +151,7 @@ public class MultiObjectiveMcts {
             // search for child that maximises UCB
             if (ucb>maxUct) {
                 potentiallySelected = child;
+                maxUct = ucb;
             }
         }
         return potentiallySelected;
