@@ -50,12 +50,12 @@ public class MultiObjectiveMcts {
      * 
      * @return
      */
-    public List<Node> select() {
+    public static List<Node> select(Node root) {
 
         // Declare output
         List<Node> episode = new ArrayList<Node>();
 
-        Node current = this.descisionTree.getRoot();
+        Node current = root;
         episode.add(current);
         List<Node> children = current.getChildren();
         
@@ -69,7 +69,7 @@ public class MultiObjectiveMcts {
         return episode;
     }
 
-    public Node expand(List<Node> episode, Node leaf){
+/*     public Node expand(List<Node> episode, Node leaf){
 
         // Sample a macro action
         MacroAction objective = null;
@@ -91,9 +91,9 @@ public class MultiObjectiveMcts {
 
 
         return leaf;
-    }
+    } */
 
-    public List<Node> simulate(Node leaf) {
+/*     public List<Node> simulate(Node leaf) {
 
         // Declare output
         List<Node> episode = new ArrayList<Node>();
@@ -108,7 +108,7 @@ public class MultiObjectiveMcts {
             currentEpoch = current.getEpoch();
         }
         return episode;
-    }
+    } */
 
     /**
      * Update the state of every parent node along the episode from the initial node down to the 

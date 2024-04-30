@@ -49,5 +49,31 @@ public class MultiObjectiveMctsTest {
     @Test
     public void testSelect() {
 
+        // Build up test decision tree
+        DecisionNode root = new DecisionNode(24, 4, null, null, null);
+        
+        ChanceNode child1 = new ChanceNode(0, 17, 2, null, null, root);
+        ChanceNode child2 = new ChanceNode(0, 8, 2, null, null, root);
+        root.setChild(child1);
+        root.setChild(child2);
+
+        DecisionNode grandchild1 = new DecisionNode(10, 1, null, null, null);
+        DecisionNode grandchild2 = new DecisionNode(7, 1, null, null, null);
+        DecisionNode grandchild3 = new DecisionNode(3, 1, null, null, null);
+        DecisionNode grandchild4 = new DecisionNode(5, 1, null, null, null);
+        child1.setChild(grandchild1);
+        child1.setChild(grandchild2);
+        child2.setChild(grandchild3);
+        child2.setChild(grandchild4);
+
+        ChanceNode ggchild1 = new ChanceNode(0, 10, 1, null, null, grandchild1);
+        ChanceNode ggchild2 = new ChanceNode(0, 7, 1, null, null, grandchild2);
+        grandchild1.setChild(ggchild1);
+        grandchild2.setChild(ggchild2);
+
+        DecisionNode gggchild1 = new DecisionNode(10, 1, null, null, null);
+        DecisionNode gggchild2 = new DecisionNode(7, 1, null, null, null);
+        ggchild1.setChild(gggchild1);
+        ggchild2.setChild(gggchild2);
     }
 }
