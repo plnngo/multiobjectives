@@ -45,4 +45,9 @@ public class MultiObjectiveMctsTest {
         Assert.assertEquals(expectedlySelected, actuallySelected);
 
     }
+
+    @Test
+    public void testSelect() {
+
+    }
 }

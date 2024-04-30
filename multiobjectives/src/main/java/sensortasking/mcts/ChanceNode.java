@@ -1,20 +1,27 @@
 package sensortasking.mcts;
 
-import java.util.Map.Entry;
-
 import lombok.Getter;
 
 @Getter
 public class ChanceNode extends Node{
-
-    public ChanceNode(MacroAction objective, ChanceNode microAction, Node leaf, 
-            Entry<Outcome, Double> outcomeReward) {
-        //TODO Auto-generated constructor stub
-    }
 
     /** Micro action realised as pointing direction. */
     AngularDirection micro;
 
     /** Macro Action realised as tasking objective. */
     MacroAction macro;
+
+    /** Execution duration. */
+    double executionDuration;
+
+    public ChanceNode(double duration, double utility, int numVisits, MacroAction objective, 
+    AngularDirection pointing, DecisionNode parent) {
+
+        this.micro = pointing;
+        this.macro = objective;
+        super.numVisits = numVisits;
+        super.utility = utility;
+        super.parent = parent;
+        this.executionDuration = duration;
+    }
 }

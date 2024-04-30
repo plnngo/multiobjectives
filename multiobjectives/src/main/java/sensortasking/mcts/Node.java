@@ -17,10 +17,10 @@ public class Node {
     protected List<Node> children = new ArrayList<Node>();
 
     /** Number of visits. */
-    private int numVisits = 1;
+    protected int numVisits = 1;
 
     /** Utility value. */
-    private double utility;
+    protected double utility;
 
     /** Reference epoch. */
     private AbsoluteDate epoch;
