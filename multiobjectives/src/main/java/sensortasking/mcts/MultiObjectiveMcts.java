@@ -59,7 +59,7 @@ public class MultiObjectiveMcts {
         episode.add(current);
         List<Node> children = current.getChildren();
         
-        while(!children.isEmpty() || !Objects.isNull(children)) {
+        while(!children.isEmpty() && !Objects.isNull(children)) {
 
             // travers the tree until a leaf node is reached
             current = selectChild(current);

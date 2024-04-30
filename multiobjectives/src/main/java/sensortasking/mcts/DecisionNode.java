@@ -21,5 +21,7 @@ public class DecisionNode extends Node{
         this.sensorPointing = pointing;
         this.weights = weights;
         this.timeResources = timeResources;
+        super.utility = utility;
+        super.numVisits = numVisits;
     }
 }

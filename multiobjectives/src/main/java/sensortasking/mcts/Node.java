@@ -25,6 +25,9 @@ public class Node {
     /** Reference epoch. */
     private AbsoluteDate epoch;
 
+    /** Node identifier. */
+    protected long id;
+
     public void setChild(Node child) {
         children.add(child);
         child.parent = this;
@@ -49,5 +52,9 @@ public class Node {
 
     public void setNumVisits(int numVisits) {
         this.numVisits = numVisits;
+    }
+
+    public void setId(long id) {
+        this.id = id;
     }
 }
