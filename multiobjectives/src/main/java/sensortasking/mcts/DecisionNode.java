@@ -1,13 +1,25 @@
 package sensortasking.mcts;
 
-import java.util.Map.Entry;
+import lombok.Getter;
 
+@Getter
 public class DecisionNode extends Node{
 
-    public DecisionNode(double utility, Entry<Outcome, Double> outcomeReward) {
-        //TODO Auto-generated constructor stub
-    }
+    /** Sensor pointing location. */
+    AngularDirection sensorPointing;
 
-    /** Macro-micro-environment value. */
-    double outcome;
+    /** Prioritisation weight vector. 1st entry refers to search, 2nd to tracking objective. */
+    double[] weights;
+
+    /** Time durations dedicated for each objective. 1st entry refers to search, 2nd to tracking 
+     * objective. */
+    double[] timeResources;
+
+    public DecisionNode(double utility, int numVisits, AngularDirection pointing, double[] weights,
+                        double[] timeResources) {
+
+        this.sensorPointing = pointing;
+        this.weights = weights;
+        this.timeResources = timeResources;
+    }
 }
