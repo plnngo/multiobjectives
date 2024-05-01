@@ -12,6 +12,9 @@ import org.orekit.data.DirectoryCrawler;
 
 public class MultiObjectiveMctsTest {
 
+    /** Tree structure stored in a root node. */
+    Node root;
+
     @Before
     public void init() {
         // Load orekit data
@@ -20,38 +23,9 @@ public class MultiObjectiveMctsTest {
         File orekitData = new File(workingDir + orekitDataDir);
         DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
         manager.addProvider(new DirectoryCrawler(orekitData));
-    }   
-
-    @Test
-    public void testSelectChild() {
-
-        Node parent = new Node();
-        parent.setUtility(50);
-        parent.setNumVisits(9);
-
-        int[] numVisits = new int[]{3, 6, 1, 7, 8, 3, 2, 1, 1, 9};
-        for(int i=0; i<numVisits.length; i++){
-            double utility = i * 10;
-            Node child = new Node();
-            child.setUtility(utility);
-            child.setNumVisits(numVisits[i]);
-
-            parent.setChild(child);
-        }
-
-        Node actuallySelected = MultiObjectiveMcts.selectChild(parent);
-
-        // Last child is expected to reveal largest UCB because of its large utility value
-        Node expectedlySelected = parent.getChildren().get(numVisits.length - 1);
-        Assert.assertEquals(expectedlySelected, actuallySelected);
-
-    }
-
-    @Test
-    public void testSelect() {
 
         // Build up test decision tree
-        DecisionNode root = new DecisionNode(24, 4, null, null, null);
+        root = new DecisionNode(28, 4, null, null, null);
         root.setId(0);
         
         ChanceNode child1 = new ChanceNode(0, 17, 2, null, null, root);
@@ -87,12 +61,75 @@ public class MultiObjectiveMctsTest {
         gggchild2.setId(10);
         ggchild1.setChild(gggchild1);
         ggchild2.setChild(gggchild2);
+    }   
 
+    @Test
+    public void testSelectChild() {
+
+        Node parent = new Node();
+        parent.setUtility(50);
+        parent.setNumVisits(9);
+
+        int[] numVisits = new int[]{3, 6, 1, 7, 8, 3, 2, 1, 1, 9};
+        for(int i=0; i<numVisits.length; i++){
+            double utility = i * 10;
+            Node child = new Node();
+            child.setUtility(utility);
+            child.setNumVisits(numVisits[i]);
+
+            parent.setChild(child);
+        }
+
+        Node actuallySelected = MultiObjectiveMcts.selectChild(parent);
+
+        // Last child is expected to reveal largest UCB because of its large utility value
+        Node expectedlySelected = parent.getChildren().get(numVisits.length - 1);
+        Assert.assertEquals(expectedlySelected, actuallySelected);
+
+    }
+
+    @Test
+    public void testSelect() {
         // Compare
         List<Node> actual = MultiObjectiveMcts.select(root);
         long[] expectedIds = new long[]{0, 1, 3, 7, 9};
         for(int i=0; i<expectedIds.length; i++) {
             Assert.assertEquals(expectedIds[i], actual.get(i).getId());
+        }
+    }
+
+    @Test
+    public void testBackpropagate() {
+
+        // Set up
+        long[] expectedIds = new long[]{0, 1, 3, 7, 9};
+        List<Node> selected = MultiObjectiveMcts.select(root);
+        MultiObjectiveMcts mcts = new MultiObjectiveMcts(root, null, null, null);
+
+        // Add fakely simulated nodes
+        DecisionNode termination = new DecisionNode(1, 1, null, null, null);
+
+        mcts.backpropagate(selected, termination);
+        Node updatedRoot = mcts.getInitial();
+        List<Node> updatedEpisode = MultiObjectiveMcts.select(updatedRoot);
+
+        // Updated tree should result in the same nodes selected using the UCB condition
+        for(int i=0; i<expectedIds.length; i++) {
+            Assert.assertEquals(expectedIds[i], updatedEpisode.get(i).getId());
+        }
+
+        // Compare root node
+        Assert.assertEquals(5, updatedEpisode.get(0).getNumVisits());
+        Assert.assertEquals(29, updatedEpisode.get(0).getUtility(),1e-16);
+
+        // Compare next descendant
+        Assert.assertEquals(3, updatedEpisode.get(1).getNumVisits());
+        Assert.assertEquals(18, updatedEpisode.get(1).getUtility(),1e-16);
+
+        // Compare the rest of the episode
+        for(int i=2; i<updatedEpisode.size(); i++) {
+            Assert.assertEquals(2, updatedEpisode.get(i).getNumVisits());
+            Assert.assertEquals(11, updatedEpisode.get(i).getUtility(),1e-16);
         }
     }
 }

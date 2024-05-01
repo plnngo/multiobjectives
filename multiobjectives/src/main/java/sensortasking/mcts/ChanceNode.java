@@ -15,7 +15,7 @@ public class ChanceNode extends Node{
     double executionDuration;
 
     public ChanceNode(double duration, double utility, int numVisits, MacroAction objective, 
-    AngularDirection pointing, DecisionNode parent) {
+    AngularDirection pointing, Node parent) {
 
         this.micro = pointing;
         this.macro = objective;

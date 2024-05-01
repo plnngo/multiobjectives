@@ -2,16 +2,18 @@ package sensortasking.mcts;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 import org.hipparchus.util.FastMath;
 import org.orekit.time.AbsoluteDate;
 
+import lombok.Getter;
+
+@Getter
 public class MultiObjectiveMcts {
 
     /** Structure of the decision tree. */
-    TreeStructure descisionTree;
+    //TreeStructure descisionTree;
 
     /** Root node. */
     Node initial;
@@ -35,11 +37,12 @@ public class MultiObjectiveMcts {
      * @param start
      * @param end
      */
-    public MultiObjectiveMcts(TreeStructure descisionTree, List<MacroAction> objectives,
+    public MultiObjectiveMcts(Node descisionTree, List<MacroAction> objectives,
                               AbsoluteDate start, AbsoluteDate end) {
 
-        this.descisionTree = descisionTree;
-        this.initial = this.descisionTree.getRoot();
+        //this.descisionTree = descisionTree;
+        //this.initial = this.descisionTree.getRoot();
+        this.initial = descisionTree;
         this.objectives = objectives;
         this.startCampaign = start;
         this.endCampaign = end;
@@ -112,22 +115,26 @@ public class MultiObjectiveMcts {
 
     /**
      * Update the state of every parent node along the episode from the initial node down to the 
-     * newest expanded node.
+     * newest expanded node, i.e. simulated nodes (including termination node) do not get added to  
+     * the decision tree and do not need to get updated.
      * 
      * @param selected          List of nodes that has been filled by calling {@link #select()}.
-     * @param last              Newest expanded node.
+     * @param last              Termination node.
      */
     public void backpropagate(List<Node> selected, Node last) {
 
         // Search for corresponding node in tree
         Node findCurrent = this.initial;
+        findCurrent.incrementNumVisits();
+        double updatedUtility = findCurrent.getUtility() + last.getUtility();
+        findCurrent.setUtility(updatedUtility);
         for (int i=1; i<selected.size(); i++) {
             int ancestorIndex = findCurrent.getChildren().indexOf(selected.get(i));
             findCurrent = findCurrent.getChildren().get(ancestorIndex);
 
             // Update status of ancestor node
             findCurrent.incrementNumVisits();
-            double updatedUtility = findCurrent.getUtility() + last.getUtility();
+            updatedUtility = findCurrent.getUtility() + last.getUtility();
             findCurrent.setUtility(updatedUtility);
         }
     }
