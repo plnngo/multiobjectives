@@ -2,6 +2,7 @@ package sensortasking.mcts;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import org.hipparchus.util.FastMath;
@@ -46,7 +47,6 @@ public class MultiObjectiveMcts {
         this.objectives = objectives;
         this.startCampaign = start;
         this.endCampaign = end;
-
     }
 
     /**
@@ -72,7 +72,7 @@ public class MultiObjectiveMcts {
         return episode;
     }
 
-/*     public Node expand(List<Node> episode, Node leaf){
+    public Node expand(List<Node> episode, Node leaf){
 
         // Sample a macro action
         MacroAction objective = null;
@@ -94,7 +94,7 @@ public class MultiObjectiveMcts {
 
 
         return leaf;
-    } */
+    }
 
 /*     public List<Node> simulate(Node leaf) {
 
