@@ -3,7 +3,7 @@ package sensortasking.mcts;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
 
-public class ObservedObjects {
+public class ObservedObject {
 
     /** Objects ID, can be Norad ID */
     long id;
@@ -14,7 +14,7 @@ public class ObservedObjects {
     /** Derived covariance from observation. */
     CartesianCovariance covariance;
 
-    public ObservedObjects(long id, StateVector state, CartesianCovariance covariance) {
+    public ObservedObject(long id, StateVector state, CartesianCovariance covariance) {
         this.id = id;
         this.state = state;
         this.covariance = covariance;
