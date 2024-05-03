@@ -9,6 +9,7 @@ import org.hipparchus.util.FastMath;
 import org.orekit.time.AbsoluteDate;
 
 import lombok.Getter;
+import tools.WeightedRandomNumberPicker;
 
 @Getter
 public class MultiObjectiveMcts {
@@ -82,6 +83,26 @@ public class MultiObjectiveMcts {
         } else if (nodeType.equals("DecisionNode")) {
             DecisionNode castedLeaf = (DecisionNode) leaf;
             double[] weights = castedLeaf.getWeights();
+
+            // Generate array filled with indexes representing the objective IDs
+            int[] indexObjective = new int[weights.length];
+            for (int i=0; i<weights.length; i++) {
+                indexObjective[i] = i;
+            }
+            int indexSelectedObjective = 
+                WeightedRandomNumberPicker.pickNumber(indexObjective, weights);
+            switch (indexSelectedObjective) {
+                case 0:
+                    // Macro action = search
+                    break;
+                case 1:
+                    // Macro action = track
+
+                    break;
+
+                default:
+                    throw new IllegalAccessError("Unkown objective.");
+            }
             ChanceNode toBeAdded = new ChanceNode(C, C, 0, null, null, leaf);
 
         } else {
