@@ -72,9 +72,23 @@ public class MultiObjectiveMcts {
         return episode;
     }
 
-    public Node expand(List<Node> episode, Node leaf){
+    public Node expand(List<Node> selected){
 
-        // Sample a macro action
+        Node leaf = selected.get(selected.size()-1);
+        String nodeType = leaf.getClass().getSimpleName();
+        if (nodeType.equals("ChanceNode")){
+            
+
+        } else if (nodeType.equals("DecisionNode")) {
+            DecisionNode castedLeaf = (DecisionNode) leaf;
+            double[] weights = castedLeaf.getWeights();
+            ChanceNode toBeAdded = new ChanceNode(C, C, 0, null, null, leaf);
+
+        } else {
+            throw new IllegalArgumentException("Unknown node type");
+        }
+
+/*         // Sample a macro action
         MacroAction objective = null;
         ChanceNode microAction = objective.setMicroAction();
 
@@ -89,8 +103,8 @@ public class MultiObjectiveMcts {
         leaf.setChild(nextDecision);
 
         // Extend episode by new decision and chance nodes too
-        episode.add(nextDecision);
-        episode.add(nextChance);
+        selected.add(nextDecision);
+        selected.add(nextChance); */
 
 
         return leaf;
@@ -166,7 +180,7 @@ public class MultiObjectiveMcts {
 
         
     public static void main(String[] args) {
-        List<Node> test = new ArrayList<Node>();
+/*         List<Node> test = new ArrayList<Node>();
         Node decision = new Node();
         decision.setUtility(9);
         Node chance = new Node();
@@ -183,6 +197,12 @@ public class MultiObjectiveMcts {
 
         for(Node node : test) {
             System.out.println("Utilities in tree: " + node.getUtility());
-        }
+        } */
+
+        Node test = new DecisionNode(C, 0, null, new double[]{0.3, 0.7}, null);
+        System.out.println(test.getClass().getSimpleName().equals("DecisionNode"));
+        DecisionNode convert = (DecisionNode) test;
+        double[] weights = convert.getWeights();
+        System.out.println(weights[0] + weights[1]);
     }
 }
