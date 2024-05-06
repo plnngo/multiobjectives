@@ -4,6 +4,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.util.FastMath;
 import org.junit.Assert;
 import org.junit.Before;
@@ -103,7 +104,33 @@ public class MultiObjectiveMctsTest {
 
     @Test
     public void testExpandFromChanceNode(){
+
+        double tObs = 480. * 60.;
+        double[] initialWeight = new double[]{1., 0.};
+        double[] initialTimeResources = new double[]{tObs * initialWeight[0], tObs * initialWeight[1]};
+        DecisionNode root = new DecisionNode(0., 0, null, initialWeight, initialTimeResources,
+                                             new AbsoluteDate(), new ArrayList<ObservedObject>());
+
+        double executionDuration = 5. * 60.;
+        MacroAction search = new SearchObjective();
+        AngularDirection pointing = search.setMicroAction();
+        ChanceNode leaf = new ChanceNode(executionDuration, 0., 0, search, pointing, root);
+        Node actual = MultiObjectiveMcts.expand(leaf);
         
+        // Compare
+        DecisionNode castedActual = (DecisionNode) actual;
+        AngularDirection actualPointing = castedActual.getSensorPointing();
+        ObservedObject detection = castedActual.getPropEnvironment().get(0);
+        //RealMatrix expectedCov = new DiagonalMatrix(new double[]{10., 10., 10., 100., 100., 100.});
+
+        Assert.assertEquals("DecisionNode", actual.getClass().getSimpleName());
+        Assert.assertEquals(5.*60., actual.getEpoch().durationFrom(leaf.getEpoch()), 1E-16);
+        Assert.assertEquals(AngleType.AZEL, actualPointing.getAngleType());
+        Assert.assertEquals(FastMath.toRadians(30.), actualPointing.getAngle1(), 1E-16);
+        Assert.assertEquals(FastMath.toRadians(50.), actualPointing.getAngle2(), 1E-16);
+        Assert.assertEquals(new Vector3D(100., 200., 300.), 
+                            detection.getState().getPositionVector());
+        //Assert.assertEquals(expectedCov, detection.getCovariance().getCovarianceMatrix());
     }
 
     @Test

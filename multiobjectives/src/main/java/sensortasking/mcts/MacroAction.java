@@ -5,6 +5,8 @@ import java.util.List;
 public interface MacroAction {
     public double utilityWeight = 0;
 
+    public AngularDirection pointingDirection = null;
+
     //public static final Map<Outcome, Double> possibleOutcome = new HashMap<Outcome, Double>();
 
     public AngularDirection setMicroAction();
