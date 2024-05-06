@@ -153,8 +153,7 @@ public class MultiObjectiveMcts {
             }
 
             AngularDirection pointing = objective.setMicroAction();
-            toBeAdded = new ChanceNode(objective.getExecusionDuration(), 0., 0, objective, pointing, leaf);
-            leaf.setChild(toBeAdded);    
+            toBeAdded = new ChanceNode(objective.getExecusionDuration(), 0., 0, objective, pointing, leaf);   
             //selected.add(toBeAdded);
 
         } else {
@@ -163,7 +162,7 @@ public class MultiObjectiveMcts {
         return toBeAdded;
     }
 
-    public List<Node> simulate(Node leaf) {
+    public static List<Node> simulate(Node leaf, AbsoluteDate campaignEndDate) {
 
         // Declare output
         List<Node> episode = new ArrayList<Node>();
@@ -172,7 +171,7 @@ public class MultiObjectiveMcts {
         Node current = leaf;
         AbsoluteDate currentEpoch = leaf.getEpoch();
 
-        while(currentEpoch.compareTo(this.endCampaign) <= 0) {
+        while(currentEpoch.compareTo(campaignEndDate) <= 0) {
             current = expand(current);
             episode.add(current);
             currentEpoch = current.getEpoch();

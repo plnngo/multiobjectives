@@ -34,7 +34,7 @@ public class SearchObjective implements MacroAction{
     @Override
     public double getExecusionDuration() {
         // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getExecusionDuration'");
+        return 5.*60.;
     }
 
     @Override

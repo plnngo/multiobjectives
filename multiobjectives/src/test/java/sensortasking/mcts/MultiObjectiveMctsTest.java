@@ -104,7 +104,6 @@ public class MultiObjectiveMctsTest {
 
     @Test
     public void testExpandFromChanceNode(){
-
         double tObs = 480. * 60.;
         double[] initialWeight = new double[]{1., 0.};
         double[] initialTimeResources = new double[]{tObs * initialWeight[0], tObs * initialWeight[1]};
@@ -155,6 +154,17 @@ public class MultiObjectiveMctsTest {
         Assert.assertEquals(FastMath.toRadians(30.), actualPointing.getAngle2(), 1E-16);
     }
 
+    @Test
+    public void testSimulate() {
+        double tObs = 480. * 60.;
+        double[] initialWeight = new double[]{0.5, 0.5};
+        double[] initialTimeResources = new double[]{tObs * initialWeight[0], tObs * initialWeight[1]};
+        DecisionNode leaf = new DecisionNode(0., 0, null, initialWeight, initialTimeResources,
+                                             new AbsoluteDate(), new ArrayList<ObservedObject>());
+        List<Node> actual = MultiObjectiveMcts.simulate(leaf, leaf.getEpoch().shiftedBy(15.*60.));
+        Assert.assertEquals(9, actual.size());
+
+    }
     @Test
     public void testBackpropagate() {
 
