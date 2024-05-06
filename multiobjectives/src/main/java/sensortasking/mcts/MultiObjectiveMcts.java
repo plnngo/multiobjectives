@@ -72,10 +72,11 @@ public class MultiObjectiveMcts {
         return episode;
     }
 
-    public Node expand(Node leaf){
+    public static Node expand(Node leaf){
 
         //Node leaf = selected.get(selected.size()-1);
         String nodeType = leaf.getClass().getSimpleName();
+        Node toBeAdded = null;
         if (nodeType.equals("ChanceNode")){
             // Need to propagate the environment under the selected macro/micro action pair
             ChanceNode castedLeaf = (ChanceNode) leaf;
@@ -118,7 +119,7 @@ public class MultiObjectiveMcts {
                 throw new IllegalAccessError("Unkown objective.");
             }
             AbsoluteDate propEpoch = castedLeaf.getEpoch().shiftedBy(castedLeaf.executionDuration);
-            DecisionNode toBeAdded = new DecisionNode(0., 0, castedLeaf.getMicro(), postWeights, 
+            toBeAdded = new DecisionNode(0., 0, castedLeaf.getMicro(), postWeights, 
                                                       postTimeResources, propEpoch, propEnviroment);
             leaf.setChild(toBeAdded);    
             //selected.add(toBeAdded);
@@ -152,14 +153,14 @@ public class MultiObjectiveMcts {
             }
 
             AngularDirection pointing = objective.setMicroAction();
-            ChanceNode toBeAdded = new ChanceNode(objective.getExecusionDuration(), 0., 0, objective, pointing, leaf);
+            toBeAdded = new ChanceNode(objective.getExecusionDuration(), 0., 0, objective, pointing, leaf);
             leaf.setChild(toBeAdded);    
             //selected.add(toBeAdded);
 
         } else {
             throw new IllegalArgumentException("Unknown node type");
         }
-        return leaf;
+        return toBeAdded;
     }
 
     public List<Node> simulate(Node leaf) {

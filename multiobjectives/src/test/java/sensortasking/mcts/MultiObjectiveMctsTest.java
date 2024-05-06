@@ -1,8 +1,10 @@
 package sensortasking.mcts;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 
+import org.hipparchus.util.FastMath;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -97,6 +99,33 @@ public class MultiObjectiveMctsTest {
         for(int i=0; i<expectedIds.length; i++) {
             Assert.assertEquals(expectedIds[i], actual.get(i).getId());
         }
+    }
+
+    @Test
+    public void testExpandFromChanceNode(){
+        
+    }
+
+    @Test
+    public void testExpandFromDecisionNode(){
+        double tObs = 480. * 60.;
+        double[] initialWeight = new double[]{0., 1.};
+        double[] initialTimeResources = new double[]{tObs * initialWeight[0], tObs * initialWeight[1]};
+        DecisionNode leaf = new DecisionNode(0., 0, null, initialWeight, initialTimeResources,
+                                             new AbsoluteDate(), new ArrayList<ObservedObject>());
+        Node actual = MultiObjectiveMcts.expand(leaf);
+
+        // Compare
+        Assert.assertEquals("ChanceNode", actual.getClass().getSimpleName());
+        ChanceNode castedActual = (ChanceNode) actual;
+        AngularDirection actualPointing = castedActual.getMicro();
+        Assert.assertEquals(leaf.getEpoch(), castedActual.getEpoch());
+        Assert.assertEquals("TrackingObjective", 
+                                     castedActual.getMacro().getClass().getSimpleName());
+        Assert.assertEquals(60.*10, castedActual.getExecutionDuration(), 1E-16);
+        Assert.assertEquals(AngleType.AZEL, actualPointing.getAngleType());
+        Assert.assertEquals(FastMath.toRadians(88.), actualPointing.getAngle1(), 1E-16);
+        Assert.assertEquals(FastMath.toRadians(30.), actualPointing.getAngle2(), 1E-16);
     }
 
     @Test

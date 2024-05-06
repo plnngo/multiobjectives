@@ -28,7 +28,7 @@ public class TrackingObjective implements MacroAction{
     @Override
     public double getExecusionDuration() {
         // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getExecusionDuration'");
+        return 60.*10;
     }
 
     @Override
