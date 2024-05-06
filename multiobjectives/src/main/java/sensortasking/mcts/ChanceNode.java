@@ -23,5 +23,6 @@ public class ChanceNode extends Node{
         super.utility = utility;
         super.parent = parent;
         this.executionDuration = duration;
+        super.setEpoch(parent.getEpoch());
     }
 }

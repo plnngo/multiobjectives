@@ -15,8 +15,5 @@ public interface MacroAction {
 
     public double getExecusionDuration();
 
-    public List<ObservedObject> propagateOutcome();
-
-    //public Map.Entry<Outcome, Double> sampleOutcome();
-    
+    public List<ObservedObject> propagateOutcome();    
 }

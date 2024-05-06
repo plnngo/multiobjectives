@@ -9,6 +9,7 @@ import org.junit.Test;
 import org.orekit.data.DataContext;
 import org.orekit.data.DataProvidersManager;
 import org.orekit.data.DirectoryCrawler;
+import org.orekit.time.AbsoluteDate;
 
 public class MultiObjectiveMctsTest {
 
@@ -25,7 +26,7 @@ public class MultiObjectiveMctsTest {
         manager.addProvider(new DirectoryCrawler(orekitData));
 
         // Build up test decision tree
-        root = new DecisionNode(28, 4, null, null, null, null);
+        root = new DecisionNode(28, 4, null, null, null, new AbsoluteDate(), null);
         root.setId(0);
         
         ChanceNode child1 = new ChanceNode(0, 17, 2, null, null, root);
@@ -35,10 +36,10 @@ public class MultiObjectiveMctsTest {
         root.setChild(child1);
         root.setChild(child2);
 
-        DecisionNode grandchild1 = new DecisionNode(10, 1, null, null, null, null);
-        DecisionNode grandchild2 = new DecisionNode(7, 1, null, null, null, null);
-        DecisionNode grandchild3 = new DecisionNode(3, 1, null, null, null, null);
-        DecisionNode grandchild4 = new DecisionNode(5, 1, null, null, null, null);
+        DecisionNode grandchild1 = new DecisionNode(10, 1, null, null, null, new AbsoluteDate(), null);
+        DecisionNode grandchild2 = new DecisionNode(7, 1, null, null, null, new AbsoluteDate(), null);
+        DecisionNode grandchild3 = new DecisionNode(3, 1, null, null, null, new AbsoluteDate(), null);
+        DecisionNode grandchild4 = new DecisionNode(5, 1, null, null, null, new AbsoluteDate(), null);
         grandchild1.setId(3);
         grandchild2.setId(4);
         grandchild3.setId(5);
@@ -55,8 +56,8 @@ public class MultiObjectiveMctsTest {
         grandchild1.setChild(ggchild1);
         grandchild2.setChild(ggchild2);
 
-        DecisionNode gggchild1 = new DecisionNode(10, 1, null, null, null, null);
-        DecisionNode gggchild2 = new DecisionNode(7, 1, null, null, null, null);
+        DecisionNode gggchild1 = new DecisionNode(10, 1, null, null, null, new AbsoluteDate(), null);
+        DecisionNode gggchild2 = new DecisionNode(7, 1, null, null, null, new AbsoluteDate(), null);
         gggchild1.setId(9);
         gggchild2.setId(10);
         ggchild1.setChild(gggchild1);
@@ -107,7 +108,7 @@ public class MultiObjectiveMctsTest {
         MultiObjectiveMcts mcts = new MultiObjectiveMcts(root, null, null, null);
 
         // Add fakely simulated nodes
-        DecisionNode termination = new DecisionNode(1, 1, null, null, null, null);
+        DecisionNode termination = new DecisionNode(1, 1, null, null, null, null, null);
 
         mcts.backpropagate(selected, termination);
         Node updatedRoot = mcts.getInitial();

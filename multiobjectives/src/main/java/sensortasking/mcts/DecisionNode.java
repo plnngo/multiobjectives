@@ -2,6 +2,8 @@ package sensortasking.mcts;
 
 import java.util.List;
 
+import org.orekit.time.AbsoluteDate;
+
 import lombok.Getter;
 
 @Getter
@@ -21,7 +23,7 @@ public class DecisionNode extends Node{
     List<ObservedObject> propEnvironment;
 
     public DecisionNode(double utility, int numVisits, AngularDirection pointing, double[] weights,
-                        double[] timeResources, List<ObservedObject> propEnvironment) {
+                        double[] timeResources, AbsoluteDate epoch, List<ObservedObject> propEnvironment) {
 
         this.sensorPointing = pointing;
         this.weights = weights;
@@ -29,5 +31,6 @@ public class DecisionNode extends Node{
         super.utility = utility;
         super.numVisits = numVisits;
         this.propEnvironment = propEnvironment;
+        super.setEpoch(epoch);
     }
 }

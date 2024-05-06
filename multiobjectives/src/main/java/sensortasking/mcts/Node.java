@@ -23,7 +23,7 @@ public class Node {
     protected double utility;
 
     /** Reference epoch. */
-    private AbsoluteDate epoch;
+    protected AbsoluteDate epoch;
 
     /** Node identifier. */
     protected long id;
@@ -56,5 +56,9 @@ public class Node {
 
     public void setId(long id) {
         this.id = id;
+    }
+
+    public void setEpoch(AbsoluteDate epoch) {
+        this.epoch = epoch;
     }
 }

@@ -81,7 +81,48 @@ public class MultiObjectiveMcts {
             // Need to propagate the environment under the selected macro/micro action pair
             ChanceNode castedLeaf = (ChanceNode) leaf;
             MacroAction objective = castedLeaf.getMacro();  
-            List<ObservedObject> propEnviroment = objective.propagateOutcome();     
+            List<ObservedObject> propEnviroment = objective.propagateOutcome();    
+
+            // Update 
+            DecisionNode grandparent = (DecisionNode) leaf.getParent();
+            double[] priorTimeResources = grandparent.getTimeResources();
+            double[] postTimeResources = new double[priorTimeResources.length];
+            double[] postWeights = new double[grandparent.getWeights().length];
+
+            // Compute post observation duration
+            double priorTobs = 0;
+            for (int i=0; i<priorTimeResources.length; i++) {
+                priorTobs += priorTimeResources[i];
+            }
+            double postTobs = priorTobs - castedLeaf.getExecutionDuration();
+
+             // Update weights
+             for (int i=0; i<postWeights.length; i++) {
+                postWeights[i] = priorTimeResources[i]/postTobs;
+            }
+
+            String objectiveType = objective.getClass().getSimpleName();
+            if (objectiveType.equals("SearchObjective")) {
+                // Update time resources
+                postTimeResources[0] = priorTimeResources[0] - castedLeaf.getExecutionDuration();
+                
+               // Correct weight update for given objective
+                postWeights[0] = postTimeResources[0]/postTobs;
+
+            } else if(objectiveType.equals("TrackingObjective")) {
+                // Update time resources
+                postTimeResources[1] = priorTimeResources[1] - castedLeaf.getExecutionDuration();
+
+                // Correct weight update for given objective
+                postWeights[1] = postTimeResources[1]/postTobs;
+            }else {
+                throw new IllegalAccessError("Unkown objective.");
+            }
+            AbsoluteDate propEpoch = castedLeaf.getEpoch().shiftedBy(castedLeaf.executionDuration);
+            DecisionNode toBeAdded = new DecisionNode(0., 0, castedLeaf.getMicro(), postWeights, 
+                                                      postTimeResources, propEpoch, propEnviroment);
+            leaf.setChild(toBeAdded);    
+            selected.add(toBeAdded);
 
         } else if (nodeType.equals("DecisionNode")) {
             // Need to sample a new pair of macro and micro action
@@ -142,7 +183,7 @@ public class MultiObjectiveMcts {
         return leaf;
     }
 
-/*     public List<Node> simulate(Node leaf) {
+    public List<Node> simulate(Node leaf) {
 
         // Declare output
         List<Node> episode = new ArrayList<Node>();
@@ -152,12 +193,12 @@ public class MultiObjectiveMcts {
         AbsoluteDate currentEpoch = leaf.getEpoch();
 
         while(currentEpoch.compareTo(this.endCampaign) <= 0) {
-            current = expand(episode, current);
+            //current = expand(episode, current);
             episode.add(current);
             currentEpoch = current.getEpoch();
         }
         return episode;
-    } */
+    }
 
     /**
      * Update the state of every parent node along the episode from the initial node down to the 
