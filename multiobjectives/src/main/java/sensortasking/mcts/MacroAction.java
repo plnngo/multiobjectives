@@ -1,5 +1,6 @@
 package sensortasking.mcts;
 
+import java.util.List;
 
 public interface MacroAction {
     public double utilityWeight = 0;
@@ -13,6 +14,8 @@ public interface MacroAction {
     public double getUtility();
 
     public double getExecusionDuration();
+
+    public List<ObservedObject> propagateOutcome();
 
     //public Map.Entry<Outcome, Double> sampleOutcome();
     

@@ -1,5 +1,7 @@
 package sensortasking.mcts;
 
+import java.util.List;
+
 import lombok.Getter;
 
 @Getter
@@ -15,13 +17,17 @@ public class DecisionNode extends Node{
      * objective. */
     double[] timeResources;
 
+    /** Propoagated environment under the influence of the last macro/micro action. */
+    List<ObservedObject> propEnvironment;
+
     public DecisionNode(double utility, int numVisits, AngularDirection pointing, double[] weights,
-                        double[] timeResources) {
+                        double[] timeResources, List<ObservedObject> propEnvironment) {
 
         this.sensorPointing = pointing;
         this.weights = weights;
         this.timeResources = timeResources;
         super.utility = utility;
         super.numVisits = numVisits;
+        this.propEnvironment = propEnvironment;
     }
 }

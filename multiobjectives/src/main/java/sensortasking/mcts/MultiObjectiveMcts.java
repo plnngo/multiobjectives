@@ -78,9 +78,13 @@ public class MultiObjectiveMcts {
         Node leaf = selected.get(selected.size()-1);
         String nodeType = leaf.getClass().getSimpleName();
         if (nodeType.equals("ChanceNode")){
-            
+            // Need to propagate the environment under the selected macro/micro action pair
+            ChanceNode castedLeaf = (ChanceNode) leaf;
+            MacroAction objective = castedLeaf.getMacro();  
+            List<ObservedObject> propEnviroment = objective.propagateOutcome();     
 
         } else if (nodeType.equals("DecisionNode")) {
+            // Need to sample a new pair of macro and micro action
             DecisionNode castedLeaf = (DecisionNode) leaf;
             double[] weights = castedLeaf.getWeights();
 
@@ -97,7 +101,7 @@ public class MultiObjectiveMcts {
                     // Macro action = search
                     objective = new SearchObjective();
                     break;
-                    
+
                 case 1:
                     // Macro action = track
                     objective = new TrackingObjective();
@@ -109,7 +113,8 @@ public class MultiObjectiveMcts {
 
             AngularDirection pointing = objective.setMicroAction();
             ChanceNode toBeAdded = new ChanceNode(objective.getExecusionDuration(), 0., 0, objective, pointing, leaf);
-            leaf.setChild(toBeAdded);            
+            leaf.setChild(toBeAdded);    
+            selected.add(toBeAdded);
 
         } else {
             throw new IllegalArgumentException("Unknown node type");
@@ -226,10 +231,10 @@ public class MultiObjectiveMcts {
             System.out.println("Utilities in tree: " + node.getUtility());
         } */
 
-        Node test = new DecisionNode(C, 0, null, new double[]{0.3, 0.7}, null);
+/*         Node test = new DecisionNode(C, 0, null, new double[]{0.3, 0.7}, null);
         System.out.println(test.getClass().getSimpleName().equals("DecisionNode"));
         DecisionNode convert = (DecisionNode) test;
         double[] weights = convert.getWeights();
-        System.out.println(weights[0] + weights[1]);
+        System.out.println(weights[0] + weights[1]); */
     }
 }

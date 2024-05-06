@@ -1,5 +1,7 @@
 package sensortasking.mcts;
 
+import java.util.List;
+
 import org.hipparchus.util.FastMath;
 
 public class SearchObjective implements MacroAction{
@@ -27,6 +29,12 @@ public class SearchObjective implements MacroAction{
     public double getExecusionDuration() {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'getExecusionDuration'");
+    }
+
+    @Override
+    public List<ObservedObject> propagateOutcome() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'propagateOutcome'");
     }
     
 }
