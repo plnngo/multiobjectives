@@ -91,19 +91,25 @@ public class MultiObjectiveMcts {
             }
             int indexSelectedObjective = 
                 WeightedRandomNumberPicker.pickNumber(indexObjective, weights);
+            MacroAction objective;
             switch (indexSelectedObjective) {
                 case 0:
                     // Macro action = search
+                    objective = new SearchObjective();
                     break;
+                    
                 case 1:
                     // Macro action = track
-
+                    objective = new TrackingObjective();
                     break;
 
                 default:
                     throw new IllegalAccessError("Unkown objective.");
             }
-            ChanceNode toBeAdded = new ChanceNode(C, C, 0, null, null, leaf);
+
+            AngularDirection pointing = objective.setMicroAction();
+            ChanceNode toBeAdded = new ChanceNode(objective.getExecusionDuration(), 0., 0, objective, pointing, leaf);
+            leaf.setChild(toBeAdded);            
 
         } else {
             throw new IllegalArgumentException("Unknown node type");

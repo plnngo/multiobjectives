@@ -12,6 +12,8 @@ public interface MacroAction {
 
     public double getUtility();
 
+    public double getExecusionDuration();
+
     //public Map.Entry<Outcome, Double> sampleOutcome();
     
 }
