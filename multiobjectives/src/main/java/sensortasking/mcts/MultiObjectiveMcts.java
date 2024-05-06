@@ -2,7 +2,6 @@ package sensortasking.mcts;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 import org.hipparchus.util.FastMath;
@@ -73,9 +72,9 @@ public class MultiObjectiveMcts {
         return episode;
     }
 
-    public Node expand(List<Node> selected){
+    public Node expand(Node leaf){
 
-        Node leaf = selected.get(selected.size()-1);
+        //Node leaf = selected.get(selected.size()-1);
         String nodeType = leaf.getClass().getSimpleName();
         if (nodeType.equals("ChanceNode")){
             // Need to propagate the environment under the selected macro/micro action pair
@@ -122,7 +121,7 @@ public class MultiObjectiveMcts {
             DecisionNode toBeAdded = new DecisionNode(0., 0, castedLeaf.getMicro(), postWeights, 
                                                       postTimeResources, propEpoch, propEnviroment);
             leaf.setChild(toBeAdded);    
-            selected.add(toBeAdded);
+            //selected.add(toBeAdded);
 
         } else if (nodeType.equals("DecisionNode")) {
             // Need to sample a new pair of macro and micro action
@@ -155,31 +154,11 @@ public class MultiObjectiveMcts {
             AngularDirection pointing = objective.setMicroAction();
             ChanceNode toBeAdded = new ChanceNode(objective.getExecusionDuration(), 0., 0, objective, pointing, leaf);
             leaf.setChild(toBeAdded);    
-            selected.add(toBeAdded);
+            //selected.add(toBeAdded);
 
         } else {
             throw new IllegalArgumentException("Unknown node type");
         }
-
-/*         // Sample a macro action
-        MacroAction objective = null;
-        ChanceNode microAction = objective.setMicroAction();
-
-        AngularDirection pointing = microAction.getMicro();
-        Map.Entry<Outcome, Double> outcomeReward = objective.sampleOutcome();
-        double utility = objective.getUtility();
-        Node nextChance = new ChanceNode(objective, microAction, leaf, outcomeReward);
-        Node nextDecision = new DecisionNode(utility, outcomeReward);
-
-        // Extend the tree by new decision and chance nodes
-        nextDecision.setChild(nextChance);
-        leaf.setChild(nextDecision);
-
-        // Extend episode by new decision and chance nodes too
-        selected.add(nextDecision);
-        selected.add(nextChance); */
-
-
         return leaf;
     }
 
@@ -193,7 +172,7 @@ public class MultiObjectiveMcts {
         AbsoluteDate currentEpoch = leaf.getEpoch();
 
         while(currentEpoch.compareTo(this.endCampaign) <= 0) {
-            //current = expand(episode, current);
+            current = expand(current);
             episode.add(current);
             currentEpoch = current.getEpoch();
         }
