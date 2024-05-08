@@ -146,7 +146,7 @@ public class MultiObjectiveMctsTest {
         Assert.assertEquals(leaf.getEpoch(), castedActual.getEpoch());
         Assert.assertEquals("TrackingObjective", 
                                      castedActual.getMacro().getClass().getSimpleName());
-        Assert.assertEquals(60.*10, castedActual.getExecutionDuration(), 1E-16);
+        Assert.assertEquals(60.*5., castedActual.getExecutionDuration(), 1E-16);
         Assert.assertEquals(AngleType.AZEL, actualPointing.getAngleType());
         Assert.assertEquals(FastMath.toRadians(88.), actualPointing.getAngle1(), 1E-16);
         Assert.assertEquals(FastMath.toRadians(30.), actualPointing.getAngle2(), 1E-16);
