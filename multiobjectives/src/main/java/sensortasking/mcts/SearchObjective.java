@@ -10,7 +10,7 @@ import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
 import lombok.Getter;
 
 @Getter
-public class SearchObjective implements MacroAction{
+public class SearchObjective implements Objective{
 
 
     @Override
@@ -19,11 +19,11 @@ public class SearchObjective implements MacroAction{
                                     FastMath.toRadians(50.)}, AngleType.AZEL);
     }
 
-    @Override
+/*     @Override
     public double computeGain() {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'computeGain'");
-    }
+    } */
 
     @Override
     public double getUtility() {

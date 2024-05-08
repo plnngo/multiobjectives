@@ -20,7 +20,7 @@ public class MultiObjectiveMcts {
     Node initial;
 
     /** Objectives. */
-    final List<MacroAction> objectives;
+    final List<Objective> objectives;
 
     /** Start date.*/
     final AbsoluteDate startCampaign;
@@ -38,20 +38,22 @@ public class MultiObjectiveMcts {
      * @param start
      * @param end
      */
-    public MultiObjectiveMcts(Node descisionTree, List<MacroAction> objectives,
+    public MultiObjectiveMcts(Node descisionTree, List<Objective> objectives,
                               AbsoluteDate start, AbsoluteDate end) {
 
-        //this.descisionTree = descisionTree;
-        //this.initial = this.descisionTree.getRoot();
         this.initial = descisionTree;
         this.objectives = objectives;
         this.startCampaign = start;
         this.endCampaign = end;
     }
 
+  
     /**
+     * Given the initial node {@code root}, the next child is selected based on the Upper 
+     * Confidence Bound criteria until a leaf node is reached that does not hold any child nodes.
      * 
-     * @return
+     * @param root              Initial node.
+     * @return                  List of selected node that fulfill UCB criteria.
      */
     public static List<Node> select(Node root) {
 
@@ -80,7 +82,7 @@ public class MultiObjectiveMcts {
         if (nodeType.equals("ChanceNode")){
             // Need to propagate the environment under the selected macro/micro action pair
             ChanceNode castedLeaf = (ChanceNode) leaf;
-            MacroAction objective = castedLeaf.getMacro();  
+            Objective objective = castedLeaf.getMacro();  
             List<ObservedObject> propEnviroment = objective.propagateOutcome();    
 
             // Update 
@@ -136,7 +138,7 @@ public class MultiObjectiveMcts {
             }
             int indexSelectedObjective = 
                 WeightedRandomNumberPicker.pickNumber(indexObjective, weights);
-            MacroAction objective;
+            Objective objective;
             switch (indexSelectedObjective) {
                 case 0:
                     // Macro action = search
@@ -162,6 +164,14 @@ public class MultiObjectiveMcts {
         return toBeAdded;
     }
 
+    /**
+     * Roll out the decision tree until termination condition is met given by the end of the 
+     * observation campaign.
+     * 
+     * @param leaf              Current leaf node of the decision tree.
+     * @param campaignEndDate   End of observation campaign.
+     * @return                  List of nodes that have been simulated during roll-out.
+     */
     public static List<Node> simulate(Node leaf, AbsoluteDate campaignEndDate) {
 
         // Declare output
@@ -206,9 +216,12 @@ public class MultiObjectiveMcts {
     }
 
     /**
+     * Given the {@code current} node, the next child is selected based on the Upper 
+     * Confidence Bound criteria.
      * 
-     * @param current
-     * @return
+     * @param current           Current node with children out of which the next one shall be 
+     *                          selected.
+     * @return                  Child node that maximises UCB criteria.
      */
     protected static Node selectChild(Node current) {
         double maxUcb = Double.NEGATIVE_INFINITY;

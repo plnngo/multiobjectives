@@ -9,12 +9,12 @@ public class ChanceNode extends Node{
     AngularDirection micro;
 
     /** Macro Action realised as tasking objective. */
-    MacroAction macro;
+    Objective macro;
 
     /** Execution duration. */
     double executionDuration;
 
-    public ChanceNode(double duration, double utility, int numVisits, MacroAction objective, 
+    public ChanceNode(double duration, double utility, int numVisits, Objective objective, 
     AngularDirection pointing, Node parent) {
 
         parent.setChild(this);

@@ -7,7 +7,7 @@ import org.hipparchus.util.FastMath;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
 
-public class TrackingObjective implements MacroAction{
+public class TrackingObjective implements Objective{
 
     @Override
     public AngularDirection setMicroAction() {
@@ -16,11 +16,11 @@ public class TrackingObjective implements MacroAction{
                             AngleType.AZEL);
     }
 
-    @Override
+/*     @Override
     public double computeGain() {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'computeGain'");
-    }
+    } */
 
     @Override
     public double getUtility() {

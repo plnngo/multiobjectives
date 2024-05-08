@@ -83,13 +83,11 @@ public class MultiObjectiveMctsTest {
 
             parent.setChild(child);
         }
-
         Node actuallySelected = MultiObjectiveMcts.selectChild(parent);
 
         // Last child is expected to reveal largest UCB because of its large utility value
         Node expectedlySelected = parent.getChildren().get(numVisits.length - 1);
         Assert.assertEquals(expectedlySelected, actuallySelected);
-
     }
 
     @Test
@@ -111,7 +109,7 @@ public class MultiObjectiveMctsTest {
                                              new AbsoluteDate(), new ArrayList<ObservedObject>());
 
         double executionDuration = 5. * 60.;
-        MacroAction search = new SearchObjective();
+        Objective search = new SearchObjective();
         AngularDirection pointing = search.setMicroAction();
         ChanceNode leaf = new ChanceNode(executionDuration, 0., 0, search, pointing, root);
         Node actual = MultiObjectiveMcts.expand(leaf);
@@ -163,7 +161,6 @@ public class MultiObjectiveMctsTest {
                                              new AbsoluteDate(), new ArrayList<ObservedObject>());
         List<Node> actual = MultiObjectiveMcts.simulate(leaf, leaf.getEpoch().shiftedBy(15.*60.));
         Assert.assertEquals(9, actual.size());
-
     }
     @Test
     public void testBackpropagate() {
