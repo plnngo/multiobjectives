@@ -6,8 +6,15 @@ import java.util.List;
 import org.hipparchus.util.FastMath;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
+import org.orekit.time.AbsoluteDate;
 
 public class TrackingObjective implements Objective{
+
+    /** List of targets of interests with their initial condition. */
+    List<ObservedObject> initTargets;
+
+    /** List of targets of interest with latest state update. */
+    List<ObservedObject> updatedTargets;
 
     @Override
     public AngularDirection setMicroAction() {
@@ -48,7 +55,7 @@ public class TrackingObjective implements Objective{
             cov.setCovarianceMatrixEntry(pos+3, pos+3, 150.);
         }
         
-        ObservedObject obj = new ObservedObject(345, state, cov);
+        ObservedObject obj = new ObservedObject(345, state, cov, new AbsoluteDate());
         List<ObservedObject> out = new ArrayList<ObservedObject>();
         out.add(obj);
         return out;
