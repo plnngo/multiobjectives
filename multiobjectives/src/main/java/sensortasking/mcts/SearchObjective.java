@@ -6,6 +6,7 @@ import java.util.List;
 import org.hipparchus.util.FastMath;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
+import org.orekit.frames.FramesFactory;
 import org.orekit.time.AbsoluteDate;
 
 import lombok.Getter;
@@ -15,7 +16,7 @@ public class SearchObjective implements Objective{
 
 
     @Override
-    public AngularDirection setMicroAction() {
+    public AngularDirection setMicroAction(AbsoluteDate current) {
         return new AngularDirection(null, new double[]{FastMath.toRadians(30.),  
                                     FastMath.toRadians(50.)}, AngleType.AZEL);
     }
@@ -53,7 +54,7 @@ public class SearchObjective implements Objective{
             cov.setCovarianceMatrixEntry(pos+3, pos+3, 100.);
         }
         
-        ObservedObject obj = new ObservedObject(0123, state, cov, new AbsoluteDate());
+        ObservedObject obj = new ObservedObject(0123, state, cov, new AbsoluteDate(), FramesFactory.getTEME());
         List<ObservedObject> out = new ArrayList<ObservedObject>();
         out.add(obj);
         return out;

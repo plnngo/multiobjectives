@@ -154,7 +154,7 @@ public class MultiObjectiveMcts {
                     throw new IllegalAccessError("Unkown objective.");
             }
 
-            AngularDirection pointing = objective.setMicroAction();
+            AngularDirection pointing = objective.setMicroAction(castedLeaf.getEpoch());
             toBeAdded = new ChanceNode(objective.getExecusionDuration(), 0., 0, objective, pointing, leaf);   
             //selected.add(toBeAdded);
 

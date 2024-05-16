@@ -4,8 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.hipparchus.util.FastMath;
+import org.orekit.files.ccsds.definitions.FrameFacade;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
+import org.orekit.frames.FramesFactory;
 import org.orekit.time.AbsoluteDate;
 
 public class TrackingObjective implements Objective{
@@ -17,7 +19,11 @@ public class TrackingObjective implements Objective{
     List<ObservedObject> updatedTargets;
 
     @Override
-    public AngularDirection setMicroAction() {
+    public AngularDirection setMicroAction(AbsoluteDate current) {
+
+        // Iterate through list of objects of interest
+
+        // Fake data
         return new AngularDirection(null, 
                             new double[]{FastMath.toRadians(88.), FastMath.toRadians(30.)}, 
                             AngleType.AZEL);
@@ -55,7 +61,7 @@ public class TrackingObjective implements Objective{
             cov.setCovarianceMatrixEntry(pos+3, pos+3, 150.);
         }
         
-        ObservedObject obj = new ObservedObject(345, state, cov, new AbsoluteDate());
+        ObservedObject obj = new ObservedObject(345, state, cov, new AbsoluteDate(), FramesFactory.getTEME());
         List<ObservedObject> out = new ArrayList<ObservedObject>();
         out.add(obj);
         return out;

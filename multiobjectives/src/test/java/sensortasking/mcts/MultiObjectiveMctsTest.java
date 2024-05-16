@@ -110,7 +110,7 @@ public class MultiObjectiveMctsTest {
 
         double executionDuration = 5. * 60.;
         Objective search = new SearchObjective();
-        AngularDirection pointing = search.setMicroAction();
+        AngularDirection pointing = search.setMicroAction(new AbsoluteDate());
         ChanceNode leaf = new ChanceNode(executionDuration, 0., 0, search, pointing, root);
         Node actual = MultiObjectiveMcts.expand(leaf);
         

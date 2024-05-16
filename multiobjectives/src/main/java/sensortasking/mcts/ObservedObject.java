@@ -2,6 +2,7 @@ package sensortasking.mcts;
 
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
+import org.orekit.frames.Frame;
 import org.orekit.time.AbsoluteDate;
 
 import lombok.Getter;
@@ -21,11 +22,15 @@ public class ObservedObject {
     /** Reference epoch. */
     private AbsoluteDate epoch;
 
+    /** Reference frame. */
+    private Frame frame;
+
     public ObservedObject(long id, StateVector state, CartesianCovariance covariance, 
-                          AbsoluteDate epoch) {
+                          AbsoluteDate epoch, Frame frame) {
         this.id = id;
         this.state = state;
         this.covariance = covariance;
         this.epoch = epoch;
+        this.frame = frame;
     }
 }
