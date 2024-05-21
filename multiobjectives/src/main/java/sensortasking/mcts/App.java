@@ -1,9 +1,7 @@
 package sensortasking.mcts;
 
 import java.io.File;
-import java.util.Locale;
 
-import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.DiagonalMatrix;
 import org.hipparchus.linear.RealMatrix;
 import org.hipparchus.ode.events.Action;

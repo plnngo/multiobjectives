@@ -1,5 +1,7 @@
 package sensortasking.mcts;
 
+import org.orekit.time.AbsoluteDate;
+
 import lombok.Getter;
 
 @Getter
@@ -12,9 +14,9 @@ public class ChanceNode extends Node{
     Objective macro;
 
     /** Execution duration. */
-    double executionDuration;
+    private AbsoluteDate[] executionDuration;
 
-    public ChanceNode(double duration, double utility, int numVisits, Objective objective, 
+    public ChanceNode(AbsoluteDate[] obsTimeInterval, double utility, int numVisits, Objective objective, 
     AngularDirection pointing, Node parent) {
 
         parent.setChild(this);
@@ -23,7 +25,7 @@ public class ChanceNode extends Node{
         super.numVisits = numVisits;
         super.utility = utility;
         super.parent = parent;
-        this.executionDuration = duration;
+        this.executionDuration = obsTimeInterval;
         super.setEpoch(parent.getEpoch());
     }
 }
