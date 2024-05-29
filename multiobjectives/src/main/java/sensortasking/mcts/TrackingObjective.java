@@ -30,6 +30,7 @@ import org.orekit.propagation.events.EclipseDetector;
 import org.orekit.propagation.events.ElevationDetector;
 import org.orekit.propagation.events.EventDetector;
 import org.orekit.propagation.events.EventsLogger;
+import org.orekit.propagation.events.GroundFieldOfViewDetector;
 import org.orekit.propagation.events.EventsLogger.LoggedEvent;
 import org.orekit.propagation.events.handlers.ContinueOnEvent;
 import org.orekit.time.AbsoluteDate;
@@ -80,17 +81,22 @@ public class TrackingObjective implements Objective{
 
     double sensorApartureRadius = FastMath.toRadians(2.);
 
+    final TopocentricFrame stationFrame;
 
-    public TrackingObjective(List<ObservedObject> targets) {
+
+    public TrackingObjective(List<ObservedObject> targets, TopocentricFrame gs) {
 
         // Initialise list of targets
         for (ObservedObject target : targets) {
             initTargets.add(target);
             updatedTargets.add(target);
         }
+
+        this.stationFrame = gs;
+
     }
     @Override
-    public AngularDirection setMicroAction(AbsoluteDate current, TopocentricFrame stationFrame) {
+    public AngularDirection setMicroAction(AbsoluteDate current) {
 
         // Set up Earth shape
         OneAxisEllipsoid earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
@@ -149,35 +155,30 @@ public class TrackingObjective implements Objective{
                 double timeDurationBetweenTasks = 
                     (passInterval[1].durationFrom(passInterval[0])-totalObsDuration) / (numObs+1);
                 AbsoluteDate taskEpoch = passInterval[0].shiftedBy(timeDurationBetweenTasks);
-                TLEPropagator outerProp = TLEPropagator.selectExtrapolator(candidate.getPseudoTle());
+                //TLEPropagator outerProp = TLEPropagator.selectExtrapolator(candidate.getPseudoTle());
                 EventsLogger earthShadowLogger = new EventsLogger();
 
                 // set up eclipse detector
-                EclipseDetector detector = new EclipseDetector(sun, Constants.SUN_RADIUS, earth)
+                EclipseDetector eclipseDetector = new EclipseDetector(sun, Constants.SUN_RADIUS, earth)
                                                 .withMaxCheck(60.0)
                                                 .withThreshold(1.0e-3)
                                                 .withHandler(new ContinueOnEvent<>())
                                                 .withUmbra();
-                outerProp.addEventDetector(earthShadowLogger.monitorDetector(detector));
+                tleProp.addEventDetector(earthShadowLogger.monitorDetector(eclipseDetector));
 
                 // organise observation tasks
                 for (int i=0; i<numObs; i++) {
 
                     // Propagate over tasking duration
-                    SpacecraftState state = outerProp.propagate(taskEpoch);
-                    boolean inEarthShadow = detector.g(state)<0.0;
+                    SpacecraftState state = tleProp.propagate(taskEpoch);
+                    boolean inEarthShadow = eclipseDetector.g(state)<0.0;
                     if (inEarthShadow) {
                         // Observation cannot be performed because of lack of visibility
                         continue;
                     }
                     // Transform spacecraft state into sensor pointing direction
-                    Vector3D posTeme = state.getPVCoordinates().getPosition(); 
-                    AngularDirection dirTeme = 
-                        new AngularDirection(state.getFrame(), 
-                                             new double[]{posTeme.getAlpha(), posTeme.getDelta()}, 
-                                             AngleType.RADEC);
-                    AngularDirection dirAzEl = 
-                        dirTeme.transformReference(stationFrame, taskEpoch, AngleType.AZEL);
+                    AngularDirection dirAzEl = transformStateToMeasurement(state);
+                    
                     boolean goodSolarPhase = Tasking.checkSolarPhaseCondition(taskEpoch, dirAzEl);
 
                     if (!goodSolarPhase) {
@@ -193,6 +194,7 @@ public class TrackingObjective implements Objective{
 
                     // If code reaches here, object is observable and visible
                     //DoubleDihedraFieldOfView fov = new DoubleDihedraFieldOfView(Vector3D.ZERO, posTeme, timeDurationBetweenTasks, posTeme, distMoon, i)
+                    List<AngularDirection> simulatedMeasurements = new ArrayList<AngularDirection>();
                     Vector3D centerFov = new Vector3D(dirAzEl.getAngle1(), dirAzEl.getAngle2());
                     Vector3D meridian = new Rotation(Vector3D.PLUS_K, sensorApartureRadius, 
                                                      RotationConvention.VECTOR_OPERATOR).applyTo(centerFov);
@@ -200,6 +202,27 @@ public class TrackingObjective implements Objective{
                         new PolygonalFieldOfView(new Vector3D(dirAzEl.getAngle1(), dirAzEl.getAngle2()),
                                                  DefiningConeType.INSIDE_CONE_TOUCHING_POLYGON_AT_EDGES_MIDDLE,
                                                  meridian, sensorApartureRadius, 4, 0);
+
+                    GroundFieldOfViewDetector fovDetector = new GroundFieldOfViewDetector(stationFrame, fov)
+                                                                .withHandler((s, d, increasing) -> {
+                                                                    System.out.println(" Visibility on satellite" +
+                                                                                       (increasing ? " begins at " : " ends at ") +
+                                                                                       s.getDate().toStringWithoutUtcOffset(utc, 3));
+                                                                    if (increasing) {
+                                                                        // TODO: check when a measurement is generated --> which propagation step size
+                                                                        simulatedMeasurements.add(generateMeasurements(s));
+                                                                    }
+                                                                    return increasing ? Action.CONTINUE : Action.STOP;
+                                                                });
+                    final EventsLogger logFovPass = new EventsLogger();
+                    tleProp.addEventDetector(logFovPass.monitorDetector(fovDetector));
+
+                    // Extract FOV pass
+                    tleProp.propagate(taskEpoch.shiftedBy(taskDuration/2.));
+                    List<LoggedEvent> fovCrossings = logFovPass.getLoggedEvents();
+                    if (fovCrossings.size()!=2) {
+                        throw new Error("Satellite does not cross through FOV as expected.");
+                    }
 
                     //ArrayList<AngularDirection> simulatedMeas = generateMeasurements(candidate, );
 
@@ -221,6 +244,19 @@ public class TrackingObjective implements Objective{
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'computeGain'");
     } */
+
+    private AngularDirection transformStateToMeasurement(SpacecraftState state) {
+        Vector3D posTeme = state.getPVCoordinates().getPosition(); 
+        AngularDirection dirTeme = 
+            new AngularDirection(state.getFrame(), 
+                                 new double[]{posTeme.getAlpha(), posTeme.getDelta()}, 
+                                 AngleType.RADEC);
+        return dirTeme.transformReference(stationFrame, state.getDate(), AngleType.AZEL);
+    }
+    private AngularDirection generateMeasurements(SpacecraftState state) {
+        // TODO: add noise
+        return transformStateToMeasurement(state);
+    }
 
     @Override
     public double getUtility() {
