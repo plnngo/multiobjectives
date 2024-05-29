@@ -3,6 +3,8 @@ package sensortasking.mcts;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hipparchus.geometry.euclidean.threed.Rotation;
+import org.hipparchus.geometry.euclidean.threed.RotationConvention;
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.RealMatrix;
 import org.hipparchus.ode.events.Action;
@@ -14,9 +16,9 @@ import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
 import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
-import org.orekit.geometry.fov.CircularFieldOfView;
-import org.orekit.geometry.fov.DoubleDihedraFieldOfView;
 import org.orekit.geometry.fov.FieldOfView;
+import org.orekit.geometry.fov.PolygonalFieldOfView;
+import org.orekit.geometry.fov.PolygonalFieldOfView.DefiningConeType;
 import org.orekit.orbits.OrbitType;
 import org.orekit.orbits.PositionAngle;
 import org.orekit.propagation.MatricesHarvester;
@@ -75,6 +77,8 @@ public class TrackingObjective implements Objective{
 
     /** Minimal angular distance between Moon and sensor pointing direction. */
     double minMoonDist = FastMath.toRadians(20.);
+
+    double sensorApartureRadius = FastMath.toRadians(2.);
 
 
     public TrackingObjective(List<ObservedObject> targets) {
@@ -188,8 +192,16 @@ public class TrackingObjective implements Objective{
                     }
 
                     // If code reaches here, object is observable and visible
-/*                     FieldOfView fov = new DoubleDihedraFieldOfView();
-                    ArrayList<AngularDirection> simulatedMeas = generateMeasurements(candidate, ); */
+                    //DoubleDihedraFieldOfView fov = new DoubleDihedraFieldOfView(Vector3D.ZERO, posTeme, timeDurationBetweenTasks, posTeme, distMoon, i)
+                    Vector3D centerFov = new Vector3D(dirAzEl.getAngle1(), dirAzEl.getAngle2());
+                    Vector3D meridian = new Rotation(Vector3D.PLUS_K, sensorApartureRadius, 
+                                                     RotationConvention.VECTOR_OPERATOR).applyTo(centerFov);
+                    FieldOfView fov =
+                        new PolygonalFieldOfView(new Vector3D(dirAzEl.getAngle1(), dirAzEl.getAngle2()),
+                                                 DefiningConeType.INSIDE_CONE_TOUCHING_POLYGON_AT_EDGES_MIDDLE,
+                                                 meridian, sensorApartureRadius, 4, 0);
+
+                    //ArrayList<AngularDirection> simulatedMeas = generateMeasurements(candidate, );
 
                 }
             }
