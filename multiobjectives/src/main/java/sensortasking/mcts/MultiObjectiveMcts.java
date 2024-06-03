@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 
 import org.hipparchus.util.FastMath;
+import org.orekit.frames.TopocentricFrame;
 import org.orekit.time.AbsoluteDate;
 
 import lombok.Getter;
@@ -28,8 +29,11 @@ public class MultiObjectiveMcts {
     /** End date. */
     final AbsoluteDate endCampaign;
 
-    /** Tuning parameter fur UCB */
+    /** Tuning parameter fur UCB. */
     final static double C = 2;
+
+    /** Topocentric horizon frame. */
+    final TopocentricFrame stationFrame;
 
     /** Basic constructor.
      * 
@@ -39,12 +43,13 @@ public class MultiObjectiveMcts {
      * @param end
      */
     public MultiObjectiveMcts(Node descisionTree, List<Objective> objectives,
-                              AbsoluteDate start, AbsoluteDate end) {
+                              AbsoluteDate start, AbsoluteDate end, TopocentricFrame stationFrame) {
 
         this.initial = descisionTree;
         this.objectives = objectives;
         this.startCampaign = start;
         this.endCampaign = end;
+        this.stationFrame = stationFrame;
     }
 
   
@@ -74,7 +79,7 @@ public class MultiObjectiveMcts {
         return episode;
     }
 
-    public static Node expand(Node leaf){
+    public Node expand(Node leaf){
 
         //Node leaf = selected.get(selected.size()-1);
         String nodeType = leaf.getClass().getSimpleName();
@@ -96,7 +101,9 @@ public class MultiObjectiveMcts {
             for (int i=0; i<priorTimeResources.length; i++) {
                 priorTobs += priorTimeResources[i];
             }
-            double postTobs = priorTobs - castedLeaf.getExecutionDuration();
+            AbsoluteDate[] obsTimeInterval = castedLeaf.getExecutionDuration();
+            double executionDuration = obsTimeInterval[1].durationFrom(obsTimeInterval[0]);
+            double postTobs = priorTobs - executionDuration;
 
              // Update weights
              for (int i=0; i<postWeights.length; i++) {
@@ -106,21 +113,21 @@ public class MultiObjectiveMcts {
             String objectiveType = objective.getClass().getSimpleName();
             if (objectiveType.equals("SearchObjective")) {
                 // Update time resources
-                postTimeResources[0] = priorTimeResources[0] - castedLeaf.getExecutionDuration();
+                postTimeResources[0] = priorTimeResources[0] - executionDuration;
                 
                // Correct weight update for given objective
                 postWeights[0] = postTimeResources[0]/postTobs;
 
             } else if(objectiveType.equals("TrackingObjective")) {
                 // Update time resources
-                postTimeResources[1] = priorTimeResources[1] - castedLeaf.getExecutionDuration();
+                postTimeResources[1] = priorTimeResources[1] - executionDuration;
 
                 // Correct weight update for given objective
                 postWeights[1] = postTimeResources[1]/postTobs;
             }else {
                 throw new IllegalAccessError("Unkown objective.");
             }
-            AbsoluteDate propEpoch = castedLeaf.getEpoch().shiftedBy(castedLeaf.executionDuration);
+            AbsoluteDate propEpoch = castedLeaf.getEpoch().shiftedBy(executionDuration);
             toBeAdded = new DecisionNode(0., 0, castedLeaf.getMicro(), postWeights, 
                                                       postTimeResources, propEpoch, propEnviroment);
             leaf.setChild(toBeAdded);    
@@ -142,20 +149,31 @@ public class MultiObjectiveMcts {
             switch (indexSelectedObjective) {
                 case 0:
                     // Macro action = search
-                    objective = new SearchObjective();
+                    for (Objective macro : this.objectives) {
+                        if (macro.getClass().getSimpleName().equals("SearchObjective")) {
+                            objective = macro;
+                            break;
+                        }
+                    }
+                    objective = null;
                     break;
 
                 case 1:
                     // Macro action = track
-                    objective = new TrackingObjective();
-                    break;
+                    for (Objective macro : this.objectives) {
+                        if (macro.getClass().getSimpleName().equals("TrackingObjective")) {
+                            objective = macro;
+                            break;
+                        }
+                    }
+                    objective = null;
 
                 default:
                     throw new IllegalAccessError("Unkown objective.");
             }
 
             AngularDirection pointing = objective.setMicroAction(castedLeaf.getEpoch());
-            toBeAdded = new ChanceNode(objective.getExecusionDuration(), 0., 0, objective, pointing, leaf);   
+            toBeAdded = new ChanceNode(objective.getExecusionDuration(castedLeaf.getEpoch()), 0., 0, objective, pointing, leaf);   
             //selected.add(toBeAdded);
 
         } else {
@@ -172,7 +190,7 @@ public class MultiObjectiveMcts {
      * @param campaignEndDate   End of observation campaign.
      * @return                  List of nodes that have been simulated during roll-out.
      */
-    public static List<Node> simulate(Node leaf, AbsoluteDate campaignEndDate) {
+    public List<Node> simulate(Node leaf, AbsoluteDate campaignEndDate) {
 
         // Declare output
         List<Node> episode = new ArrayList<Node>();

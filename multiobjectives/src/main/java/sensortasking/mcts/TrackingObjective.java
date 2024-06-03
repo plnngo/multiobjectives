@@ -12,6 +12,9 @@ import org.hipparchus.util.FastMath;
 import org.orekit.bodies.CelestialBody;
 import org.orekit.bodies.CelestialBodyFactory;
 import org.orekit.bodies.OneAxisEllipsoid;
+import org.orekit.estimation.measurements.AngularAzEl;
+import org.orekit.estimation.measurements.GroundStation;
+import org.orekit.estimation.measurements.ObservableSatellite;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
 import org.orekit.frames.FramesFactory;
@@ -25,6 +28,7 @@ import org.orekit.propagation.MatricesHarvester;
 import org.orekit.propagation.SpacecraftState;
 import org.orekit.propagation.StateCovariance;
 import org.orekit.propagation.StateCovarianceMatrixProvider;
+import org.orekit.propagation.analytical.tle.TLE;
 import org.orekit.propagation.analytical.tle.TLEPropagator;
 import org.orekit.propagation.events.EclipseDetector;
 import org.orekit.propagation.events.ElevationDetector;
@@ -169,24 +173,25 @@ public class TrackingObjective implements Objective{
                 // organise observation tasks
                 for (int i=0; i<numObs; i++) {
 
-                    // Propagate over tasking duration
-                    SpacecraftState state = tleProp.propagate(taskEpoch);
-                    boolean inEarthShadow = eclipseDetector.g(state)<0.0;
+                    // Propagate towards beginning of tasking interval
+                    SpacecraftState stateBeginTask = tleProp.propagate(taskEpoch);
+                    boolean inEarthShadow = eclipseDetector.g(stateBeginTask)<0.0;
                     if (inEarthShadow) {
                         // Observation cannot be performed because of lack of visibility
                         continue;
                     }
                     // Transform spacecraft state into sensor pointing direction
-                    AngularDirection dirAzEl = transformStateToMeasurement(state);
+                    AngularDirection azElBeginTask = transformStateToMeasurement(stateBeginTask);
                     
-                    boolean goodSolarPhase = Tasking.checkSolarPhaseCondition(taskEpoch, dirAzEl);
+                    boolean goodSolarPhase = 
+                        Tasking.checkSolarPhaseCondition(taskEpoch, azElBeginTask);
 
                     if (!goodSolarPhase) {
                         // Observation cannot be performed because of lack of visibility
                         continue;
                     }
                     double distMoon = 
-                        AngularDirection.computeAngularDistMoon(taskEpoch, stationFrame, dirAzEl);
+                        AngularDirection.computeAngularDistMoon(taskEpoch, stationFrame, azElBeginTask);
                     if (distMoon < minMoonDist) {
                         // Observation cannot be performed because of lack of visibility
                         continue;
@@ -195,11 +200,13 @@ public class TrackingObjective implements Objective{
                     // If code reaches here, object is observable and visible
                     //DoubleDihedraFieldOfView fov = new DoubleDihedraFieldOfView(Vector3D.ZERO, posTeme, timeDurationBetweenTasks, posTeme, distMoon, i)
                     List<AngularDirection> simulatedMeasurements = new ArrayList<AngularDirection>();
-                    Vector3D centerFov = new Vector3D(dirAzEl.getAngle1(), dirAzEl.getAngle2());
+
+                    // TODO: Placed FOV centrally at location of satellite at beginning of tasking interval --> need to relocate to get maximised pass duration 
+                    Vector3D centerFov = new Vector3D(azElBeginTask.getAngle1(), azElBeginTask.getAngle2());
                     Vector3D meridian = new Rotation(Vector3D.PLUS_K, sensorApartureRadius, 
                                                      RotationConvention.VECTOR_OPERATOR).applyTo(centerFov);
                     FieldOfView fov =
-                        new PolygonalFieldOfView(new Vector3D(dirAzEl.getAngle1(), dirAzEl.getAngle2()),
+                        new PolygonalFieldOfView(new Vector3D(azElBeginTask.getAngle1(), azElBeginTask.getAngle2()),
                                                  DefiningConeType.INSIDE_CONE_TOUCHING_POLYGON_AT_EDGES_MIDDLE,
                                                  meridian, sensorApartureRadius, 4, 0);
 
@@ -214,17 +221,30 @@ public class TrackingObjective implements Objective{
                                                                     }
                                                                     return increasing ? Action.CONTINUE : Action.STOP;
                                                                 });
-                    final EventsLogger logFovPass = new EventsLogger();
-                    tleProp.addEventDetector(logFovPass.monitorDetector(fovDetector));
+                    
 
-                    // Extract FOV pass
-                    tleProp.propagate(taskEpoch.shiftedBy(taskDuration/2.));
+                    // Set up modified TLE using the state at the beginning of the tasking window
+                    TLE modTleBeginTask = TLE.stateToTLE(stateBeginTask, candidate.getPseudoTle());
+
+                    // Set up SGP4 propagator to propagate over tasking duration
+                    TLEPropagator tlePropBeginTask = TLEPropagator.selectExtrapolator(modTleBeginTask);
+                    tlePropBeginTask.propagate(taskEpoch.shiftedBy(taskDuration));
+                    final EventsLogger logFovPass = new EventsLogger();
+                    tlePropBeginTask.addEventDetector(logFovPass.monitorDetector(fovDetector));
                     List<LoggedEvent> fovCrossings = logFovPass.getLoggedEvents();
                     if (fovCrossings.size()!=2) {
                         throw new Error("Satellite does not cross through FOV as expected.");
                     }
 
-                    //ArrayList<AngularDirection> simulatedMeas = generateMeasurements(candidate, );
+                    // Transform measurements into orekit measurements
+                    List<AngularAzEl> orekitAzElMeas = new ArrayList<AngularAzEl>();
+                    for (AngularDirection meas : simulatedMeasurements) {
+                        orekitAzElMeas.add(transformAngularAzEl2OrekitMeasurements(meas));
+                    }
+                    // Perform updated state estimation with measurements
+
+                    estimateStateWithKalmanEstimator();
+
 
                 }
             }
@@ -245,6 +265,15 @@ public class TrackingObjective implements Objective{
         throw new UnsupportedOperationException("Unimplemented method 'computeGain'");
     } */
 
+    private AngularAzEl transformAngularAzEl2OrekitMeasurements(AngularDirection meas) {
+        AngularAzEl azElOrekit = 
+            new AngularAzEl(new GroundStation(stationFrame), meas.getDate(), 
+                                              new double[]{meas.getAngle1(), meas.getAngle2()}, 
+                                              new double[]{1e-3, 1e-3}, 
+                                              new double[]{1., 1.},
+                                               new ObservableSatellite(0));
+        return null;
+    }
     private AngularDirection transformStateToMeasurement(SpacecraftState state) {
         Vector3D posTeme = state.getPVCoordinates().getPosition(); 
         AngularDirection dirTeme = 

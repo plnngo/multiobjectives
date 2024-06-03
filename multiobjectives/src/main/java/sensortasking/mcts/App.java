@@ -111,6 +111,7 @@ public class App {
 
             // Propagate from the initial date to the first raising or for the fixed duration
             AbsoluteDate targetEpoch = initialDate.shiftedBy(60.*60.*24);
+            targetEpoch = new AbsoluteDate(2024, 5, 21, 21, 56, 0, utc);
             final SpacecraftState finalState = tleProp.propagate(targetEpoch);
 
             System.out.println(" Final state duration from initial date (s) : " + finalState.getDate().durationFrom(initialDate));

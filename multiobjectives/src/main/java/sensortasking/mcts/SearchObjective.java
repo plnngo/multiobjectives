@@ -7,7 +7,6 @@ import org.hipparchus.util.FastMath;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
 import org.orekit.frames.FramesFactory;
-import org.orekit.frames.TopocentricFrame;
 import org.orekit.time.AbsoluteDate;
 
 import lombok.Getter;
@@ -17,7 +16,7 @@ public class SearchObjective implements Objective{
 
 
     @Override
-    public AngularDirection setMicroAction(AbsoluteDate current, TopocentricFrame stationFrame) {
+    public AngularDirection setMicroAction(AbsoluteDate current) {
         return new AngularDirection(null, new double[]{FastMath.toRadians(30.),  
                                     FastMath.toRadians(50.)}, AngleType.AZEL);
     }
@@ -35,7 +34,7 @@ public class SearchObjective implements Objective{
     }
 
     @Override
-    public AbsoluteDate[] getExecusionDuration() {
+    public AbsoluteDate[] getExecusionDuration(AbsoluteDate current) {
         // TODO Auto-generated method stub
         //return 5.*60.;
         return null;
