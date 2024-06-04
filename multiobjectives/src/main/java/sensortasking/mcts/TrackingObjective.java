@@ -6,6 +6,7 @@ import java.util.List;
 import org.hipparchus.geometry.euclidean.threed.Rotation;
 import org.hipparchus.geometry.euclidean.threed.RotationConvention;
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
+import org.hipparchus.linear.MatrixUtils;
 import org.hipparchus.linear.RealMatrix;
 import org.hipparchus.ode.events.Action;
 import org.hipparchus.util.FastMath;
@@ -15,6 +16,10 @@ import org.orekit.bodies.OneAxisEllipsoid;
 import org.orekit.estimation.measurements.AngularAzEl;
 import org.orekit.estimation.measurements.GroundStation;
 import org.orekit.estimation.measurements.ObservableSatellite;
+import org.orekit.estimation.measurements.ObservedMeasurement;
+import org.orekit.estimation.sequential.ConstantProcessNoise;
+import org.orekit.estimation.sequential.KalmanEstimator;
+import org.orekit.estimation.sequential.KalmanEstimatorBuilder;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
 import org.orekit.frames.FramesFactory;
@@ -22,14 +27,17 @@ import org.orekit.frames.TopocentricFrame;
 import org.orekit.geometry.fov.FieldOfView;
 import org.orekit.geometry.fov.PolygonalFieldOfView;
 import org.orekit.geometry.fov.PolygonalFieldOfView.DefiningConeType;
+import org.orekit.orbits.Orbit;
 import org.orekit.orbits.OrbitType;
 import org.orekit.orbits.PositionAngle;
 import org.orekit.propagation.MatricesHarvester;
+import org.orekit.propagation.Propagator;
 import org.orekit.propagation.SpacecraftState;
 import org.orekit.propagation.StateCovariance;
 import org.orekit.propagation.StateCovarianceMatrixProvider;
 import org.orekit.propagation.analytical.tle.TLE;
 import org.orekit.propagation.analytical.tle.TLEPropagator;
+import org.orekit.propagation.conversion.TLEPropagatorBuilder;
 import org.orekit.propagation.events.EclipseDetector;
 import org.orekit.propagation.events.ElevationDetector;
 import org.orekit.propagation.events.EventDetector;
@@ -175,6 +183,8 @@ public class TrackingObjective implements Objective{
 
                     // Propagate towards beginning of tasking interval
                     SpacecraftState stateBeginTask = tleProp.propagate(taskEpoch);
+                    StateCovariance covBeginTask = provider.getStateCovariance(stateBeginTask);
+
                     boolean inEarthShadow = eclipseDetector.g(stateBeginTask)<0.0;
                     if (inEarthShadow) {
                         // Observation cannot be performed because of lack of visibility
@@ -225,6 +235,9 @@ public class TrackingObjective implements Objective{
 
                     // Set up modified TLE using the state at the beginning of the tasking window
                     TLE modTleBeginTask = TLE.stateToTLE(stateBeginTask, candidate.getPseudoTle());
+                    StateVector stateVecBeginTask = candidate.spacecraftStateToStateVector(stateBeginTask);
+                    CartesianCovariance cartCovBeginTask = candidate.stateCovToCartesianCov(stateBeginTask.getOrbit(), covBeginTask);
+                    ObservedObject candidateBeginTask = new ObservedObject(candidate.getId(), stateVecBeginTask, cartCovBeginTask, stationFrame, modTleBeginTask);
 
                     // Set up SGP4 propagator to propagate over tasking duration
                     TLEPropagator tlePropBeginTask = TLEPropagator.selectExtrapolator(modTleBeginTask);
@@ -237,13 +250,13 @@ public class TrackingObjective implements Objective{
                     }
 
                     // Transform measurements into orekit measurements
-                    List<AngularAzEl> orekitAzElMeas = new ArrayList<AngularAzEl>();
+                    List<ObservedMeasurement<?>> orekitAzElMeas = new ArrayList<>();
                     for (AngularDirection meas : simulatedMeasurements) {
                         orekitAzElMeas.add(transformAngularAzEl2OrekitMeasurements(meas));
                     }
                     // Perform updated state estimation with measurements
 
-                    estimateStateWithKalmanEstimator();
+                    ObservedObject[] result = estimateStateWithKalman(orekitAzElMeas, candidateBeginTask);
 
 
                 }
@@ -265,6 +278,67 @@ public class TrackingObjective implements Objective{
         throw new UnsupportedOperationException("Unimplemented method 'computeGain'");
     } */
 
+    private ObservedObject[] estimateStateWithKalman(Iterable<ObservedMeasurement<?>> orekitAzElMeas,
+                                                  ObservedObject candidate) {
+
+        // Initialise output
+        ObservedObject[] output = new ObservedObject[3];
+
+        // State at beginning of tasking
+        output[0] = new ObservedObject(candidate.getId() + 0, candidate.getState(), 
+                                       candidate.getCovariance(), candidate.getFrame(), 
+                                       candidate.getPseudoTle());
+
+        // Set initial state covariance
+        RealMatrix initialP = candidate.getCovariance().getCovarianceMatrix();
+
+        // Set process noise
+        RealMatrix Q = 
+            MatrixUtils.createRealDiagonalMatrix(new double[]{1e-8, 1e-8, 1e-8, 1e-8, 1e-8, 1e-8});
+        
+        // Set propagator
+        TLEPropagatorBuilder propBuilder = 
+            new TLEPropagatorBuilder(candidate.getPseudoTle(), PositionAngle.MEAN, 1.);
+
+        // Build Kalman filter
+        KalmanEstimator kalman = 
+            new KalmanEstimatorBuilder()
+                .addPropagationConfiguration(propBuilder, new ConstantProcessNoise(initialP, Q))
+                .build();
+        Propagator[] estimated = kalman.processMeasurements(orekitAzElMeas);
+
+        // Retrieve updated state and covariance
+        AbsoluteDate lastMeasEpoch = estimated[estimated.length-1].getInitialState().getDate();
+        SpacecraftState stateEndUpdated = estimated[estimated.length-1].getInitialState();
+        StateVector stateVecEndUpdate = candidate.spacecraftStateToStateVector(stateEndUpdated);
+        Orbit estimatedO = stateEndUpdated.getOrbit();
+        RealMatrix estimatedP = kalman.getPhysicalEstimatedCovarianceMatrix();
+
+        // Process covariance to derive Cartesian orbital covariance matrix
+        double[][] dCdY = new double[6][6];
+        estimatedO.getJacobianWrtParameters(PositionAngle.MEAN, dCdY);
+        RealMatrix jacobian = MatrixUtils.createRealMatrix(dCdY);
+        RealMatrix estimatedCartesianP = jacobian.multiply(estimatedP.getSubMatrix(0, 5, 0, 5))
+                                                 .multiply(jacobian.transpose());       // TODO: check if sqrt of diagonal has to be taken
+        StateCovariance stateCovEndUpdated = 
+            new StateCovariance(estimatedCartesianP, lastMeasEpoch, stationFrame,       // TODO: check frame
+                                OrbitType.CARTESIAN, PositionAngle.MEAN);
+        CartesianCovariance cartCovEndUpdated = candidate.stateCovToCartesianCov(estimatedO, stateCovEndUpdated);
+
+        // State at the end of tasking with measurement updates
+        output[3] = new ObservedObject(candidate.getId() + 3, stateVecEndUpdate, cartCovEndUpdated,
+                                       stationFrame, TLE.stateToTLE(stateEndUpdated, 
+                                       candidate.getPseudoTle()));
+
+        // Propagate from start of window to last measurement epoch without measurement update
+
+        
+        
+
+
+        return null;
+        
+    }
     private AngularAzEl transformAngularAzEl2OrekitMeasurements(AngularDirection meas) {
         AngularAzEl azElOrekit = 
             new AngularAzEl(new GroundStation(stationFrame), meas.getDate(), 
@@ -272,7 +346,7 @@ public class TrackingObjective implements Objective{
                                               new double[]{1e-3, 1e-3}, 
                                               new double[]{1., 1.},
                                                new ObservableSatellite(0));
-        return null;
+        return azElOrekit;
     }
     private AngularDirection transformStateToMeasurement(SpacecraftState state) {
         Vector3D posTeme = state.getPVCoordinates().getPosition(); 
