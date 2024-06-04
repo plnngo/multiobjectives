@@ -6,6 +6,7 @@ import java.util.List;
 import org.hipparchus.geometry.euclidean.threed.Rotation;
 import org.hipparchus.geometry.euclidean.threed.RotationConvention;
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
+import org.hipparchus.linear.DiagonalMatrix;
 import org.hipparchus.linear.MatrixUtils;
 import org.hipparchus.linear.RealMatrix;
 import org.hipparchus.ode.events.Action;
@@ -255,15 +256,10 @@ public class TrackingObjective implements Objective{
                         orekitAzElMeas.add(transformAngularAzEl2OrekitMeasurements(meas));
                     }
                     // Perform updated state estimation with measurements
-
                     ObservedObject[] result = estimateStateWithKalman(orekitAzElMeas, candidateBeginTask);
-
 
                 }
             }
-
-
-
         }
 
         // Fake data
@@ -331,13 +327,35 @@ public class TrackingObjective implements Objective{
                                        candidate.getPseudoTle()));
 
         // Propagate from start of window to last measurement epoch without measurement update
+        TLEPropagator prop = TLEPropagator.selectExtrapolator(candidate.getPseudoTle());
 
-        
-        
+        // Covariance
+        final RealMatrix covInitMatrix = candidate.getCovariance().getCovarianceMatrix();
+        final StateCovariance covInit = 
+            new StateCovariance(covInitMatrix, candidate.getEpoch(), candidate.getFrame(), 
+                                OrbitType.CARTESIAN, PositionAngle.MEAN);
+        final String stmAdditionalName = "stm";
+        final MatricesHarvester harvester = prop.setupMatricesComputation(stmAdditionalName, null, null);
 
+        final StateCovarianceMatrixProvider provider = new StateCovarianceMatrixProvider("covariance", stmAdditionalName,
+                                                                                        harvester, OrbitType.CARTESIAN, PositionAngle.MEAN, covInit);
 
-        return null;
-        
+        prop.addAdditionalStateProvider(provider);
+
+        final SpacecraftState stateEndNotUpdated = prop.propagate(lastMeasEpoch);
+        StateVector stateVecEndNotUpdate = candidate.spacecraftStateToStateVector(stateEndNotUpdated);
+        RealMatrix covProp = provider.getStateCovariance(stateEndNotUpdated).getMatrix();
+        StateCovariance stateCovEndNotUpdated = 
+            new StateCovariance(covProp, lastMeasEpoch, stateEndNotUpdated.getFrame(),       // TODO: check frame
+                                OrbitType.CARTESIAN, PositionAngle.MEAN);
+        CartesianCovariance cartCovNotEndUpdated = candidate.stateCovToCartesianCov(stateEndNotUpdated.getOrbit(), stateCovEndNotUpdated);
+
+        // State at the end of tasking without measurement updates
+        output[2] = new ObservedObject(candidate.getId() + 2, stateVecEndNotUpdate, cartCovNotEndUpdated, 
+                                       stationFrame, TLE.stateToTLE(stateEndNotUpdated, 
+                                       candidate.getPseudoTle()));
+
+        return output;
     }
     private AngularAzEl transformAngularAzEl2OrekitMeasurements(AngularDirection meas) {
         AngularAzEl azElOrekit = 
