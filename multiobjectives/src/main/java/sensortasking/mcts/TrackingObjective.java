@@ -6,7 +6,7 @@ import java.util.List;
 import org.hipparchus.geometry.euclidean.threed.Rotation;
 import org.hipparchus.geometry.euclidean.threed.RotationConvention;
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
-import org.hipparchus.linear.DiagonalMatrix;
+import org.hipparchus.linear.LUDecomposition;
 import org.hipparchus.linear.MatrixUtils;
 import org.hipparchus.linear.RealMatrix;
 import org.hipparchus.ode.events.Action;
@@ -258,6 +258,9 @@ public class TrackingObjective implements Objective{
                     // Perform updated state estimation with measurements
                     ObservedObject[] result = estimateStateWithKalman(orekitAzElMeas, candidateBeginTask);
 
+                    // Evaluate information gain
+                    double iG = computeInformationGain(result[1], result[2]);
+
                 }
             }
         }
@@ -268,12 +271,79 @@ public class TrackingObjective implements Objective{
                             AngleType.AZEL);
     }
 
-/*     @Override
-    public double computeGain() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'computeGain'");
-    } */
+    private double computeInformationGain(ObservedObject prior, ObservedObject posterior) {
+        return computeJensenShannonDivergence(prior, posterior);
+    }
+    private double computeJensenShannonDivergence(ObservedObject prior, ObservedObject posterior) {
+        // Compute mixture distribution
+        ObservedObject mixture = null;
 
+        // Compute KL divergence between prior and mixture
+        double klPriorMixture = computeKullbackLeiblerDivergence(prior, mixture);
+
+        // Compute KL divergence between posterior and mixture
+        double klPosteriorMixture = computeKullbackLeiblerDivergence(posterior, mixture);
+
+        // Compute JS divergence
+        double jsPriorPosterior = 0.5 * klPriorMixture + 0.5 * klPosteriorMixture;
+
+        return jsPriorPosterior;
+    }
+    private double computeKullbackLeiblerDivergence(ObservedObject p, ObservedObject q) {
+        
+        // Retrieve covariances
+        RealMatrix covP = p.getCovariance().getCovarianceMatrix();
+        RealMatrix covQ = q.getCovariance().getCovarianceMatrix();
+
+        // Compute determinant
+        LUDecomposition decomP = new LUDecomposition(covP);
+        LUDecomposition decomQ = new LUDecomposition(covQ);
+        double detP = decomP.getDeterminant();
+        double detQ = decomQ.getDeterminant();
+
+        double logDetCovQByDetCovP = FastMath.log(detQ/detP);
+
+        // Compute inverse of covQ
+        RealMatrix invCovQ = MatrixUtils.inverse(covQ);
+
+        double traceInvCovQCovP = invCovQ.multiply(covP).getTrace();
+
+        // Substract means of probability distributions
+        Vector3D posQ = q.getState().getPositionVector();
+        Vector3D velQ = q.getState().getVelocityVector();
+        double[] meanStateQ = new double[]{posQ.getX(), posQ.getY(), posQ.getZ(), 
+                                           velQ.getX(), velQ.getY(), velQ.getZ()};
+        Vector3D posP = p.getState().getPositionVector();
+        Vector3D velP = p.getState().getVelocityVector();
+        double[] meanStateP = new double[]{posP.getX(), posP.getY(), posP.getZ(),
+                                           velP.getX(), velP.getY(), velP.getZ()};
+
+        double[] meanQMinusMeanP = new double[6];
+        
+        for (int i=0; i<meanQMinusMeanP.length; i++) {
+            meanQMinusMeanP[i] = meanStateQ[i] - meanStateP[i];
+        }
+
+        // Means transposed multiplied by inverse covariance of Q
+        double[] meanTMultiplyInvCovQ = new double[]{0.,0.,0.,0.,0.,0.};
+        for (int numCol=0; numCol<invCovQ.getColumnDimension(); numCol++) {
+            double[] colInvCovQ = invCovQ.getColumn(numCol);
+            for (int i=0; i<meanQMinusMeanP.length; i++) {
+                meanTMultiplyInvCovQ[numCol] += meanQMinusMeanP[i] * colInvCovQ[i];
+            }
+        }
+        
+        // Multiply with mean again
+        double meanTMultiplyInvCovQMultiplyMean = 0.;
+        for (int i=0; i<meanQMinusMeanP.length; i++) {
+            meanTMultiplyInvCovQMultiplyMean += meanTMultiplyInvCovQ[i] * meanQMinusMeanP[i];
+        }
+        
+        double dKL = 0.5 * (logDetCovQByDetCovP + traceInvCovQCovP 
+                                + meanTMultiplyInvCovQMultiplyMean - meanQMinusMeanP.length);
+        
+        return dKL;
+    }
     private ObservedObject[] estimateStateWithKalman(Iterable<ObservedMeasurement<?>> orekitAzElMeas,
                                                   ObservedObject candidate) {
 
