@@ -25,6 +25,7 @@ import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
 import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
+import org.orekit.frames.Transform;
 import org.orekit.geometry.fov.FieldOfView;
 import org.orekit.geometry.fov.PolygonalFieldOfView;
 import org.orekit.geometry.fov.PolygonalFieldOfView.DefiningConeType;
@@ -51,6 +52,7 @@ import org.orekit.time.TimeScale;
 import org.orekit.time.TimeScalesFactory;
 import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
+import org.orekit.utils.TimeStampedPVCoordinates;
 
 import sensortasking.stripescanning.Tasking;
 
@@ -134,8 +136,6 @@ public class TrackingObjective implements Objective{
             // Set up SGP4 propagator
             TLEPropagator tleProp = TLEPropagator.selectExtrapolator(candidate.getPseudoTle());
 
-            // State
-            
             // Covariance
             final RealMatrix covInitMatrix = candidate.getCovariance().getCovarianceMatrix();
             final StateCovariance covInit = 
@@ -209,7 +209,6 @@ public class TrackingObjective implements Objective{
                     }
 
                     // If code reaches here, object is observable and visible
-                    //DoubleDihedraFieldOfView fov = new DoubleDihedraFieldOfView(Vector3D.ZERO, posTeme, timeDurationBetweenTasks, posTeme, distMoon, i)
                     List<AngularDirection> simulatedMeasurements = new ArrayList<AngularDirection>();
 
                     // TODO: Placed FOV centrally at location of satellite at beginning of tasking interval --> need to relocate to get maximised pass duration 
@@ -226,9 +225,9 @@ public class TrackingObjective implements Objective{
                                                                     System.out.println(" Visibility on satellite" +
                                                                                        (increasing ? " begins at " : " ends at ") +
                                                                                        s.getDate().toStringWithoutUtcOffset(utc, 3));
-                                                                    if (increasing) {
+                                                                    if (!increasing) {
                                                                         // TODO: check when a measurement is generated --> which propagation step size
-                                                                        simulatedMeasurements.add(generateMeasurements(s));
+                                                                        simulatedMeasurements.add(transformStateToMeasurement(s));
                                                                     }
                                                                     return increasing ? Action.CONTINUE : Action.STOP;
                                                                 });
@@ -242,9 +241,10 @@ public class TrackingObjective implements Objective{
 
                     // Set up SGP4 propagator to propagate over tasking duration
                     TLEPropagator tlePropBeginTask = TLEPropagator.selectExtrapolator(modTleBeginTask);
-                    tlePropBeginTask.propagate(taskEpoch.shiftedBy(taskDuration));
                     final EventsLogger logFovPass = new EventsLogger();
                     tlePropBeginTask.addEventDetector(logFovPass.monitorDetector(fovDetector));
+                    tlePropBeginTask.propagate(taskEpoch.shiftedBy(taskDuration));
+
                     List<LoggedEvent> fovCrossings = logFovPass.getLoggedEvents();
                     if (fovCrossings.size()!=2) {
                         throw new Error("Satellite does not cross through FOV as expected.");
@@ -344,8 +344,8 @@ public class TrackingObjective implements Objective{
         
         return dKL;
     }
-    private ObservedObject[] estimateStateWithKalman(Iterable<ObservedMeasurement<?>> orekitAzElMeas,
-                                                  ObservedObject candidate) {
+    private ObservedObject[] estimateStateWithKalman(Iterable<ObservedMeasurement<?>> azElMeas,
+                                                     ObservedObject candidate) {
 
         // Initialise output
         ObservedObject[] output = new ObservedObject[3];
@@ -371,7 +371,7 @@ public class TrackingObjective implements Objective{
             new KalmanEstimatorBuilder()
                 .addPropagationConfiguration(propBuilder, new ConstantProcessNoise(initialP, Q))
                 .build();
-        Propagator[] estimated = kalman.processMeasurements(orekitAzElMeas);
+        Propagator[] estimated = kalman.processMeasurements(azElMeas);
 
         // Retrieve updated state and covariance
         AbsoluteDate lastMeasEpoch = estimated[estimated.length-1].getInitialState().getDate();
@@ -436,17 +436,23 @@ public class TrackingObjective implements Objective{
                                                new ObservableSatellite(0));
         return azElOrekit;
     }
+
+    /**
+     * Transform spacecraft state into angular direction in topocentric horizon frame.
+     * 
+     * @param state         Spacecraft state.
+     * @return              Angular pointing direction with respect to topocentric horizon frame.
+     */
     private AngularDirection transformStateToMeasurement(SpacecraftState state) {
-        Vector3D posTeme = state.getPVCoordinates().getPosition(); 
-        AngularDirection dirTeme = 
-            new AngularDirection(state.getFrame(), 
-                                 new double[]{posTeme.getAlpha(), posTeme.getDelta()}, 
-                                 AngleType.RADEC);
-        return dirTeme.transformReference(stationFrame, state.getDate(), AngleType.AZEL);
-    }
-    private AngularDirection generateMeasurements(SpacecraftState state) {
-        // TODO: add noise
-        return transformStateToMeasurement(state);
+
+        Transform toTopo = state.getFrame().getTransformTo(stationFrame, state.getDate());
+        TimeStampedPVCoordinates stateTopo = toTopo.transformPVCoordinates(state.getPVCoordinates());
+        Vector3D posTopo = stateTopo.getPosition();
+        AngularDirection dirTopo = 
+            new AngularDirection(stationFrame, 
+                                 new double[]{posTopo.getAlpha(), posTopo.getDelta()}, 
+                                 AngleType.AZEL);
+        return dirTopo;
     }
 
     @Override
