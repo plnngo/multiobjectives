@@ -147,6 +147,10 @@ public class ObservedObjectTest {
         RealMatrix covITRF = covEcef.getCovarianceMatrix();
 
         // Rotational matrix from ECEF to ENU (Topocentric Horizon Frame)
+        double[][] rot = new double[6][6];
+        rot[0] = new double[]{-FastMath.sin(pos.getLongitude()), FastMath.cos(pos.getLongitude()), 0., 0., 0.};
+        
+        RealMatrix rotEcefToEnu = MatrixUtils.createRealMatrix(rot);
 
 
         CartesianCovariance covTopo = 
