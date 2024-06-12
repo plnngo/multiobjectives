@@ -235,8 +235,8 @@ public class TrackingObjective implements Objective{
 
                     // Set up modified TLE using the state at the beginning of the tasking window
                     TLE modTleBeginTask = TLE.stateToTLE(stateBeginTask, candidate.getPseudoTle());
-                    StateVector stateVecBeginTask = candidate.spacecraftStateToStateVector(stateBeginTask);
-                    CartesianCovariance cartCovBeginTask = candidate.stateCovToCartesianCov(stateBeginTask.getOrbit(), covBeginTask);
+                    StateVector stateVecBeginTask = ObservedObject.spacecraftStateToStateVector(stateBeginTask, candidate.getFrame());
+                    CartesianCovariance cartCovBeginTask = ObservedObject.stateCovToCartesianCov(stateBeginTask.getOrbit(), covBeginTask, candidate.getFrame());
                     ObservedObject candidateBeginTask = new ObservedObject(candidate.getId(), stateVecBeginTask, cartCovBeginTask, stationFrame, modTleBeginTask);
 
                     // Set up SGP4 propagator to propagate over tasking duration
@@ -376,7 +376,7 @@ public class TrackingObjective implements Objective{
         // Retrieve updated state and covariance
         AbsoluteDate lastMeasEpoch = estimated[estimated.length-1].getInitialState().getDate();
         SpacecraftState stateEndUpdated = estimated[estimated.length-1].getInitialState();
-        StateVector stateVecEndUpdate = candidate.spacecraftStateToStateVector(stateEndUpdated);
+        StateVector stateVecEndUpdate = ObservedObject.spacecraftStateToStateVector(stateEndUpdated, candidate.getFrame());
         Orbit estimatedO = stateEndUpdated.getOrbit();
         RealMatrix estimatedP = kalman.getPhysicalEstimatedCovarianceMatrix();
 
@@ -389,7 +389,9 @@ public class TrackingObjective implements Objective{
         StateCovariance stateCovEndUpdated = 
             new StateCovariance(estimatedCartesianP, lastMeasEpoch, stationFrame,       // TODO: check frame
                                 OrbitType.CARTESIAN, PositionAngle.MEAN);
-        CartesianCovariance cartCovEndUpdated = candidate.stateCovToCartesianCov(estimatedO, stateCovEndUpdated);
+        CartesianCovariance cartCovEndUpdated = 
+            ObservedObject.stateCovToCartesianCov(estimatedO, stateCovEndUpdated, 
+                                                  candidate.getFrame());
 
         // State at the end of tasking with measurement updates
         output[3] = new ObservedObject(candidate.getId() + 3, stateVecEndUpdate, cartCovEndUpdated,
@@ -413,12 +415,14 @@ public class TrackingObjective implements Objective{
         prop.addAdditionalStateProvider(provider);
 
         final SpacecraftState stateEndNotUpdated = prop.propagate(lastMeasEpoch);
-        StateVector stateVecEndNotUpdate = candidate.spacecraftStateToStateVector(stateEndNotUpdated);
+        StateVector stateVecEndNotUpdate = ObservedObject.spacecraftStateToStateVector(stateEndNotUpdated, candidate.getFrame());
         RealMatrix covProp = provider.getStateCovariance(stateEndNotUpdated).getMatrix();
         StateCovariance stateCovEndNotUpdated = 
             new StateCovariance(covProp, lastMeasEpoch, stateEndNotUpdated.getFrame(),       // TODO: check frame
                                 OrbitType.CARTESIAN, PositionAngle.MEAN);
-        CartesianCovariance cartCovNotEndUpdated = candidate.stateCovToCartesianCov(stateEndNotUpdated.getOrbit(), stateCovEndNotUpdated);
+        CartesianCovariance cartCovNotEndUpdated = 
+            ObservedObject.stateCovToCartesianCov(stateEndNotUpdated.getOrbit(), 
+                                                  stateCovEndNotUpdated, candidate.getFrame());
 
         // State at the end of tasking without measurement updates
         output[2] = new ObservedObject(candidate.getId() + 2, stateVecEndNotUpdate, cartCovNotEndUpdated, 
@@ -526,7 +530,7 @@ public class TrackingObjective implements Objective{
             cov.setCovarianceMatrixEntry(pos+3, pos+3, 150.);
         }
         
-        ObservedObject obj = new ObservedObject(345, state, cov, new AbsoluteDate(), FramesFactory.getTEME());
+        ObservedObject obj = new ObservedObject(345, state, cov, new AbsoluteDate(), stationFrame);
         List<ObservedObject> out = new ArrayList<ObservedObject>();
         out.add(obj);
         return out;

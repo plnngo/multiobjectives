@@ -43,7 +43,7 @@ public class SearchObjective implements Objective{
     @Override
     public List<ObservedObject> propagateOutcome() {
 
-        // Fake data
+       /*  // Fake data
         StateVector state = new StateVector();
         state.setX(100.);
         state.setY(200.);
@@ -57,7 +57,7 @@ public class SearchObjective implements Objective{
         
         ObservedObject obj = new ObservedObject(0123, state, cov, new AbsoluteDate(), FramesFactory.getTEME());
         List<ObservedObject> out = new ArrayList<ObservedObject>();
-        out.add(obj);
-        return out;
+        out.add(obj); */
+        return null;
     }
 }

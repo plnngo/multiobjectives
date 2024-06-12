@@ -1,11 +1,8 @@
 package sensortasking.mcts;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.List;
 
-import org.hipparchus.geometry.euclidean.threed.Vector3D;
-import org.hipparchus.util.FastMath;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;

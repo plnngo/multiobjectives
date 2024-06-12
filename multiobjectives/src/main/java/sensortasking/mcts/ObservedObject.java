@@ -57,9 +57,10 @@ public class ObservedObject {
         this.pseudoTle = pseudoTle;
     }
 
-    public StateVector spacecraftStateToStateVector(SpacecraftState spacecraftState){
+    public static StateVector spacecraftStateToStateVector(SpacecraftState spacecraftState, 
+                                                           Frame stationFrame){
 
-        TimeStampedPVCoordinates pv = spacecraftState.getPVCoordinates(this.frame);
+        TimeStampedPVCoordinates pv = spacecraftState.getPVCoordinates(stationFrame);
         StateVector state = new StateVector();
 
         // Set position
@@ -77,8 +78,9 @@ public class ObservedObject {
         return state;
     }
 
-    public CartesianCovariance stateCovToCartesianCov(Orbit orbit, StateCovariance stateCov) {
-        stateCov = stateCov.changeCovarianceFrame(orbit, this.frame);
+    public static CartesianCovariance stateCovToCartesianCov(Orbit orbit, StateCovariance stateCov, 
+                                                      Frame stationFrame) {
+        stateCov = stateCov.changeCovarianceFrame(orbit, stationFrame);
 
         CartesianCovariance output = new CartesianCovariance(null);
         
