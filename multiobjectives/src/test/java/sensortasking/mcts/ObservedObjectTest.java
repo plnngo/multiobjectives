@@ -86,6 +86,25 @@ public class ObservedObjectTest {
         Assert.assertEquals(11710812, posTopoHorizon.getNorm(), 1e2);
     }
 
+    /**
+     * Test {@link ObservedObject#stateCovToCartesianCov(org.orekit.orbits.Orbit, StateCovariance, Frame)}
+     * using test data from "Covariance Transformations for Satellite Flight Dynamics Operations"
+     * by David A. Vallado and the test class related to 
+     * {@link org.orekit.propagation.StateCovariance#changeCovarianceFrame(org.orekit.orbits.Orbit, Frame)}.
+     * The input data in the orekit test function is given wrt GCRF. However, 
+     * {@link ObservedObject#stateCovToCartesianCov(org.orekit.orbits.Orbit, StateCovariance, Frame)} 
+     * is usually called on state and covariances defined in TEME. For this reason the initial 
+     * input parameters are first converted into TEME. Furthermore, the orekit test function only 
+     * provides the transformed covariance matrix in ITRF. Hence the resulting covariance is then 
+     * transformed into ITRF and compared with the results of orekit. In the last step, the 
+     * transformation into the topocentric horizon frame (ENU) needs to be manually verified. The 
+     * output covariance in ITRF {@code covITRF} is converted to ENU using the appropiate rotation
+     * matrix {@code rotEcefToEnu}. The result is compared with the outcome of 
+     * {@link ObservedObject#stateCovToCartesianCov(org.orekit.orbits.Orbit, StateCovariance, Frame)}
+     * which computes the state covariance directly into ENU from an input defined in TEME.
+     * 
+     * @see org.orekit.propagation.StateCovariance
+     */
     @Test
     public void testStateCovToCartesianCov() {
 
@@ -100,14 +119,14 @@ public class ObservedObjectTest {
                                               2194.56);              // in [m]
 
         // Set up topocentric horizon frame
-        Frame earthFrame = FramesFactory.getITRF(IERSConventions.IERS_2010, false);
         BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
                                                Constants.WGS84_EARTH_FLATTENING,
-                                               earthFrame);
+                                               ecef);
         TopocentricFrame topoHorizon = new TopocentricFrame(earth, pos, "United States Air Force Academy");
 
         // Set up input data from Vallado
-        AbsoluteDate date = new AbsoluteDate(2000, 12, 15, 16, 58, 50.208, TimeScalesFactory.getUTC());
+        AbsoluteDate date = 
+            new AbsoluteDate(2000, 12, 15, 16, 58, 50.208, TimeScalesFactory.getUTC());
         PVCoordinates pvEci = 
             new PVCoordinates(new Vector3D(-605792.21660, -5870229.51108, 3493053.19896),
                               new Vector3D(-1568.25429, -3702.34891, -6479.48395));
@@ -115,9 +134,6 @@ public class ObservedObjectTest {
         // Transform from ECI to TEME
         Transform eciToTeme = eci.getTransformTo(teme, date);
         PVCoordinates pvTeme = eciToTeme.transformPVCoordinates(pvEci);
-
-        // Generate test object 
-        //SpacecraftState scState = new SpacecraftState(new AbsolutePVCoordinates(teme, date, pvTeme));
 
         // Set covariance matrix
         double[][] covArray = new double[6][6];
@@ -146,32 +162,62 @@ public class ObservedObjectTest {
         CartesianCovariance covEcef = ObservedObject.stateCovToCartesianCov(orbit, covTeme, ecef);
         RealMatrix covITRF = covEcef.getCovarianceMatrix();
 
+        // Verify that transformation from eci to ecef worked correctly
+        double[][] covItrfOrekit = new double[6][6];
+        covItrfOrekit[0] = 
+            new double[]{0.9934000575390601, 0.007512499898238329, 0.00583126745930062,
+                         3.454839551824719E-5, 2.685122990788755E-6, 5.831267711564615E-5};
+        covItrfOrekit[1] =
+            new double[]{0.007512499898238334, 1.0065990293024842, 0.01288431024807918, 
+                         1.4852735913336836E-4, 1.654424728247383E-4, 1.288431070222388E-4};
+        covItrfOrekit[2] =
+            new double[]{0.005831267459300618, 0.012884310248079177, 1.0000009131584502,
+                         5.925221082546215E-5, 1.284178752507414E-4, 1.00009131657014E-4};
+        covItrfOrekit[3] =
+            new double[]{3.454839551824716E-5, 1.4852735913336836E-4, 5.9252210825462165E-5,
+                         3.5631474107176443E-7, 7.608348837390666E-7, 5.925221338121884E-7};
+        covItrfOrekit[4] =
+            new double[]{2.6851229907887606E-6, 1.654424728247383E-4, 1.284178752507414E-4,
+                         7.608348837390664E-7, 1.6542289254103502E-6, 1.2841787977379298E-6};
+        covItrfOrekit[5] = 
+            new double[]{5.831267711564615E-5, 1.288431070222388E-4, 1.0000913165701402E-4,
+                         5.925221338121886E-7, 1.2841787977379302E-6, 1.0000913172951267E-6};
+
+        for (int row=0; row<covItrfOrekit.length; row++) {
+            double[] actualRowVec = covITRF.getRow(row);
+            for (int col=0; col<covItrfOrekit[row].length; col++){
+                Assert.assertEquals(covItrfOrekit[row][col], actualRowVec[col], 1e-6);
+            }
+        }
+
         // Rotational matrix from ECEF to ENU (Topocentric Horizon Frame)
         double[][] rot = new double[6][6];
-        rot[0] = new double[]{-FastMath.sin(pos.getLongitude()), FastMath.cos(pos.getLongitude()), 0., 0., 0.};
+        double cosLon = FastMath.cos(pos.getLongitude());
+        double sinLon = FastMath.sin(pos.getLongitude());
+        double cosLat = FastMath.cos(pos.getLatitude());
+        double sinLat = FastMath.sin(pos.getLatitude());
+        
+        rot[0] = new double[]{-sinLon, cosLon, 0., 0., 0., 0.};
+        rot[1] = new double[]{-cosLon*sinLat, -sinLon*sinLat, cosLat, 0., 0., 0.};
+        rot[2] = new double[]{cosLon*cosLat, sinLon*cosLat, sinLat, 0., 0., 0.};
+        rot[3] = new double[]{0., 0., 0., -sinLon, cosLon, 0.};
+        rot[4] = new double[]{0., 0., 0., -cosLon*sinLat, -sinLon*sinLat, cosLat};
+        rot[5] = new double[]{0., 0., 0., cosLon*cosLat, sinLon*cosLat, sinLat};
         
         RealMatrix rotEcefToEnu = MatrixUtils.createRealMatrix(rot);
-
+        RealMatrix covExpected = rotEcefToEnu.multiply(covITRF.multiplyTransposed(rotEcefToEnu));
 
         CartesianCovariance covTopo = 
             ObservedObject.stateCovToCartesianCov(orbit, covTeme, topoHorizon);
-        RealMatrix covTopoMatrix = covTopo.getCovarianceMatrix();
+        RealMatrix covActual = covTopo.getCovarianceMatrix();
 
-        System.out.println("Covariance in ITRF");
-        for (int row=0; row<covITRF.getRowDimension(); row++) {
-                double[] rowVector = covITRF.getRow(row);
-                for (int col=0; col<covITRF.getColumnDimension(); col++) {
-                        System.out.print(rowVector[col] + " ");
-                }
-                System.out.println();
-        }
-        System.out.println("Covariance in Topocentric horizon frame");
-        for (int row=0; row<covTopoMatrix.getRowDimension(); row++) {
-                double[] rowVector = covTopoMatrix.getRow(row);
-                for (int col=0; col<covTopoMatrix.getColumnDimension(); col++) {
-                        System.out.print(rowVector[col] + " ");
-                }
-                System.out.println();
+        // Verify transformation to ENU (Topocentric Horizon frame)
+        for (int row=0; row<covExpected.getRowDimension(); row++) {
+            double[] rowVecExpected = covExpected.getRow(row);
+            double[] rowVecActual = covActual.getRow(row);
+            for (int col=0; col<covExpected.getColumnDimension(); col++) {
+                Assert.assertEquals(rowVecExpected[col], rowVecActual[col], 1e-14);
+            }
         }
     }
 }
