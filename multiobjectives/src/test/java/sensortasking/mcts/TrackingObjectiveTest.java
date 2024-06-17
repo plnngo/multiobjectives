@@ -25,17 +25,16 @@ import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
 import org.orekit.orbits.CartesianOrbit;
 import org.orekit.orbits.OrbitType;
-import org.orekit.orbits.PositionAngle;
+import org.orekit.orbits.PositionAngleType;
 import org.orekit.propagation.SpacecraftState;
 import org.orekit.propagation.StateCovariance;
 import org.orekit.propagation.analytical.tle.TLE;
+import org.orekit.propagation.analytical.tle.generation.FixedPointTleGenerationAlgorithm;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.time.TimeScalesFactory;
-import org.orekit.utils.AbsolutePVCoordinates;
 import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
 import org.orekit.utils.PVCoordinates;
-import org.orekit.utils.TimeStampedPVCoordinates;
 
 public class TrackingObjectiveTest {
 
@@ -83,9 +82,11 @@ public class TrackingObjectiveTest {
         // Transform from ECI to TEME and ECEF
         Transform eciToTeme = eci.getTransformTo(teme, date);
         PVCoordinates pvTeme = eciToTeme.transformPVCoordinates(pvEci);
-        AbsolutePVCoordinates pv = 
-            new AbsolutePVCoordinates(eci, new TimeStampedPVCoordinates(date, pvTeme));
-        SpacecraftState scStateTeme = new SpacecraftState(pv);
+        //AbsolutePVCoordinates pv = 
+        //    new AbsolutePVCoordinates(eci, new TimeStampedPVCoordinates(date, pvTeme));
+        
+        CartesianOrbit orbit = new CartesianOrbit(pvTeme, teme, date, Constants.IERS2010_EARTH_MU);
+        SpacecraftState scStateTeme = new SpacecraftState(orbit);
         StateVector stateTeme = ObservedObject.spacecraftStateToStateVector(scStateTeme, teme);
 
         Transform eciToEcef = eci.getTransformTo(ecef, date);
@@ -112,22 +113,24 @@ public class TrackingObjectiveTest {
             new double[]{9.997710067646443E-5, 1.0002746172251205E-4, 1.0000913010505871E-4, 
                          9.99770997102827E-7, 1.0002745855414737E-6, 1.000091301464106E-6};
         RealMatrix covMatrix = MatrixUtils.createRealMatrix(covArray);
-        StateCovariance covTeme = new StateCovariance(covMatrix, date, teme, OrbitType.CARTESIAN, PositionAngle.MEAN);
-        CartesianOrbit orbit = new CartesianOrbit(pvTeme, teme, date, Constants.IERS2010_EARTH_MU);
+        StateCovariance covTeme = new StateCovariance(covMatrix, date, teme, OrbitType.CARTESIAN, PositionAngleType.MEAN);
+        
         CartesianCovariance stateCovTeme = 
             ObservedObject.stateCovToCartesianCov(orbit, covTeme, teme);
 
         // Generate list of object of interest OOI
+        //LeastSquaresTleGenerationAlgorithm converter = new LeastSquaresTleGenerationAlgorithm();
         TLE testTle = new TLE("1 55586U 23020T   23336.86136309  .00002085  00000-0  16934-3 0  9990", 
                            "2 55586  43.0014 182.7273 0001366 277.9331  82.1357 15.02547145 44391");
-        TLE.stateToTLE(scStateTeme, testTle);
-        ObservedObject test = new ObservedObject(123, stateTeme , stateCovTeme, teme, testTle);
+        //TLE.stateToTLE(scStateTeme, testTle, converter);
+        TLE pseudoTle = new FixedPointTleGenerationAlgorithm().generate(scStateTeme, testTle);
+        ObservedObject test = new ObservedObject(123, stateTeme , stateCovTeme, teme, pseudoTle);
         List<ObservedObject> ooi = new ArrayList<ObservedObject>();
         ooi.add(test);
 
         // Retrieve coordinates of ground station
-        double lat = pvEcef.getPosition().getAlpha();
-        double lon = pvEcef.getPosition().getDelta();
+        double lon = pvEcef.getPosition().getAlpha();
+        double lat = pvEcef.getPosition().getDelta();
         System.out.println("Lat " + FastMath.toDegrees(lat));
         System.out.println("Lon " + FastMath.toDegrees(lon));
 
@@ -143,7 +146,7 @@ public class TrackingObjectiveTest {
 
         // Call test function 
         TrackingObjective trackTask = new TrackingObjective(ooi, topoHorizon);
-        trackTask.setMicroAction(date.shiftedBy(10));
+        trackTask.setMicroAction(date);
 
 
 

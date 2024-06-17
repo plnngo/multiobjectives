@@ -111,7 +111,7 @@ public class SpatialDensityModel {
             EclipseDetector detector = new EclipseDetector(sun, Constants.SUN_RADIUS, obateEarth)
                                             .withMaxCheck(60.0)
                                             .withThreshold(1.0e-3)
-                                            .withHandler(new ContinueOnEvent<>())
+                                            .withHandler(new ContinueOnEvent())
                                             .withUmbra();
 
             TLEPropagator propagator = TLEPropagator.selectExtrapolator(tle);

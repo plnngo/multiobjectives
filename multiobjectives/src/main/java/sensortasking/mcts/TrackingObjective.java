@@ -3,8 +3,6 @@ package sensortasking.mcts;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hipparchus.geometry.euclidean.threed.Rotation;
-import org.hipparchus.geometry.euclidean.threed.RotationConvention;
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.LUDecomposition;
 import org.hipparchus.linear.MatrixUtils;
@@ -23,15 +21,13 @@ import org.orekit.estimation.sequential.KalmanEstimator;
 import org.orekit.estimation.sequential.KalmanEstimatorBuilder;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
+import org.orekit.frames.FactoryManagedFrame;
 import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
-import org.orekit.geometry.fov.FieldOfView;
-import org.orekit.geometry.fov.PolygonalFieldOfView;
-import org.orekit.geometry.fov.PolygonalFieldOfView.DefiningConeType;
 import org.orekit.orbits.Orbit;
 import org.orekit.orbits.OrbitType;
-import org.orekit.orbits.PositionAngle;
+import org.orekit.orbits.PositionAngleType;
 import org.orekit.propagation.MatricesHarvester;
 import org.orekit.propagation.Propagator;
 import org.orekit.propagation.SpacecraftState;
@@ -39,12 +35,11 @@ import org.orekit.propagation.StateCovariance;
 import org.orekit.propagation.StateCovarianceMatrixProvider;
 import org.orekit.propagation.analytical.tle.TLE;
 import org.orekit.propagation.analytical.tle.TLEPropagator;
+import org.orekit.propagation.analytical.tle.generation.FixedPointTleGenerationAlgorithm;
 import org.orekit.propagation.conversion.TLEPropagatorBuilder;
-import org.orekit.propagation.events.EclipseDetector;
 import org.orekit.propagation.events.ElevationDetector;
 import org.orekit.propagation.events.EventDetector;
 import org.orekit.propagation.events.EventsLogger;
-import org.orekit.propagation.events.GroundFieldOfViewDetector;
 import org.orekit.propagation.events.EventsLogger.LoggedEvent;
 import org.orekit.propagation.events.handlers.ContinueOnEvent;
 import org.orekit.time.AbsoluteDate;
@@ -54,15 +49,14 @@ import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
 import org.orekit.utils.TimeStampedPVCoordinates;
 
-import sensortasking.stripescanning.Tasking;
 
 public class TrackingObjective implements Objective{
 
     /** List of targets of interests with their initial condition. */
-    List<ObservedObject> initTargets;
+    List<ObservedObject> initTargets = new ArrayList<ObservedObject>();
 
     /** List of targets of interest with latest state update. */
-    List<ObservedObject> updatedTargets;
+    List<ObservedObject> updatedTargets = new ArrayList<ObservedObject>();
 
     /** Maximum checking interval of event detector. */
     final double maxcheck  = 60.0;
@@ -80,7 +74,7 @@ public class TrackingObjective implements Objective{
     //List<LoggedEvent> loggedFORpasses = new ArrayList<LoggedEvent>();
 
     /** Maximal propagation duration in [sec] to check if satellite is entering field of regard. */
-    final double maxPropDuration = 60.*15;
+    final double maxPropDuration = 60.*2;
 
     /** Number of observations during one field of regard pass. */
     final int numObs = 4;
@@ -113,11 +107,12 @@ public class TrackingObjective implements Objective{
     @Override
     public AngularDirection setMicroAction(AbsoluteDate current) {
 
+        FactoryManagedFrame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+
         // Set up Earth shape
         OneAxisEllipsoid earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
                                                       Constants.WGS84_EARTH_FLATTENING,
-                                                      FramesFactory.getITRF(IERSConventions.IERS_2010,
-                                                                            true));
+                                                      ecef);
 
         // Iterate through list of objects of interest
         for (ObservedObject candidate : updatedTargets) {
@@ -125,18 +120,21 @@ public class TrackingObjective implements Objective{
             final EventDetector visibility =
                     new ElevationDetector(maxcheck, threshold, stationFrame).
                     withConstantElevation(elevation).
-                    withHandler((s, d, increasing) -> {
-                        System.out.println(" Visibility on " +
-                                           ((ElevationDetector) d).getTopocentricFrame().getName() +
+                    withHandler(/* (s, d, increasing) -> {
+                        System.out.println(" Visibility on object " +
+                                           candidate.getId() +
                                            (increasing ? " begins at " : " ends at ") +
                                            s.getDate().toStringWithoutUtcOffset(utc, 3));
                         return increasing ? Action.CONTINUE : Action.STOP;
-                    });
+                    } */new ContinueOnEvent());
 
             // Set up SGP4 propagator
-            TLEPropagator tleProp = TLEPropagator.selectExtrapolator(candidate.getPseudoTle());
+            TLE tle = candidate.getPseudoTle();
+            //KeplerianOrbit kepOrbit = new KeplerianOrbit(tle.getS, maxcheck, minMoonDist, sensorApartureRadius, maxPropDuration, elevation, null, ecef, current, utilityWeight)
+            TLEPropagator tleProp = TLEPropagator.selectExtrapolator(tle);
 
-            // Covariance
+
+            /* // Covariance
             final RealMatrix covInitMatrix = candidate.getCovariance().getCovarianceMatrix();
             final StateCovariance covInit = 
                 new StateCovariance(covInitMatrix, candidate.getEpoch(), candidate.getFrame(), 
@@ -149,14 +147,19 @@ public class TrackingObjective implements Objective{
                 new StateCovarianceMatrixProvider("covariance", stmAdditionalName, harvester,
                                                  OrbitType.CARTESIAN, PositionAngle.MEAN, covInit);
 
-            tleProp.addAdditionalStateProvider(provider);
+            tleProp.addAdditionalStateProvider(provider); */
             // Add event to be detected
             final EventsLogger logger = new EventsLogger();
             tleProp.addEventDetector(logger.monitorDetector(visibility));
 
             // Propagate over maximal propoagation duration
-            tleProp.propagate(current.shiftedBy(maxPropDuration));
-            AbsoluteDate[] passInterval = getFORPassDuration(current, logger.getLoggedEvents());
+            //SpacecraftState s = tleProp.propagate(current.shiftedBy(maxPropDuration));
+            SpacecraftState s = tleProp.propagate(current);
+            System.out.println("Events: " + logger.getLoggedEvents().size());
+            StateVector stateVec = ObservedObject.spacecraftStateToStateVector(s, ecef);
+            System.out.println("Latitude: " + FastMath.toDegrees(stateVec.getPositionVector().getDelta()));
+            System.out.println("Longitude: " + FastMath.toDegrees(stateVec.getPositionVector().getAlpha()));
+           /*  AbsoluteDate[] passInterval = getFORPassDuration(current, logger.getLoggedEvents());
             if (passInterval[0].equals(passInterval[1])){
                 // object doess not pass through FOR within the upcoming 15mins
                 continue;
@@ -262,7 +265,7 @@ public class TrackingObjective implements Objective{
                     double iG = computeInformationGain(result[1], result[2]);
 
                 }
-            }
+            } */
         }
 
         // Fake data
@@ -363,8 +366,10 @@ public class TrackingObjective implements Objective{
             MatrixUtils.createRealDiagonalMatrix(new double[]{1e-8, 1e-8, 1e-8, 1e-8, 1e-8, 1e-8});
         
         // Set propagator
+        //LeastSquaresTleGenerationAlgorithm converter = new LeastSquaresTleGenerationAlgorithm();
         TLEPropagatorBuilder propBuilder = 
-            new TLEPropagatorBuilder(candidate.getPseudoTle(), PositionAngle.MEAN, 1.);
+            new TLEPropagatorBuilder(candidate.getPseudoTle(), PositionAngleType.MEAN, 1., 
+                                     new FixedPointTleGenerationAlgorithm());
 
         // Build Kalman filter
         KalmanEstimator kalman = 
@@ -382,21 +387,22 @@ public class TrackingObjective implements Objective{
 
         // Process covariance to derive Cartesian orbital covariance matrix
         double[][] dCdY = new double[6][6];
-        estimatedO.getJacobianWrtParameters(PositionAngle.MEAN, dCdY);
+        estimatedO.getJacobianWrtParameters(PositionAngleType.MEAN, dCdY);
         RealMatrix jacobian = MatrixUtils.createRealMatrix(dCdY);
         RealMatrix estimatedCartesianP = jacobian.multiply(estimatedP.getSubMatrix(0, 5, 0, 5))
                                                  .multiply(jacobian.transpose());       // TODO: check if sqrt of diagonal has to be taken
         StateCovariance stateCovEndUpdated = 
             new StateCovariance(estimatedCartesianP, lastMeasEpoch, stationFrame,       // TODO: check frame
-                                OrbitType.CARTESIAN, PositionAngle.MEAN);
+                                OrbitType.CARTESIAN, PositionAngleType.MEAN);
         CartesianCovariance cartCovEndUpdated = 
             ObservedObject.stateCovToCartesianCov(estimatedO, stateCovEndUpdated, 
                                                   candidate.getFrame());
 
         // State at the end of tasking with measurement updates
+        TLE pseudoTleMeas = new FixedPointTleGenerationAlgorithm().generate(stateEndUpdated, 
+                                                                        candidate.getPseudoTle());
         output[3] = new ObservedObject(candidate.getId() + 3, stateVecEndUpdate, cartCovEndUpdated,
-                                       stationFrame, TLE.stateToTLE(stateEndUpdated, 
-                                       candidate.getPseudoTle()));
+                                       stationFrame, pseudoTleMeas);
 
         // Propagate from start of window to last measurement epoch without measurement update
         TLEPropagator prop = TLEPropagator.selectExtrapolator(candidate.getPseudoTle());
@@ -405,12 +411,12 @@ public class TrackingObjective implements Objective{
         final RealMatrix covInitMatrix = candidate.getCovariance().getCovarianceMatrix();
         final StateCovariance covInit = 
             new StateCovariance(covInitMatrix, candidate.getEpoch(), candidate.getFrame(), 
-                                OrbitType.CARTESIAN, PositionAngle.MEAN);
+                                OrbitType.CARTESIAN, PositionAngleType.MEAN);
         final String stmAdditionalName = "stm";
         final MatricesHarvester harvester = prop.setupMatricesComputation(stmAdditionalName, null, null);
 
-        final StateCovarianceMatrixProvider provider = new StateCovarianceMatrixProvider("covariance", stmAdditionalName,
-                                                                                        harvester, OrbitType.CARTESIAN, PositionAngle.MEAN, covInit);
+        final StateCovarianceMatrixProvider provider = 
+            new StateCovarianceMatrixProvider("cov", stmAdditionalName, harvester, covInit);
 
         prop.addAdditionalStateProvider(provider);
 
@@ -419,15 +425,16 @@ public class TrackingObjective implements Objective{
         RealMatrix covProp = provider.getStateCovariance(stateEndNotUpdated).getMatrix();
         StateCovariance stateCovEndNotUpdated = 
             new StateCovariance(covProp, lastMeasEpoch, stateEndNotUpdated.getFrame(),       // TODO: check frame
-                                OrbitType.CARTESIAN, PositionAngle.MEAN);
+                                OrbitType.CARTESIAN, PositionAngleType.MEAN);
         CartesianCovariance cartCovNotEndUpdated = 
             ObservedObject.stateCovToCartesianCov(stateEndNotUpdated.getOrbit(), 
                                                   stateCovEndNotUpdated, candidate.getFrame());
 
         // State at the end of tasking without measurement updates
+        TLE pseudoTle = new FixedPointTleGenerationAlgorithm().generate(stateEndNotUpdated, 
+                                                                        candidate.getPseudoTle());
         output[2] = new ObservedObject(candidate.getId() + 2, stateVecEndNotUpdate, cartCovNotEndUpdated, 
-                                       stationFrame, TLE.stateToTLE(stateEndNotUpdated, 
-                                       candidate.getPseudoTle()));
+                                       stationFrame, pseudoTle);
 
         return output;
     }

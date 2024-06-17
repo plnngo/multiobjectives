@@ -23,7 +23,7 @@ import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
 import org.orekit.orbits.CartesianOrbit;
 import org.orekit.orbits.OrbitType;
-import org.orekit.orbits.PositionAngle;
+import org.orekit.orbits.PositionAngleType;
 import org.orekit.propagation.SpacecraftState;
 import org.orekit.propagation.StateCovariance;
 import org.orekit.time.AbsoluteDate;
@@ -156,7 +156,7 @@ public class ObservedObjectTest {
             new double[]{9.997710067646443E-5, 1.0002746172251205E-4, 1.0000913010505871E-4, 
                          9.99770997102827E-7, 1.0002745855414737E-6, 1.000091301464106E-6};
         RealMatrix covMatrix = MatrixUtils.createRealMatrix(covArray);
-        StateCovariance covTeme = new StateCovariance(covMatrix, date, teme, OrbitType.CARTESIAN, PositionAngle.MEAN);
+        StateCovariance covTeme = new StateCovariance(covMatrix, date, teme, OrbitType.CARTESIAN, PositionAngleType.MEAN);
 
         CartesianOrbit orbit = new CartesianOrbit(pvTeme, teme, date, Constants.IERS2010_EARTH_MU);
         CartesianCovariance covEcef = ObservedObject.stateCovToCartesianCov(orbit, covTeme, ecef);

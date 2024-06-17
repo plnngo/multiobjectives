@@ -2,6 +2,7 @@ package sensortasking.mcts;
 
 import java.io.File;
 
+import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.DiagonalMatrix;
 import org.hipparchus.linear.RealMatrix;
 import org.hipparchus.ode.events.Action;
@@ -12,18 +13,24 @@ import org.orekit.data.DataContext;
 import org.orekit.data.DataProvidersManager;
 import org.orekit.data.DirectoryCrawler;
 import org.orekit.errors.OrekitException;
+import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.frames.Frame;
 import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
+import org.orekit.frames.Transform;
 import org.orekit.models.earth.ReferenceEllipsoid;
+import org.orekit.orbits.CartesianOrbit;
+import org.orekit.orbits.KeplerianOrbit;
 import org.orekit.orbits.OrbitType;
-import org.orekit.orbits.PositionAngle;
+import org.orekit.orbits.PositionAngleType;
 import org.orekit.propagation.MatricesHarvester;
 import org.orekit.propagation.SpacecraftState;
 import org.orekit.propagation.StateCovariance;
 import org.orekit.propagation.StateCovarianceMatrixProvider;
 import org.orekit.propagation.analytical.tle.TLE;
+import org.orekit.propagation.analytical.tle.TLEConstants;
 import org.orekit.propagation.analytical.tle.TLEPropagator;
+import org.orekit.propagation.analytical.tle.generation.FixedPointTleGenerationAlgorithm;
 import org.orekit.propagation.events.ElevationDetector;
 import org.orekit.propagation.events.EventDetector;
 import org.orekit.propagation.events.EventsLogger;
@@ -31,7 +38,9 @@ import org.orekit.propagation.events.EventsLogger.LoggedEvent;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.time.TimeScale;
 import org.orekit.time.TimeScalesFactory;
+import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
+import org.orekit.utils.PVCoordinates;
 
 /**
  * Hello world!
@@ -39,6 +48,71 @@ import org.orekit.utils.IERSConventions;
  */
 public class App {
     public static void main( String[] args ){
+
+        // Load orekit data
+        String orekitDataDir = "multiobjectives\\src\\test\\java\\resources\\orekit-data";
+        File orekitData = new File(orekitDataDir);
+        DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
+        manager.addProvider(new DirectoryCrawler(orekitData));
+
+        // Create frames
+        Frame eci = FramesFactory.getGCRF();
+        Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+        Frame teme = FramesFactory.getTEME();
+
+        // Set up input data from Vallado
+        AbsoluteDate date = 
+            new AbsoluteDate(2000, 12, 15, 16, 58, 50.208, TimeScalesFactory.getUTC());
+        PVCoordinates pvEci = 
+            new PVCoordinates(new Vector3D(-605792.21660, -5870229.51108, 3493053.19896),
+                              new Vector3D(-1568.25429, -3702.34891, -6479.48395));
+
+        // Transform from ECI to TEME and ECEF
+        Transform eciToTeme = eci.getTransformTo(teme, date);
+        PVCoordinates pvTeme = eciToTeme.transformPVCoordinates(pvEci);
+        System.out.println("State in TEME using Transform");
+        System.out.println(pvTeme.toString());
+
+        CartesianOrbit orbit = new CartesianOrbit(pvTeme, teme, date, Constants.IERS2010_EARTH_MU);
+        SpacecraftState scStateTeme = new SpacecraftState(orbit);
+        StateVector stateTeme = ObservedObject.spacecraftStateToStateVector(scStateTeme, teme);
+        System.out.println("State in TEME using spacecraftStateToStateVector");
+        System.out.println(stateTeme.getPositionVector());
+        System.out.println(stateTeme.getVelocityVector());
+
+        TLE testTle = new TLE("1 55586U 23020T   23336.86136309  .00002085  00000-0  16934-3 0  9990", 
+                           "2 55586  43.0014 182.7273 0001366 277.9331  82.1357 15.02547145 44391");
+        //LeastSquaresTleGenerationAlgorithm converter = new LeastSquaresTleGenerationAlgorithm();
+        //TLE pseudoTle = TLE.stateToTLE(scStateTeme, testTle, converter);   //TODO: check if SGP4 model is applied or if the state vector is still the same
+        TLE pseudoTle = new FixedPointTleGenerationAlgorithm().generate(scStateTeme, testTle);
+
+        // Retrieve semi major axis from TLE
+        double n = pseudoTle.getMeanMotion();
+        double a = FastMath.pow(TLEConstants.MU, 1./3.)/(FastMath.pow(n, 2./3.));
+
+        KeplerianOrbit kepOrbitFromTle = 
+            new KeplerianOrbit(a, pseudoTle.getE(), pseudoTle.getI(), 
+                               pseudoTle.getPerigeeArgument(), pseudoTle.getRaan(), 
+                               pseudoTle.getMeanAnomaly(), PositionAngleType.MEAN, teme, date, 
+                               TLEConstants.MU);
+        System.out.println("State in TEME using stateToTLE");
+        System.out.println(kepOrbitFromTle.getPVCoordinates().getPosition());
+        System.out.println(kepOrbitFromTle.getPVCoordinates().getVelocity());
+
+        //SGP4 Propagator 
+        TLEPropagator tleProp = TLEPropagator.selectExtrapolator(pseudoTle);
+        SpacecraftState stateProp = tleProp.propagate(date);
+        System.out.println("State in TEME after propagation");
+        System.out.println(stateProp.getPVCoordinates().getPosition());
+        System.out.println(stateProp.getPVCoordinates().getVelocity());
+        System.out.println("State in TEME before propagation");
+        System.out.println(tleProp.getInitialState().getPVCoordinates().getPosition());
+        System.out.println(tleProp.getInitialState().getPVCoordinates().getVelocity());
+
+
+    }
+
+    public void testPropo() {
         try {
 
             // Load orekit data
@@ -79,12 +153,12 @@ public class App {
 
             // Covariance
             final RealMatrix covInitMatrix = new DiagonalMatrix(new double[]{10., 10., 10., 100., 100., 100.});
-            final StateCovariance covInit = new StateCovariance(covInitMatrix, initialDate, FramesFactory.getTEME(), OrbitType.CARTESIAN, PositionAngle.MEAN);
+            final StateCovariance covInit = new StateCovariance(covInitMatrix, initialDate, FramesFactory.getTEME(), OrbitType.CARTESIAN, PositionAngleType.MEAN);
             final String stmAdditionalName = "stm";
             final MatricesHarvester harvester = tleProp.setupMatricesComputation(stmAdditionalName, null, null);
 
-            final StateCovarianceMatrixProvider provider = new StateCovarianceMatrixProvider("covariance", stmAdditionalName,
-                                                                                         harvester, OrbitType.CARTESIAN, PositionAngle.MEAN, covInit);
+            final StateCovarianceMatrixProvider provider = 
+                new StateCovarianceMatrixProvider("cov", stmAdditionalName, harvester, covInit);
 
             tleProp.addAdditionalStateProvider(provider);
 
@@ -134,6 +208,5 @@ public class App {
         } catch (OrekitException oe) {
             System.err.println(oe.getLocalizedMessage());
         }
-
     }
 }
