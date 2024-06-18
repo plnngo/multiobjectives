@@ -81,9 +81,9 @@ public class ObservedObjectTest {
         double actualAzVallado = 180 - (actualAzOrekit + 90.);
 
         // Compare range, azimuth and elevation with Vallado
-        Assert.assertEquals(210.8777747, actualAzVallado, 1e-3);
-        Assert.assertEquals(-5.9409535, FastMath.toDegrees(posTopoHorizon.getDelta()), 1e-3);
-        Assert.assertEquals(11710812, posTopoHorizon.getNorm(), 1e2);
+        Assert.assertEquals(210.8777747, actualAzVallado, 1e-3);    // Azimuth in [deg]
+        Assert.assertEquals(-5.9409535, FastMath.toDegrees(posTopoHorizon.getDelta()), 1e-3);   // Elevation in [deg]
+        Assert.assertEquals(11710812, posTopoHorizon.getNorm(), 1e2);   // Range in [m]
     }
 
     /**
