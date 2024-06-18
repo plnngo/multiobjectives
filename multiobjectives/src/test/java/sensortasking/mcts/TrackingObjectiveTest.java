@@ -64,6 +64,11 @@ public class TrackingObjectiveTest {
         this.topoHorizon = new TopocentricFrame(earth, pos, "United States Air Force Academy"); */
     }
 
+    /**
+     * Test {@link TrackingObjective#setMicroAction(AbsoluteDate)}
+     * using test data from "Covariance Transformations for Satellite Flight Dynamics Operations"
+     * @throws IOException
+     */
     @Test
     public void testSetMicroAction() throws IOException {
 

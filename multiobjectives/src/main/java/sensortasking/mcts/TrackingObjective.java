@@ -3,6 +3,8 @@ package sensortasking.mcts;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hipparchus.geometry.euclidean.threed.Rotation;
+import org.hipparchus.geometry.euclidean.threed.RotationConvention;
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.LUDecomposition;
 import org.hipparchus.linear.MatrixUtils;
@@ -25,6 +27,9 @@ import org.orekit.frames.FactoryManagedFrame;
 import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
+import org.orekit.geometry.fov.FieldOfView;
+import org.orekit.geometry.fov.PolygonalFieldOfView;
+import org.orekit.geometry.fov.PolygonalFieldOfView.DefiningConeType;
 import org.orekit.orbits.Orbit;
 import org.orekit.orbits.OrbitType;
 import org.orekit.orbits.PositionAngleType;
@@ -37,10 +42,12 @@ import org.orekit.propagation.analytical.tle.TLE;
 import org.orekit.propagation.analytical.tle.TLEPropagator;
 import org.orekit.propagation.analytical.tle.generation.FixedPointTleGenerationAlgorithm;
 import org.orekit.propagation.conversion.TLEPropagatorBuilder;
+import org.orekit.propagation.events.EclipseDetector;
 import org.orekit.propagation.events.ElevationDetector;
 import org.orekit.propagation.events.EventDetector;
 import org.orekit.propagation.events.EventsLogger;
 import org.orekit.propagation.events.EventsLogger.LoggedEvent;
+import org.orekit.propagation.events.GroundFieldOfViewDetector;
 import org.orekit.propagation.events.handlers.ContinueOnEvent;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.time.TimeScale;
@@ -48,6 +55,8 @@ import org.orekit.time.TimeScalesFactory;
 import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
 import org.orekit.utils.TimeStampedPVCoordinates;
+
+import sensortasking.stripescanning.Tasking;
 
 
 public class TrackingObjective implements Objective{
@@ -74,10 +83,10 @@ public class TrackingObjective implements Objective{
     //List<LoggedEvent> loggedFORpasses = new ArrayList<LoggedEvent>();
 
     /** Maximal propagation duration in [sec] to check if satellite is entering field of regard. */
-    final double maxPropDuration = 60.*2;
+    final double maxPropDuration = 60.*10;
 
     /** Number of observations during one field of regard pass. */
-    final int numObs = 4;
+    int numObs = 4;
 
     /** Tasking duration for an observation in [sec]. */
     final double taskDuration = 2 * 60.;
@@ -120,65 +129,72 @@ public class TrackingObjective implements Objective{
             final EventDetector visibility =
                     new ElevationDetector(maxcheck, threshold, stationFrame).
                     withConstantElevation(elevation).
-                    withHandler(/* (s, d, increasing) -> {
+                    withHandler((s, d, increasing) -> {
                         System.out.println(" Visibility on object " +
                                            candidate.getId() +
                                            (increasing ? " begins at " : " ends at ") +
                                            s.getDate().toStringWithoutUtcOffset(utc, 3));
-                        return increasing ? Action.CONTINUE : Action.STOP;
-                    } */new ContinueOnEvent());
+                        return increasing ? Action.CONTINUE : Action.STOP;  // stop propagation when object leaves FOR
+                    }/* new ContinueOnEvent() */);
 
             // Set up SGP4 propagator
             TLE tle = candidate.getPseudoTle();
-            //KeplerianOrbit kepOrbit = new KeplerianOrbit(tle.getS, maxcheck, minMoonDist, sensorApartureRadius, maxPropDuration, elevation, null, ecef, current, utilityWeight)
             TLEPropagator tleProp = TLEPropagator.selectExtrapolator(tle);
 
-
-            /* // Covariance
+            // Covariance
             final RealMatrix covInitMatrix = candidate.getCovariance().getCovarianceMatrix();
             final StateCovariance covInit = 
                 new StateCovariance(covInitMatrix, candidate.getEpoch(), candidate.getFrame(), 
-                                    OrbitType.CARTESIAN, PositionAngle.MEAN);
+                                    OrbitType.CARTESIAN, PositionAngleType.MEAN);
             final String stmAdditionalName = "stm";
             final MatricesHarvester harvester = 
                 tleProp.setupMatricesComputation(stmAdditionalName, null, null);
 
             final StateCovarianceMatrixProvider provider = 
-                new StateCovarianceMatrixProvider("covariance", stmAdditionalName, harvester,
-                                                 OrbitType.CARTESIAN, PositionAngle.MEAN, covInit);
+                new StateCovarianceMatrixProvider("cov", stmAdditionalName, harvester, covInit);
 
-            tleProp.addAdditionalStateProvider(provider); */
+            tleProp.addAdditionalStateProvider(provider);
             // Add event to be detected
             final EventsLogger logger = new EventsLogger();
             tleProp.addEventDetector(logger.monitorDetector(visibility));
 
             // Propagate over maximal propoagation duration
-            //SpacecraftState s = tleProp.propagate(current.shiftedBy(maxPropDuration));
-            SpacecraftState s = tleProp.propagate(current);
+            SpacecraftState s = tleProp.propagate(current.shiftedBy(maxPropDuration));
+            //SpacecraftState s = tleProp.propagate(current);
             System.out.println("Events: " + logger.getLoggedEvents().size());
-            StateVector stateVec = ObservedObject.spacecraftStateToStateVector(s, ecef);
-            System.out.println("Latitude: " + FastMath.toDegrees(stateVec.getPositionVector().getDelta()));
-            System.out.println("Longitude: " + FastMath.toDegrees(stateVec.getPositionVector().getAlpha()));
-           /*  AbsoluteDate[] passInterval = getFORPassDuration(current, logger.getLoggedEvents());
-            if (passInterval[0].equals(passInterval[1])){
-                // object doess not pass through FOR within the upcoming 15mins
+            StateVector stateVec = ObservedObject.spacecraftStateToStateVector(s, stationFrame);
+            System.out.println("Elevation: " + FastMath.toDegrees(stateVec.getPositionVector().getDelta()));
+            System.out.println("Azimuth: " + FastMath.toDegrees(stateVec.getPositionVector().getAlpha()));
+            boolean objectAlreadyInFOR = visibility.g(tleProp.getInitialState()) > 0. ? true : false;
+            AbsoluteDate[] passInterval = 
+                getFORPassDuration(current, logger.getLoggedEvents(), objectAlreadyInFOR);
+            // System.out.println("G value end " + visibility.g(s));
+            // System.out.println("G value beginning " + visibility.g(tleProp.getInitialState()));
+             if (passInterval[0].equals(passInterval[1])){
+                // object doess not pass through FOR within the request time duration
                 continue;
             } else {
                 // schedule observations for FOR pass 
                 double totalObsDuration = numObs * taskDuration;
+                double actualObsDuration = passInterval[1].durationFrom(passInterval[0]);
+
+                // Correct number of observation request so that they fit into observation window
+                while(actualObsDuration<totalObsDuration) {
+                    numObs--;
+                    totalObsDuration = numObs * taskDuration;
+                }
 
                 // TODO: check that timeDurationBetweenTasks > taskDuration
                 double timeDurationBetweenTasks = 
                     (passInterval[1].durationFrom(passInterval[0])-totalObsDuration) / (numObs+1);
                 AbsoluteDate taskEpoch = passInterval[0].shiftedBy(timeDurationBetweenTasks);
-                //TLEPropagator outerProp = TLEPropagator.selectExtrapolator(candidate.getPseudoTle());
                 EventsLogger earthShadowLogger = new EventsLogger();
 
                 // set up eclipse detector
                 EclipseDetector eclipseDetector = new EclipseDetector(sun, Constants.SUN_RADIUS, earth)
                                                 .withMaxCheck(60.0)
                                                 .withThreshold(1.0e-3)
-                                                .withHandler(new ContinueOnEvent<>())
+                                                .withHandler(new ContinueOnEvent())
                                                 .withUmbra();
                 tleProp.addEventDetector(earthShadowLogger.monitorDetector(eclipseDetector));
 
@@ -211,28 +227,25 @@ public class TrackingObjective implements Objective{
                         continue;
                     }
 
-                    // If code reaches here, object is observable and visible
+                   /*  // If code reaches here, object is observable and visible
                     List<AngularDirection> simulatedMeasurements = new ArrayList<AngularDirection>();
 
                     // TODO: Placed FOV centrally at location of satellite at beginning of tasking interval --> need to relocate to get maximised pass duration 
                     Vector3D centerFov = new Vector3D(azElBeginTask.getAngle1(), azElBeginTask.getAngle2());
                     Vector3D meridian = new Rotation(Vector3D.PLUS_K, sensorApartureRadius, 
                                                      RotationConvention.VECTOR_OPERATOR).applyTo(centerFov);
-                    FieldOfView fov =
+                    FieldOfView fov =                    
                         new PolygonalFieldOfView(new Vector3D(azElBeginTask.getAngle1(), azElBeginTask.getAngle2()),
                                                  DefiningConeType.INSIDE_CONE_TOUCHING_POLYGON_AT_EDGES_MIDDLE,
                                                  meridian, sensorApartureRadius, 4, 0);
 
                     GroundFieldOfViewDetector fovDetector = new GroundFieldOfViewDetector(stationFrame, fov)
-                                                                .withHandler((s, d, increasing) -> {
-                                                                    System.out.println(" Visibility on satellite" +
-                                                                                       (increasing ? " begins at " : " ends at ") +
-                                                                                       s.getDate().toStringWithoutUtcOffset(utc, 3));
-                                                                    if (!increasing) {
-                                                                        // TODO: check when a measurement is generated --> which propagation step size
-                                                                        simulatedMeasurements.add(transformStateToMeasurement(s));
-                                                                    }
-                                                                    return increasing ? Action.CONTINUE : Action.STOP;
+                                                                .withHandler((c, d, increasing) -> {
+                                                                    System.out.println(" Visibility on object " +
+                                                                                    candidate.getId() +
+                                                                                    (increasing ? " begins at " : " ends at ") +
+                                                                                    c.getDate().toStringWithoutUtcOffset(utc, 3));
+                                                                    return increasing ? Action.CONTINUE : Action.STOP;  // stop propagation when object leaves FOR
                                                                 });
                     
 
@@ -262,10 +275,10 @@ public class TrackingObjective implements Objective{
                     ObservedObject[] result = estimateStateWithKalman(orekitAzElMeas, candidateBeginTask);
 
                     // Evaluate information gain
-                    double iG = computeInformationGain(result[1], result[2]);
+                    double iG = computeInformationGain(result[1], result[2]); */
 
                 }
-            } */
+            }
         }
 
         // Fake data
@@ -500,15 +513,18 @@ public class TrackingObjective implements Objective{
      * 
      * @param current
      * @param forPass
+     * @param alreadyInFOR
      * @return
      */
-    public AbsoluteDate[] getFORPassDuration(AbsoluteDate current, List<LoggedEvent> forPass) {
+    public AbsoluteDate[] getFORPassDuration(AbsoluteDate current, List<LoggedEvent> forPass, boolean alreadyInFOR) {
         
         AbsoluteDate[] interval = new AbsoluteDate[]{current, current};
         if (forPass.size() == 2) {
             // object is going to enter and exit FOR within upcoming 15min
             interval = new AbsoluteDate[]{forPass.get(0).getDate(), 
                                           forPass.get(1).getDate()};
+        } else if (forPass.size() == 0 && alreadyInFOR) {
+            interval[1] = current.shiftedBy(maxPropDuration);
         }
         for (LoggedEvent event : forPass) {
             if (event.isIncreasing()) {

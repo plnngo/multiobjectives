@@ -86,7 +86,7 @@ public class App {
         //TLE pseudoTle = TLE.stateToTLE(scStateTeme, testTle, converter);   //TODO: check if SGP4 model is applied or if the state vector is still the same
         TLE pseudoTle = new FixedPointTleGenerationAlgorithm().generate(scStateTeme, testTle);
 
-        // Retrieve semi major axis from TLE
+ /*        // Retrieve semi major axis from TLE
         double n = pseudoTle.getMeanMotion();
         double a = FastMath.pow(TLEConstants.MU, 1./3.)/(FastMath.pow(n, 2./3.));
 
@@ -97,7 +97,7 @@ public class App {
                                TLEConstants.MU);
         System.out.println("State in TEME using stateToTLE");
         System.out.println(kepOrbitFromTle.getPVCoordinates().getPosition());
-        System.out.println(kepOrbitFromTle.getPVCoordinates().getVelocity());
+        System.out.println(kepOrbitFromTle.getPVCoordinates().getVelocity()); */
 
         //SGP4 Propagator 
         TLEPropagator tleProp = TLEPropagator.selectExtrapolator(pseudoTle);
