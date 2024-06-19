@@ -4,6 +4,7 @@ import java.io.File;
 
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.DiagonalMatrix;
+import org.hipparchus.linear.MatrixUtils;
 import org.hipparchus.linear.RealMatrix;
 import org.hipparchus.ode.events.Action;
 import org.hipparchus.util.FastMath;
@@ -49,6 +50,18 @@ import org.orekit.utils.PVCoordinates;
 public class App {
     public static void main( String[] args ){
 
+        // Load orekit data
+        String orekitDataDir = "multiobjectives\\src\\test\\java\\resources\\orekit-data";
+        File orekitData = new File(orekitDataDir);
+        DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
+        manager.addProvider(new DirectoryCrawler(orekitData));
+
+        App.testPropo2();
+
+
+    }
+
+    public void testFrameConversion() {
         // Load orekit data
         String orekitDataDir = "multiobjectives\\src\\test\\java\\resources\\orekit-data";
         File orekitData = new File(orekitDataDir);
@@ -108,18 +121,10 @@ public class App {
         System.out.println("State in TEME before propagation");
         System.out.println(tleProp.getInitialState().getPVCoordinates().getPosition());
         System.out.println(tleProp.getInitialState().getPVCoordinates().getVelocity());
-
-
     }
 
-    public void testPropo() {
+    public static void testPropo() {
         try {
-
-            // Load orekit data
-            String orekitDataDir = "multiobjectives\\src\\test\\java\\resources\\orekit-data";
-            File orekitData = new File(orekitDataDir);
-            DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
-            manager.addProvider(new DirectoryCrawler(orekitData));
 
             // Test TLE
             TLE iss = new TLE("1 25544U 98067A   24142.35003124  .00025335  00000-0  42455-3 0  9992",
@@ -192,21 +197,105 @@ public class App {
             
 
              for (LoggedEvent le : logger.getLoggedEvents()) {
-            if (le.isIncreasing()) {
-                System.out.println("Enter FOR " + le.getDate());
-            } else {
-                System.out.println("Exit FOR " + le.getDate());;
+                if (le.isIncreasing()) {
+                    System.out.println("Enter FOR " + le.getDate());
+                } else {
+                    System.out.println("Exit FOR " + le.getDate());;
+                }
+                System.out.println("Propagate the covariance to " + le.getDate().toString() + " ...");
+                final RealMatrix covProp = provider.getStateCovariance(le.getState()).getMatrix();
+                System.out.println(covProp.toString());
             }
-            System.out.println("Propagate the covariance to " + le.getDate().toString() + " ...");
-            final RealMatrix covProp = provider.getStateCovariance(le.getState()).getMatrix();
-            System.out.println(covProp.toString());
-        }
-            
-
-
-
         } catch (OrekitException oe) {
             System.err.println(oe.getLocalizedMessage());
+        }
+    }
+
+    public static void testPropo2() {
+        
+        // Create frames
+        Frame eci = FramesFactory.getGCRF();
+        Frame teme = FramesFactory.getTEME();
+
+        // Set up input data from Vallado
+        AbsoluteDate date = 
+            new AbsoluteDate(2000, 12, 15, 16, 58, 50.208, TimeScalesFactory.getUTC());
+        PVCoordinates pvEci = 
+            new PVCoordinates(new Vector3D(-605792.21660, -5870229.51108, 3493053.19896),
+                                new Vector3D(-1568.25429, -3702.34891, -6479.48395));
+        
+        // Transform from ECI to TEME and ECEF
+        Transform eciToTeme = eci.getTransformTo(teme, date);
+        PVCoordinates pvTeme = eciToTeme.transformPVCoordinates(pvEci);
+        //CartesianOrbit orbit = new CartesianOrbit(pvTeme, teme, date, Constants.IERS2010_EARTH_MU);
+        
+        KeplerianOrbit kep = new KeplerianOrbit(pvTeme, teme, date, TLEConstants.MU);
+        SpacecraftState scStateTeme = new SpacecraftState(kep);
+        System.out.println(scStateTeme.getPVCoordinates());
+        final TLE tleISS = new TLE("1 25544U 98067A   21035.14486477  .00001026  00000-0  26816-4 0  9998",
+                                "2 25544  51.6455 280.7636 0002243 335.6496 186.1723 15.48938788267977");
+        double n = FastMath.sqrt(TLEConstants.MU/FastMath.pow(kep.getA(), 3));
+        TLE tle = new TLE(tleISS.getSatelliteNumber(), tleISS.getClassification(), 
+                            tleISS.getLaunchYear(), tleISS.getLaunchNumber(), tleISS.getLaunchPiece(), 
+                            tleISS.getEphemerisType(), tleISS.getElementNumber(), date, n, 
+                            tleISS.getMeanMotionFirstDerivative(), tleISS.getMeanMotionSecondDerivative(), 
+                            kep.getE(), kep.getI(), kep.getPerigeeArgument(), 
+                            kep.getRightAscensionOfAscendingNode(), kep.getMeanAnomaly(), 
+                            tleISS.getRevolutionNumberAtEpoch(), tleISS.getBStar(), 
+                            TimeScalesFactory.getUTC());
+
+        TLE pseudoTle = new FixedPointTleGenerationAlgorithm().generate(scStateTeme, tle);
+        //LeastSquaresTleGenerationAlgorithm converter = new LeastSquaresTleGenerationAlgorithm();
+        //TLE pseudoTle = TLE.stateToTLE(scStateTeme, tle, converter);
+        TLEPropagator tleProp = TLEPropagator.selectExtrapolator(pseudoTle);
+        //System.out.println(tle.toString());
+        System.out.println(pseudoTle.toString());
+
+        // Covariance
+        // Set covariance matrix
+        double[][] covArray = new double[6][6];
+        covArray[0] = 
+            new double[]{0.9999945079552018, 0.009999542228922726, 0.009997709967860641, 
+                        9.994507954236584E-5, 9.999542225752099E-5, 9.997710067646445E-5};
+        covArray[1] =
+            new double[]{0.009999542228922725, 1.0000045790384262, 0.010002745854447466, 
+                        9.999542227959272E-5, 1.0004579035257533E-4, 1.0002746172251207E-4};
+        covArray[2] =
+            new double[]{0.00999770996786064, 0.010002745854447466, 1.0000009130063703, 
+                        9.997709871242466E-5, 1.0002745537610997E-4, 1.000091301050587E-4};
+        covArray[3] =
+            new double[]{9.994507954236582E-5, 9.999542227959272E-5, 9.997709871242466E-5, 
+                        9.99450795327065E-7, 9.999542224788645E-7, 9.997709971028265E-7};
+        covArray[4] =
+            new double[]{9.999542225752099E-5, 1.0004579035257532E-4, 1.0002745537610997E-4, 
+                        9.999542224788643E-7, 1.0004579032088274E-6, 1.0002745855414732E-6};
+        covArray[5] = 
+            new double[]{9.997710067646443E-5, 1.0002746172251205E-4, 1.0000913010505871E-4, 
+                        9.99770997102827E-7, 1.0002745855414737E-6, 1.000091301464106E-6};
+        RealMatrix covMatrix = MatrixUtils.createRealMatrix(covArray);
+        StateCovariance covTeme = new StateCovariance(covMatrix, date, teme, OrbitType.CARTESIAN, PositionAngleType.MEAN);
+        
+        // final RealMatrix covInitMatrix = new DiagonalMatrix(new double[]{10., 10., 10., 100., 100., 100.});
+        // final StateCovariance covInit = new StateCovariance(covInitMatrix, date, teme, OrbitType.CARTESIAN, PositionAngleType.MEAN);
+        final String stmAdditionalName = "STM";
+        final MatricesHarvester harvester = tleProp.setupMatricesComputation(stmAdditionalName, null, null);
+
+        final StateCovarianceMatrixProvider provider = 
+            new StateCovarianceMatrixProvider("cartCov", stmAdditionalName, harvester, covTeme);
+
+        tleProp.addAdditionalStateProvider(provider);
+        SpacecraftState s = tleProp.propagate(date.shiftedBy(0.));
+        StateVector vec = ObservedObject.spacecraftStateToStateVector(s, teme);
+        System.out.println(vec.getPositionVector());
+        System.out.println(vec.getVelocityVector());
+        StateCovariance covProp = provider.getStateCovariance(s);
+        RealMatrix covPropMatrix = covProp.getMatrix();
+        for (int row=0; row<covPropMatrix.getRowDimension(); row++) {
+            double[] rowVec = covPropMatrix.getRow(row);
+            for(int col=0; col<covPropMatrix.getColumnDimension(); col++) {
+                System.out.print(rowVec[col] + " ");
+            }
+            System.out.println();
         }
     }
 }

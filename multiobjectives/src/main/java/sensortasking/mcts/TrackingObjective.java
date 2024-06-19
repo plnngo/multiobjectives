@@ -3,8 +3,6 @@ package sensortasking.mcts;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hipparchus.geometry.euclidean.threed.Rotation;
-import org.hipparchus.geometry.euclidean.threed.RotationConvention;
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.LUDecomposition;
 import org.hipparchus.linear.MatrixUtils;
@@ -27,9 +25,6 @@ import org.orekit.frames.FactoryManagedFrame;
 import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
-import org.orekit.geometry.fov.FieldOfView;
-import org.orekit.geometry.fov.PolygonalFieldOfView;
-import org.orekit.geometry.fov.PolygonalFieldOfView.DefiningConeType;
 import org.orekit.orbits.Orbit;
 import org.orekit.orbits.OrbitType;
 import org.orekit.orbits.PositionAngleType;
@@ -47,7 +42,6 @@ import org.orekit.propagation.events.ElevationDetector;
 import org.orekit.propagation.events.EventDetector;
 import org.orekit.propagation.events.EventsLogger;
 import org.orekit.propagation.events.EventsLogger.LoggedEvent;
-import org.orekit.propagation.events.GroundFieldOfViewDetector;
 import org.orekit.propagation.events.handlers.ContinueOnEvent;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.time.TimeScale;
@@ -92,7 +86,15 @@ public class TrackingObjective implements Objective{
     final double taskDuration = 2 * 60.;
 
     /** Sun. */
-    final CelestialBody sun = CelestialBodyFactory.getSun();
+    final static CelestialBody sun = CelestialBodyFactory.getSun();
+
+    FactoryManagedFrame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+
+    /** Earth. */
+    static OneAxisEllipsoid earth = 
+        new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                Constants.WGS84_EARTH_FLATTENING,
+                                FramesFactory.getITRF(IERSConventions.IERS_2010, true));
 
     /** Minimal angular distance between Moon and sensor pointing direction. */
     double minMoonDist = FastMath.toRadians(20.);
@@ -114,14 +116,7 @@ public class TrackingObjective implements Objective{
 
     }
     @Override
-    public AngularDirection setMicroAction(AbsoluteDate current) {
-
-        FactoryManagedFrame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
-
-        // Set up Earth shape
-        OneAxisEllipsoid earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
-                                                      Constants.WGS84_EARTH_FLATTENING,
-                                                      ecef);
+    public AngularDirection setMicroAction(AbsoluteDate current) { 
 
         // Iterate through list of objects of interest
         for (ObservedObject candidate : updatedTargets) {
@@ -141,30 +136,19 @@ public class TrackingObjective implements Objective{
             TLE tle = candidate.getPseudoTle();
             TLEPropagator tleProp = TLEPropagator.selectExtrapolator(tle);
 
-            // Covariance
-            final RealMatrix covInitMatrix = candidate.getCovariance().getCovarianceMatrix();
-            final StateCovariance covInit = 
-                new StateCovariance(covInitMatrix, candidate.getEpoch(), candidate.getFrame(), 
-                                    OrbitType.CARTESIAN, PositionAngleType.MEAN);
-            final String stmAdditionalName = "stm";
-            final MatricesHarvester harvester = 
-                tleProp.setupMatricesComputation(stmAdditionalName, null, null);
-
-            final StateCovarianceMatrixProvider provider = 
-                new StateCovarianceMatrixProvider("cov", stmAdditionalName, harvester, covInit);
-
-            tleProp.addAdditionalStateProvider(provider);
+            
             // Add event to be detected
             final EventsLogger logger = new EventsLogger();
             tleProp.addEventDetector(logger.monitorDetector(visibility));
 
             // Propagate over maximal propoagation duration
-            SpacecraftState s = tleProp.propagate(current.shiftedBy(maxPropDuration));
+            AbsoluteDate targetDate = current.shiftedBy(maxPropDuration);
+            SpacecraftState s = tleProp.propagate(targetDate);
             //SpacecraftState s = tleProp.propagate(current);
-            System.out.println("Events: " + logger.getLoggedEvents().size());
+            //System.out.println("Events: " + logger.getLoggedEvents().size());
             StateVector stateVec = ObservedObject.spacecraftStateToStateVector(s, stationFrame);
-            System.out.println("Elevation: " + FastMath.toDegrees(stateVec.getPositionVector().getDelta()));
-            System.out.println("Azimuth: " + FastMath.toDegrees(stateVec.getPositionVector().getAlpha()));
+            // System.out.println("Elevation: " + FastMath.toDegrees(stateVec.getPositionVector().getDelta()));
+            // System.out.println("Azimuth: " + FastMath.toDegrees(stateVec.getPositionVector().getAlpha()));
             boolean objectAlreadyInFOR = visibility.g(tleProp.getInitialState()) > 0. ? true : false;
             AbsoluteDate[] passInterval = 
                 getFORPassDuration(current, logger.getLoggedEvents(), objectAlreadyInFOR);
@@ -184,10 +168,12 @@ public class TrackingObjective implements Objective{
                     totalObsDuration = numObs * taskDuration;
                 }
 
+                TLEPropagator tlePropFOR = TLEPropagator.selectExtrapolator(tle);
                 // TODO: check that timeDurationBetweenTasks > taskDuration
                 double timeDurationBetweenTasks = 
                     (passInterval[1].durationFrom(passInterval[0])-totalObsDuration) / (numObs+1);
-                AbsoluteDate taskEpoch = passInterval[0].shiftedBy(timeDurationBetweenTasks);
+                //AbsoluteDate taskEpoch = passInterval[0].shiftedBy(timeDurationBetweenTasks);
+                AbsoluteDate taskEpoch = current;
                 EventsLogger earthShadowLogger = new EventsLogger();
 
                 // set up eclipse detector
@@ -196,13 +182,26 @@ public class TrackingObjective implements Objective{
                                                 .withThreshold(1.0e-3)
                                                 .withHandler(new ContinueOnEvent())
                                                 .withUmbra();
-                tleProp.addEventDetector(earthShadowLogger.monitorDetector(eclipseDetector));
+                tlePropFOR.addEventDetector(earthShadowLogger.monitorDetector(eclipseDetector));
+
+                // Covariance
+                final RealMatrix covInitMatrix = candidate.getCovariance().getCovarianceMatrix();
+                final StateCovariance covInit = 
+                    new StateCovariance(covInitMatrix, candidate.getEpoch(), candidate.getFrame(), 
+                                        OrbitType.CARTESIAN, PositionAngleType.MEAN);
+                final String stmAdditionalName = "STM";
+                final MatricesHarvester harvester = 
+                    tlePropFOR.setupMatricesComputation(stmAdditionalName, null, null);
+
+                final StateCovarianceMatrixProvider provider = 
+                    new StateCovarianceMatrixProvider("cartCov", stmAdditionalName, harvester, covInit);
+                tlePropFOR.addAdditionalStateProvider(provider);
 
                 // organise observation tasks
                 for (int i=0; i<numObs; i++) {
 
                     // Propagate towards beginning of tasking interval
-                    SpacecraftState stateBeginTask = tleProp.propagate(taskEpoch);
+                    SpacecraftState stateBeginTask = tlePropFOR.propagate(taskEpoch);
                     StateCovariance covBeginTask = provider.getStateCovariance(stateBeginTask);
 
                     boolean inEarthShadow = eclipseDetector.g(stateBeginTask)<0.0;
@@ -285,6 +284,44 @@ public class TrackingObjective implements Objective{
         return new AngularDirection(null, 
                             new double[]{FastMath.toRadians(88.), FastMath.toRadians(30.)}, 
                             AngleType.AZEL);
+    }
+
+    protected static StateCovariance propagateCovariance(ObservedObject candidate, AbsoluteDate target){
+
+        TLEPropagator tlePropFOR = TLEPropagator.selectExtrapolator(candidate.getPseudoTle());
+        EventsLogger earthShadowLogger = new EventsLogger();
+
+        // set up eclipse detector
+        EclipseDetector eclipseDetector = new EclipseDetector(sun, Constants.SUN_RADIUS, earth)
+                                        .withMaxCheck(60.0)
+                                        .withThreshold(1.0e-3)
+                                        .withHandler(new ContinueOnEvent())
+                                        .withUmbra();
+        tlePropFOR.addEventDetector(earthShadowLogger.monitorDetector(eclipseDetector));
+
+        // Covariance
+        final RealMatrix covInitMatrix = candidate.getCovariance().getCovarianceMatrix();
+        final StateCovariance covInit = 
+            new StateCovariance(covInitMatrix, candidate.getEpoch(), candidate.getFrame(), 
+                                OrbitType.CARTESIAN, PositionAngleType.MEAN);
+        final String stmAdditionalName = "STM";
+        final MatricesHarvester harvester = 
+            tlePropFOR.setupMatricesComputation(stmAdditionalName, null, null);
+
+        final StateCovarianceMatrixProvider provider = 
+            new StateCovarianceMatrixProvider("cartCov", stmAdditionalName, harvester, covInit);
+        tlePropFOR.addAdditionalStateProvider(provider);
+
+        // Propagate
+        SpacecraftState s = tlePropFOR.propagate(target);
+        StateCovariance covProp = provider.getStateCovariance(s);
+
+        boolean inEarthShadow = eclipseDetector.g(s)<0.0;
+        if (inEarthShadow) {
+            // Observation cannot be performed because of lack of visibility
+            return null;
+        }
+        return covProp;
     }
 
     private double computeInformationGain(ObservedObject prior, ObservedObject posterior) {

@@ -9,6 +9,7 @@ import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.MatrixUtils;
 import org.hipparchus.linear.RealMatrix;
 import org.hipparchus.util.FastMath;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.orekit.bodies.BodyShape;
@@ -23,12 +24,13 @@ import org.orekit.frames.Frame;
 import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
-import org.orekit.orbits.CartesianOrbit;
+import org.orekit.orbits.KeplerianOrbit;
 import org.orekit.orbits.OrbitType;
 import org.orekit.orbits.PositionAngleType;
 import org.orekit.propagation.SpacecraftState;
 import org.orekit.propagation.StateCovariance;
 import org.orekit.propagation.analytical.tle.TLE;
+import org.orekit.propagation.analytical.tle.TLEConstants;
 import org.orekit.propagation.analytical.tle.generation.FixedPointTleGenerationAlgorithm;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.time.TimeScalesFactory;
@@ -40,6 +42,9 @@ public class TrackingObjectiveTest {
 
     /** Topocentric horizon frame.*/
     TopocentricFrame topoHorizon;
+
+    /** Test object. */
+    ObservedObject singleTestCase = null;
 
     @Before
     public void init() {
@@ -64,13 +69,7 @@ public class TrackingObjectiveTest {
         this.topoHorizon = new TopocentricFrame(earth, pos, "United States Air Force Academy"); */
     }
 
-    /**
-     * Test {@link TrackingObjective#setMicroAction(AbsoluteDate)}
-     * using test data from "Covariance Transformations for Satellite Flight Dynamics Operations"
-     * @throws IOException
-     */
-    @Test
-    public void testSetMicroAction() throws IOException {
+    private void generateTestObject() {
 
         // Create frames
         Frame eci = FramesFactory.getGCRF();
@@ -90,12 +89,10 @@ public class TrackingObjectiveTest {
         //AbsolutePVCoordinates pv = 
         //    new AbsolutePVCoordinates(eci, new TimeStampedPVCoordinates(date, pvTeme));
         
-        CartesianOrbit orbit = new CartesianOrbit(pvTeme, teme, date, Constants.IERS2010_EARTH_MU);
-        SpacecraftState scStateTeme = new SpacecraftState(orbit);
+        //CartesianOrbit orbit = new CartesianOrbit(pvTeme, teme, date, Constants.IERS2010_EARTH_MU);
+        KeplerianOrbit kep = new KeplerianOrbit(pvTeme, teme, date, TLEConstants.MU);
+        SpacecraftState scStateTeme = new SpacecraftState(kep);
         StateVector stateTeme = ObservedObject.spacecraftStateToStateVector(scStateTeme, teme);
-
-        Transform eciToEcef = eci.getTransformTo(ecef, date);
-        PVCoordinates pvEcef =  eciToEcef.transformPVCoordinates(pvEci);
 
         // Set covariance matrix
         double[][] covArray = new double[6][6];
@@ -121,23 +118,32 @@ public class TrackingObjectiveTest {
         StateCovariance covTeme = new StateCovariance(covMatrix, date, teme, OrbitType.CARTESIAN, PositionAngleType.MEAN);
         
         CartesianCovariance stateCovTeme = 
-            ObservedObject.stateCovToCartesianCov(orbit, covTeme, teme);
+            ObservedObject.stateCovToCartesianCov(kep, covTeme, teme);
 
         // Generate list of object of interest OOI
         //LeastSquaresTleGenerationAlgorithm converter = new LeastSquaresTleGenerationAlgorithm();
-        TLE testTle = new TLE("1 55586U 23020T   23336.86136309  .00002085  00000-0  16934-3 0  9990", 
-                           "2 55586  43.0014 182.7273 0001366 277.9331  82.1357 15.02547145 44391");
-        //TLE.stateToTLE(scStateTeme, testTle, converter);
-        TLE pseudoTle = new FixedPointTleGenerationAlgorithm().generate(scStateTeme, testTle);
-        ObservedObject test = new ObservedObject(123, stateTeme , stateCovTeme, teme, pseudoTle);
-        List<ObservedObject> ooi = new ArrayList<ObservedObject>();
-        ooi.add(test);
+        TLE testTle = new TLE("1 25544U 98067A   21035.14486477  .00001026  00000-0  26816-4 0  9998",
+                              "2 25544  51.6455 280.7636 0002243 335.6496 186.1723 15.48938788267977");
+        double n = FastMath.sqrt(TLEConstants.MU/FastMath.pow(kep.getA(), 3));
+        TLE tle = new TLE(testTle.getSatelliteNumber(), testTle.getClassification(), 
+                            testTle.getLaunchYear(), testTle.getLaunchNumber(), testTle.getLaunchPiece(), 
+                            testTle.getEphemerisType(), testTle.getElementNumber(), date, n, 
+                            testTle.getMeanMotionFirstDerivative(), testTle.getMeanMotionSecondDerivative(), 
+                            kep.getE(), kep.getI(), kep.getPerigeeArgument(), 
+                            kep.getRightAscensionOfAscendingNode(), kep.getMeanAnomaly(), 
+                            testTle.getRevolutionNumberAtEpoch(), testTle.getBStar(), 
+                            TimeScalesFactory.getUTC());
+        TLE pseudoTle = new FixedPointTleGenerationAlgorithm().generate(scStateTeme, tle);
+        System.out.println(pseudoTle);
+        this.singleTestCase = new ObservedObject(123, stateTeme , stateCovTeme, teme, pseudoTle);
 
         // Retrieve coordinates of ground station
+        Transform eciToEcef = eci.getTransformTo(ecef, date);
+        PVCoordinates pvEcef =  eciToEcef.transformPVCoordinates(pvEci);
         double lon = pvEcef.getPosition().getAlpha();
         double lat = pvEcef.getPosition().getDelta();
-        System.out.println("Lat " + FastMath.toDegrees(lat));
-        System.out.println("Lon " + FastMath.toDegrees(lon));
+        // System.out.println("Lat " + FastMath.toDegrees(lat));
+        // System.out.println("Lon " + FastMath.toDegrees(lon));
 
         GeodeticPoint pos = new GeodeticPoint(lat,   // Geodetic latitude
                                               lon,   // Longitude
@@ -147,13 +153,28 @@ public class TrackingObjectiveTest {
         BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
                                                Constants.WGS84_EARTH_FLATTENING,
                                                ecef);
-        TopocentricFrame topoHorizon = new TopocentricFrame(earth, pos, "Generic Station");
+        this.topoHorizon = new TopocentricFrame(earth, pos, "Generic Station");
+
+    }
+
+    /**
+     * Test {@link TrackingObjective#setMicroAction(AbsoluteDate)}
+     * using test data from "Covariance Transformations for Satellite Flight Dynamics Operations"
+     * @throws IOException
+     */
+    @Test
+    public void testSetMicroAction() throws IOException {
+
+        AbsoluteDate date = 
+            new AbsoluteDate(2000, 12, 15, 16, 58, 50.208, TimeScalesFactory.getUTC());
+        generateTestObject();
+        
+        List<ObservedObject> ooi = new ArrayList<ObservedObject>();
+        ooi.add(this.singleTestCase);
 
         // Call test function 
-        TrackingObjective trackTask = new TrackingObjective(ooi, topoHorizon);
+        TrackingObjective trackTask = new TrackingObjective(ooi, this.topoHorizon);
         trackTask.setMicroAction(date);
-
-
 
         // Load TLEs from file
         /* String workingDir = System.getProperty("user.dir");
@@ -185,10 +206,26 @@ public class TrackingObjectiveTest {
             tleSeries.add(new TLE(current, reader.readLine()));
         }
         reader.close(); */
-        
-        AbsoluteDate sunset = new AbsoluteDate(2024, 4, 12, 0, 54, 0, TimeScalesFactory.getUTC());
-        AbsoluteDate sunrise = new AbsoluteDate(2024, 4, 12, 11, 51, 0, TimeScalesFactory.getUTC());
-        //AbsoluteDate date = new AbsoluteDate(2024, 4, 12, 2, 29, 30, TimeScalesFactory.getUTC());
 
+    }
+
+    @Test
+    public void testPropagateCovariance() {
+        AbsoluteDate date = 
+            new AbsoluteDate(2000, 12, 15, 16, 58, 50.208, TimeScalesFactory.getUTC());
+        generateTestObject();
+        StateCovariance cov = TrackingObjective.propagateCovariance(this.singleTestCase, date);
+        RealMatrix actual = cov.getMatrix();
+        RealMatrix expected = this.singleTestCase.getCovariance().getCovarianceMatrix();
+
+        // Compare
+        for (int row=0; row<expected.getRowDimension(); row++) {
+            double[] expectedRowVec = expected.getRow(row);
+            double[] actualRowVec = actual.getRow(row);
+            for(int col=0; col<expected.getColumnDimension(); col++) {
+                Assert.assertEquals(expectedRowVec[col], actualRowVec[col], 1e-16);
+                //System.out.println(expectedRowVec[col] + " - " + actualRowVec[col]);
+            }
+        }
     }
 }
