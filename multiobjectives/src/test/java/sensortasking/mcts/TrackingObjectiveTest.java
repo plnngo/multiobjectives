@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map.Entry;
 
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.MatrixUtils;
@@ -209,23 +210,37 @@ public class TrackingObjectiveTest {
 
     }
 
+    /**
+     * Propagate initial covariance using SGP4 to initial epoch.
+     */
     @Test
     public void testPropagateCovariance() {
         AbsoluteDate date = 
             new AbsoluteDate(2000, 12, 15, 16, 58, 50.208, TimeScalesFactory.getUTC());
         generateTestObject();
-        StateCovariance cov = TrackingObjective.propagateCovariance(this.singleTestCase, date);
-        RealMatrix actual = cov.getMatrix();
-        RealMatrix expected = this.singleTestCase.getCovariance().getCovarianceMatrix();
+        Entry<SpacecraftState, StateCovariance> propagated = TrackingObjective.propagateStateAndCovariance(this.singleTestCase, date);
+        RealMatrix actualCov = propagated.getValue().getMatrix();
+        RealMatrix expectedCov = this.singleTestCase.getCovariance().getCovarianceMatrix();
 
-        // Compare
-        for (int row=0; row<expected.getRowDimension(); row++) {
-            double[] expectedRowVec = expected.getRow(row);
-            double[] actualRowVec = actual.getRow(row);
-            for(int col=0; col<expected.getColumnDimension(); col++) {
+        // Compare covariance
+        for (int row=0; row<expectedCov.getRowDimension(); row++) {
+            double[] expectedRowVec = expectedCov.getRow(row);
+            double[] actualRowVec = actualCov.getRow(row);
+            for(int col=0; col<expectedCov.getColumnDimension(); col++) {
                 Assert.assertEquals(expectedRowVec[col], actualRowVec[col], 1e-16);
                 //System.out.println(expectedRowVec[col] + " - " + actualRowVec[col]);
             }
+        }
+
+        // Compare state
+        double[] actualPos = propagated.getKey().getPVCoordinates().getPosition().toArray();
+        double[] actualVel = propagated.getKey().getPVCoordinates().getVelocity().toArray();
+        double[] expectedPos = this.singleTestCase.getState().getPositionVector().toArray();
+        double[] expectedVel = this.singleTestCase.getState().getVelocityVector().toArray();
+        
+        for (int dim=0; dim<3; dim++) {
+            Assert.assertEquals(expectedPos[dim], actualPos[dim], 1e-4);
+            Assert.assertEquals(expectedVel[dim], actualVel[dim], 1e-7);
         }
     }
 }
