@@ -35,9 +35,11 @@ import org.orekit.propagation.analytical.tle.TLEConstants;
 import org.orekit.propagation.analytical.tle.generation.FixedPointTleGenerationAlgorithm;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.time.TimeScalesFactory;
+import org.orekit.utils.AbsolutePVCoordinates;
 import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
 import org.orekit.utils.PVCoordinates;
+import org.orekit.utils.TimeStampedPVCoordinates;
 
 public class TrackingObjectiveTest {
 
@@ -242,5 +244,58 @@ public class TrackingObjectiveTest {
             Assert.assertEquals(expectedPos[dim], actualPos[dim], 1e-4);
             Assert.assertEquals(expectedVel[dim], actualVel[dim], 1e-7);
         }
+    }
+
+    /**
+     * Test {@link TrackingObjective#transformStateToAzEl(SpacecraftState)} using the  
+     * reference coordinates from Vallado's Example 4-1 in "Fundamentals of Astrodynamics and 
+     * Applications". The input is first converted into TEME since 
+     * {@link TrackingObjective#transformStateToAzEl(SpacecraftState)} is usually called on states
+     * that are defined in TEME.
+     */
+    @Test
+    public void testTransformStateToAzEl() {
+        // Frames
+        Frame eci = FramesFactory.getGCRF();
+        Frame teme = FramesFactory.getTEME();
+        Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                            Constants.WGS84_EARTH_FLATTENING,
+                                            ecef);
+        GeodeticPoint posStation = new GeodeticPoint(FastMath.toRadians(39.007),     // Geodetic latitude
+                                                     FastMath.toRadians(-104.883),     // Longitude
+                                            2194.56);                         // Altitude in [m]
+        TopocentricFrame topoHorizon = new TopocentricFrame(earth, posStation, "Topocentric Horizon");
+
+        // Input
+        AbsoluteDate date = 
+            new AbsoluteDate(1994, 5, 14, 13, 11, 20.59856, TimeScalesFactory.getUTC());
+        Vector3D pos = new Vector3D(5036.736529 * 1e3, -10806.660797 * 1e3, -4534.633784 * 1e3);
+        Vector3D vel = new Vector3D(2.6843855 * 1e3, -5.7595920 * 1e3, -2.4168093* 1e3);
+
+        Transform eciToTeme = eci.getTransformTo(teme, date);
+        PVCoordinates pvTeme =  eciToTeme.transformPVCoordinates(new PVCoordinates(pos, vel));
+        AbsolutePVCoordinates pv = 
+            new AbsolutePVCoordinates(teme, new TimeStampedPVCoordinates(date, pvTeme));
+        SpacecraftState scState = new SpacecraftState(pv);
+        StateVector stateVec = ObservedObject.spacecraftStateToStateVector(scState, teme);
+        ObservedObject obj = new ObservedObject(234, stateVec, null, date, teme);
+        List<ObservedObject> ooi = new ArrayList<ObservedObject>();
+        ooi.add(obj);
+
+        // Expected data wrt Vallado's definition of topocentric horizon frame
+        double[] expectedVallado = new double[]{FastMath.toRadians(210.8777747), 
+                                                FastMath.toRadians(-5.9409535)};
+        double[] expectedOrekit = new double[]{-(expectedVallado[0]-2*FastMath.PI) + FastMath.PI/2,
+                                            expectedVallado[1]};
+        //AngularDirection actualOrekit = radec.transformReference(topoHorizon, date, AngleType.AZEL);
+        TrackingObjective objective = new TrackingObjective(ooi, topoHorizon);
+        AngularDirection actualOrekit = objective.transformStateToAzEl(scState);
+        // Compare
+        double tolerance = 1e-3;
+        Assert.assertEquals(FastMath.toDegrees(expectedOrekit[0]), 
+                            FastMath.toDegrees(actualOrekit.getAngle1()), tolerance);
+        Assert.assertEquals(FastMath.toDegrees(expectedOrekit[1]), 
+                            FastMath.toDegrees(actualOrekit.getAngle2()), tolerance);
     }
 }

@@ -147,8 +147,8 @@ public class TrackingObjective implements Objective{
 
             // Propagate over maximal propoagation duration
             AbsoluteDate targetDate = current.shiftedBy(maxPropDuration);
-            SpacecraftState s = tleProp.propagate(targetDate);
-            //SpacecraftState s = tleProp.propagate(current);
+            //SpacecraftState s = tleProp.propagate(targetDate);
+            SpacecraftState s = tleProp.propagate(current);
             //System.out.println("Events: " + logger.getLoggedEvents().size());
             //StateVector stateVec = ObservedObject.spacecraftStateToStateVector(s, stationFrame);
             // System.out.println("Elevation: " + FastMath.toDegrees(stateVec.getPositionVector().getDelta()));
@@ -185,8 +185,8 @@ public class TrackingObjective implements Objective{
                     Entry<SpacecraftState, StateCovariance> stateBeginTask = 
                         TrackingObjective.propagateStateAndCovariance(candidate, taskEpoch);
 
-/*                     RealMatrix covPropMatrix = stateBeginTask.getValue().getMatrix();
-                    for (int row=0; row<covPropMatrix.getRowDimension(); row++) {
+                    RealMatrix covPropMatrix = stateBeginTask.getValue().getMatrix();
+/*                     for (int row=0; row<covPropMatrix.getRowDimension(); row++) {
                         double[] rowVec = covPropMatrix.getRow(row);
                         for(int col=0; col<covPropMatrix.getColumnDimension(); col++) {
                             System.out.print(rowVec[col] + " ");
@@ -200,7 +200,7 @@ public class TrackingObjective implements Objective{
                     }
 
                     // Transform spacecraft state into sensor pointing direction
-                    AngularDirection azElBeginTask = transformStateToMeasurement(stateBeginTask.getKey());
+                    AngularDirection azElBeginTask = transformStateToAzEl(stateBeginTask.getKey());
                     
                     boolean goodSolarPhase = 
                         Tasking.checkSolarPhaseCondition(taskEpoch, azElBeginTask);
@@ -490,11 +490,12 @@ public class TrackingObjective implements Objective{
 
     /**
      * Transform spacecraft state into angular direction in topocentric horizon frame.
+     * TODO: move function to AngularDirection class
      * 
      * @param state         Spacecraft state.
      * @return              Angular pointing direction with respect to topocentric horizon frame.
      */
-    private AngularDirection transformStateToMeasurement(SpacecraftState state) {
+    protected AngularDirection transformStateToAzEl(SpacecraftState state) {
 
         Transform toTopo = state.getFrame().getTransformTo(stationFrame, state.getDate());
         TimeStampedPVCoordinates stateTopo = toTopo.transformPVCoordinates(state.getPVCoordinates());

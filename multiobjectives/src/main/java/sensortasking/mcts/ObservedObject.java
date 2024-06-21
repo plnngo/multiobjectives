@@ -58,9 +58,9 @@ public class ObservedObject {
     }
 
     public static StateVector spacecraftStateToStateVector(SpacecraftState spacecraftState, 
-                                                           Frame stationFrame){
+                                                           Frame outputFrame){
 
-        TimeStampedPVCoordinates pv = spacecraftState.getPVCoordinates(stationFrame);
+        TimeStampedPVCoordinates pv = spacecraftState.getPVCoordinates(outputFrame);
         StateVector state = new StateVector();
 
         // Set position
