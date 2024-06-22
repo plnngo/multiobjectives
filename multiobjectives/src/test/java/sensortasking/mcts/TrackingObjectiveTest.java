@@ -19,6 +19,7 @@ import org.orekit.bodies.OneAxisEllipsoid;
 import org.orekit.data.DataContext;
 import org.orekit.data.DataProvidersManager;
 import org.orekit.data.DirectoryCrawler;
+import org.orekit.estimation.measurements.AngularAzEl;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
 import org.orekit.frames.Frame;
@@ -59,7 +60,7 @@ public class TrackingObjectiveTest {
         DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
         manager.addProvider(new DirectoryCrawler(orekitData));
 
-        /* // Location at United States Air Force Academy according to Vallado Example 4-1
+        // Location at United States Air Force Academy according to Vallado Example 4-1
         GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(39.007),   // Geodetic latitude
                                               FastMath.toRadians(-104.883),   // Longitude
                                               2194.56);              // in [m]
@@ -69,7 +70,7 @@ public class TrackingObjectiveTest {
         BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
                                                Constants.WGS84_EARTH_FLATTENING,
                                                earthFrame);
-        this.topoHorizon = new TopocentricFrame(earth, pos, "United States Air Force Academy"); */
+        this.topoHorizon = new TopocentricFrame(earth, pos, "United States Air Force Academy");
     }
 
     private void generateTestObject() {
@@ -297,5 +298,29 @@ public class TrackingObjectiveTest {
                             FastMath.toDegrees(actualOrekit.getAngle1()), tolerance);
         Assert.assertEquals(FastMath.toDegrees(expectedOrekit[1]), 
                             FastMath.toDegrees(actualOrekit.getAngle2()), tolerance);
+    }
+
+    /**
+     * Test {@link TrackingObjective#transformAngularAzEl2OrekitMeasurements(AngularDirection, 
+     * TopocentricFrame)}. 
+     */
+    @Test
+    public void testTransformAngularAzEl2OrekitMeasurements() {
+
+        AngularDirection test = 
+            new AngularDirection(topoHorizon, new double[]{FastMath.PI/2, FastMath.PI/2}, 
+                                 AngleType.AZEL);
+        AngularAzEl orekitAzEl = TrackingObjective.transformAngularAzEl2OrekitMeasurements(test, this.topoHorizon);
+        double[] actual = orekitAzEl.getObservedValue();
+        Assert.assertEquals(test.getAngle1(), actual[0], 1e-16);
+        Assert.assertEquals(test.getAngle2(), actual[1], 1e-16);
+
+        test = 
+            new AngularDirection(topoHorizon, new double[]{0., FastMath.toRadians(78)}, 
+                                 AngleType.AZEL);
+        orekitAzEl = TrackingObjective.transformAngularAzEl2OrekitMeasurements(test, this.topoHorizon);
+        actual = orekitAzEl.getObservedValue();
+        Assert.assertEquals(test.getAngle1(), actual[0], 1e-16);
+        Assert.assertEquals(test.getAngle2(), actual[1], 1e-16);
     }
 }

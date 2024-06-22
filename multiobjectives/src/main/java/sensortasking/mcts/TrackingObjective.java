@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Map.Entry;
 
+import org.hipparchus.geometry.euclidean.threed.Rotation;
+import org.hipparchus.geometry.euclidean.threed.RotationConvention;
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.LUDecomposition;
 import org.hipparchus.linear.MatrixUtils;
@@ -29,6 +31,9 @@ import org.orekit.frames.FactoryManagedFrame;
 import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
+import org.orekit.geometry.fov.FieldOfView;
+import org.orekit.geometry.fov.PolygonalFieldOfView;
+import org.orekit.geometry.fov.PolygonalFieldOfView.DefiningConeType;
 import org.orekit.orbits.Orbit;
 import org.orekit.orbits.OrbitType;
 import org.orekit.orbits.PositionAngleType;
@@ -46,6 +51,7 @@ import org.orekit.propagation.events.ElevationDetector;
 import org.orekit.propagation.events.EventDetector;
 import org.orekit.propagation.events.EventsLogger;
 import org.orekit.propagation.events.EventsLogger.LoggedEvent;
+import org.orekit.propagation.events.GroundFieldOfViewDetector;
 import org.orekit.propagation.events.handlers.ContinueOnEvent;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.time.TimeScale;
@@ -216,13 +222,14 @@ public class TrackingObjective implements Objective{
                         continue;
                     }
 
-                   /*  // If code reaches here, object is observable and visible
+                    // If code reaches here, object is observable and visible
                     List<AngularDirection> simulatedMeasurements = new ArrayList<AngularDirection>();
 
                     // TODO: Placed FOV centrally at location of satellite at beginning of tasking interval --> need to relocate to get maximised pass duration 
                     Vector3D centerFov = new Vector3D(azElBeginTask.getAngle1(), azElBeginTask.getAngle2());
                     Vector3D meridian = new Rotation(Vector3D.PLUS_K, sensorApartureRadius, 
                                                      RotationConvention.VECTOR_OPERATOR).applyTo(centerFov);
+                    
                     FieldOfView fov =                    
                         new PolygonalFieldOfView(new Vector3D(azElBeginTask.getAngle1(), azElBeginTask.getAngle2()),
                                                  DefiningConeType.INSIDE_CONE_TOUCHING_POLYGON_AT_EDGES_MIDDLE,
@@ -239,16 +246,20 @@ public class TrackingObjective implements Objective{
                     
 
                     // Set up modified TLE using the state at the beginning of the tasking window
-                    TLE modTleBeginTask = TLE.stateToTLE(stateBeginTask, candidate.getPseudoTle());
-                    StateVector stateVecBeginTask = ObservedObject.spacecraftStateToStateVector(stateBeginTask, candidate.getFrame());
-                    CartesianCovariance cartCovBeginTask = ObservedObject.stateCovToCartesianCov(stateBeginTask.getOrbit(), covBeginTask, candidate.getFrame());
+                    TLE modTleBeginTask = new FixedPointTleGenerationAlgorithm().generate(stateBeginTask.getKey(), candidate.getPseudoTle());
+                    //TLE modTleBeginTask = TLE.stateToTLE(stateBeginTask, candidate.getPseudoTle());
+                    StateVector stateVecBeginTask = ObservedObject.spacecraftStateToStateVector(stateBeginTask.getKey(), candidate.getFrame());
+                    CartesianCovariance cartCovBeginTask = 
+                        ObservedObject.stateCovToCartesianCov(stateBeginTask.getKey().getOrbit(), stateBeginTask.getValue(), candidate.getFrame());
                     ObservedObject candidateBeginTask = new ObservedObject(candidate.getId(), stateVecBeginTask, cartCovBeginTask, stationFrame, modTleBeginTask);
 
                     // Set up SGP4 propagator to propagate over tasking duration
                     TLEPropagator tlePropBeginTask = TLEPropagator.selectExtrapolator(modTleBeginTask);
                     final EventsLogger logFovPass = new EventsLogger();
                     tlePropBeginTask.addEventDetector(logFovPass.monitorDetector(fovDetector));
-                    tlePropBeginTask.propagate(taskEpoch.shiftedBy(taskDuration));
+                    //tlePropBeginTask.propagate(taskEpoch.shiftedBy(taskDuration));
+                    tlePropBeginTask.propagate(taskEpoch);
+
 
                     List<LoggedEvent> fovCrossings = logFovPass.getLoggedEvents();
                     if (fovCrossings.size()!=2) {
@@ -258,13 +269,14 @@ public class TrackingObjective implements Objective{
                     // Transform measurements into orekit measurements
                     List<ObservedMeasurement<?>> orekitAzElMeas = new ArrayList<>();
                     for (AngularDirection meas : simulatedMeasurements) {
-                        orekitAzElMeas.add(transformAngularAzEl2OrekitMeasurements(meas));
+                        orekitAzElMeas
+                            .add(transformAngularAzEl2OrekitMeasurements(meas, this.stationFrame));
                     }
                     // Perform updated state estimation with measurements
                     ObservedObject[] result = estimateStateWithKalman(orekitAzElMeas, candidateBeginTask);
 
                     // Evaluate information gain
-                    double iG = computeInformationGain(result[1], result[2]); */
+                    double iG = computeInformationGain(result[1], result[2]); 
 
                 }
             }
@@ -478,13 +490,26 @@ public class TrackingObjective implements Objective{
 
         return output;
     }
-    private AngularAzEl transformAngularAzEl2OrekitMeasurements(AngularDirection meas) {
+
+    /**
+     * Transform angular diretion into orekit AngularAzEl object.
+     * TODO: shift this function into AngularDirection.java
+     * 
+     * @param meas          Angular direction that is to be transformed.
+     * @return              Orekit azimuth/elevation object.
+     */
+    protected static AngularAzEl transformAngularAzEl2OrekitMeasurements(AngularDirection meas, 
+                                                                  TopocentricFrame station) {
+
+        if(!meas.getAngleType().equals(AngleType.AZEL)) {
+            throw new Error("This is not an azimuth/elevation measurement pair");
+        }
         AngularAzEl azElOrekit = 
-            new AngularAzEl(new GroundStation(stationFrame), meas.getDate(), 
-                                              new double[]{meas.getAngle1(), meas.getAngle2()}, 
-                                              new double[]{1e-3, 1e-3}, 
-                                              new double[]{1., 1.},
-                                               new ObservableSatellite(0));
+            new AngularAzEl(new GroundStation(station), meas.getDate(), 
+                            new double[]{meas.getAngle1(), meas.getAngle2()}, 
+                            new double[]{1e-3, 1e-3}, 
+                            new double[]{1., 1.},
+                            new ObservableSatellite(0));
         return azElOrekit;
     }
 
