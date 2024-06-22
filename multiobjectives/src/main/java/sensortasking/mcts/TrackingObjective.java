@@ -109,7 +109,7 @@ public class TrackingObjective implements Objective{
     /** Minimal angular distance between Moon and sensor pointing direction. */
     double minMoonDist = FastMath.toRadians(20.);
 
-    double sensorApartureRadius = FastMath.toRadians(2.);
+    double sensorApartureRadius = FastMath.toRadians(1.);
 
     final TopocentricFrame stationFrame;
 
@@ -207,6 +207,9 @@ public class TrackingObjective implements Objective{
 
                     // Transform spacecraft state into sensor pointing direction
                     AngularDirection azElBeginTask = transformStateToAzEl(stateBeginTask.getKey());
+                    System.out.println("Azimuth sensor: " + FastMath.toDegrees(azElBeginTask.getAngle1()));
+                    System.out.println("Elevation sensor: " + FastMath.toDegrees(azElBeginTask.getAngle2()));
+
                     
                     boolean goodSolarPhase = 
                         Tasking.checkSolarPhaseCondition(taskEpoch, azElBeginTask);
@@ -223,6 +226,7 @@ public class TrackingObjective implements Objective{
                     }
 
                     // If code reaches here, object is observable and visible
+                    //TODO: generate Measurements
                     List<AngularDirection> simulatedMeasurements = new ArrayList<AngularDirection>();
 
                     // TODO: Placed FOV centrally at location of satellite at beginning of tasking interval --> need to relocate to get maximised pass duration 
@@ -239,9 +243,9 @@ public class TrackingObjective implements Objective{
                                                                 .withHandler((c, d, increasing) -> {
                                                                     System.out.println(" Visibility on object " +
                                                                                     candidate.getId() +
-                                                                                    (increasing ? " begins at " : " ends at ") +
+                                                                                    (!increasing ? " begins at " : " ends at ") +
                                                                                     c.getDate().toStringWithoutUtcOffset(utc, 3));
-                                                                    return increasing ? Action.CONTINUE : Action.STOP;  // stop propagation when object leaves FOR
+                                                                    return !increasing ? Action.CONTINUE : Action.STOP;  // stop propagation when object leaves FOR
                                                                 });
                     
 
@@ -257,12 +261,43 @@ public class TrackingObjective implements Objective{
                     TLEPropagator tlePropBeginTask = TLEPropagator.selectExtrapolator(modTleBeginTask);
                     final EventsLogger logFovPass = new EventsLogger();
                     tlePropBeginTask.addEventDetector(logFovPass.monitorDetector(fovDetector));
-                    //tlePropBeginTask.propagate(taskEpoch.shiftedBy(taskDuration));
-                    tlePropBeginTask.propagate(taskEpoch);
+                    AbsoluteDate end = taskEpoch.shiftedBy(2. * 60.);
+                    SpacecraftState stateProp = tlePropBeginTask.propagate(end);
+                    System.out.println("Azimuth begin: " + FastMath.toDegrees(transformStateToAzEl(tlePropBeginTask.getInitialState()).getAngle1()));
+                    System.out.println("El begin: " + FastMath.toDegrees(transformStateToAzEl(tlePropBeginTask.getInitialState()).getAngle2()));
+
+                    System.out.println("Azimuth end: " + FastMath.toDegrees(transformStateToAzEl(stateProp).getAngle1()));
+                    System.out.println("El end: " + FastMath.toDegrees(transformStateToAzEl(stateProp).getAngle2()));
 
 
+
+                    
+                    System.out.println("Initial state: " + tlePropBeginTask.getInitialState().getDate());
+                    System.out.println("End date prop: " + stateProp.getOrbit().getDate());
+                    //tlePropBeginTask.propagate(taskEpoch);
+                    
                     List<LoggedEvent> fovCrossings = logFovPass.getLoggedEvents();
-                    if (fovCrossings.size()!=2) {
+                    SpacecraftState stateEvent = fovCrossings.get(0).getState();
+                    System.out.println("Azimuth event: " + FastMath.toDegrees(transformStateToAzEl(stateEvent).getAngle1()));
+                    System.out.println("El event: " + FastMath.toDegrees(transformStateToAzEl(stateEvent).getAngle2()));
+
+                    AngularDirection azelEvent = 
+                        new AngularDirection(stationFrame, 
+                                             new double[]{transformStateToAzEl(stateEvent).getAngle1(), 
+                                                          transformStateToAzEl(stateEvent).getAngle2()}, 
+                                             AngleType.AZEL);
+                    AngularDirection azelStart = 
+                        new AngularDirection(stationFrame, 
+                                            new double[]{transformStateToAzEl(tlePropBeginTask.getInitialState()).getAngle1(), 
+                                                        transformStateToAzEl(tlePropBeginTask.getInitialState()).getAngle2()}, 
+                                            AngleType.AZEL);
+                    System.out.println("Angular distance begin to event: " + FastMath.toDegrees(azelStart.getEnclosedAngle(azelEvent)));
+
+                    System.out.println("G value event: " + fovDetector.g(fovCrossings.get(0).getState())); 
+                    System.out.println("G value before event: " + fovDetector.g(tlePropBeginTask.getInitialState()));
+                    boolean objInFovBeginTask = fovDetector.g(tlePropBeginTask.getInitialState()) < 0.;
+                    boolean objInFovEndProp = fovDetector.g(stateProp) < 0.;
+                    if (!(objInFovBeginTask && fovCrossings.size()==1 && !objInFovEndProp)) {
                         throw new Error("Satellite does not cross through FOV as expected.");
                     }
 
@@ -412,6 +447,13 @@ public class TrackingObjective implements Objective{
 
         // Set initial state covariance
         RealMatrix initialP = candidate.getCovariance().getCovarianceMatrix();
+        for (int row=0; row<initialP.getRowDimension(); row++) {
+            double[] rowVec = initialP.getRow(row);
+            for(int col=0; col<initialP.getColumnDimension(); col++) {
+                System.out.print(rowVec[col] + " ");
+            }
+            System.out.println();
+        }
 
         // Set process noise
         RealMatrix Q = 
