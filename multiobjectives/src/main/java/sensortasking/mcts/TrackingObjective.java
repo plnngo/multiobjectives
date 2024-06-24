@@ -472,7 +472,7 @@ public class TrackingObjective implements Objective{
         
         return dKL;
     }
-    private ObservedObject[] estimateStateWithKalman(Iterable<ObservedMeasurement<?>> azElMeas,
+    protected ObservedObject[] estimateStateWithKalman(Iterable<ObservedMeasurement<?>> azElMeas,
                                                      ObservedObject candidate) {
 
         // Initialise output
@@ -533,7 +533,7 @@ public class TrackingObjective implements Objective{
         // State at the end of tasking with measurement updates
         TLE pseudoTleMeas = new FixedPointTleGenerationAlgorithm().generate(stateEndUpdated, 
                                                                         candidate.getPseudoTle());
-        output[3] = new ObservedObject(candidate.getId() + 3, stateVecEndUpdate, cartCovEndUpdated,
+        output[2] = new ObservedObject(candidate.getId() + 3, stateVecEndUpdate, cartCovEndUpdated,
                                        stationFrame, pseudoTleMeas);
 
         // Propagate from start of window to last measurement epoch without measurement update
@@ -565,7 +565,7 @@ public class TrackingObjective implements Objective{
         // State at the end of tasking without measurement updates
         TLE pseudoTle = new FixedPointTleGenerationAlgorithm().generate(stateEndNotUpdated, 
                                                                         candidate.getPseudoTle());
-        output[2] = new ObservedObject(candidate.getId() + 2, stateVecEndNotUpdate, cartCovNotEndUpdated, 
+        output[1] = new ObservedObject(candidate.getId() + 2, stateVecEndNotUpdate, cartCovNotEndUpdated, 
                                        stationFrame, pseudoTle);
 
         return output;
@@ -583,6 +583,9 @@ public class TrackingObjective implements Objective{
 
         if(!meas.getAngleType().equals(AngleType.AZEL)) {
             throw new Error("This is not an azimuth/elevation measurement pair");
+        }
+        if(Objects.isNull(meas.getDate())) {
+            throw new NullPointerException("Angular measurement has unknown date");
         }
         AngularAzEl azElOrekit = 
             new AngularAzEl(new GroundStation(station), meas.getDate(), 

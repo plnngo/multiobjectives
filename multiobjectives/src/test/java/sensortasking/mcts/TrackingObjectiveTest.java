@@ -20,6 +20,7 @@ import org.orekit.data.DataContext;
 import org.orekit.data.DataProvidersManager;
 import org.orekit.data.DirectoryCrawler;
 import org.orekit.estimation.measurements.AngularAzEl;
+import org.orekit.estimation.measurements.ObservedMeasurement;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
 import org.orekit.frames.Frame;
@@ -210,6 +211,29 @@ public class TrackingObjectiveTest {
             tleSeries.add(new TLE(current, reader.readLine()));
         }
         reader.close(); */
+
+    }
+
+    @Test
+    public void testEstimateStateWithKalman() {
+        AbsoluteDate date = 
+            new AbsoluteDate(2000, 12, 15, 16, 58, 50.208, TimeScalesFactory.getUTC());
+        generateTestObject();
+        
+        List<ObservedObject> ooi = new ArrayList<ObservedObject>();
+        ooi.add(this.singleTestCase);
+
+        // Call test function 
+        TrackingObjective trackTask = new TrackingObjective(ooi, this.topoHorizon);
+        double[] angles = new double[]{FastMath.toRadians(90.0000000163951), 
+                                       FastMath.toRadians(87.78861644886392)};
+        AngularDirection meas = new AngularDirection(topoHorizon, angles, AngleType.AZEL);
+        meas.setDate(date);
+        AngularAzEl measOrekit = TrackingObjective.transformAngularAzEl2OrekitMeasurements(meas, topoHorizon);
+        List<ObservedMeasurement<?>> orekitAzElMeas = new ArrayList<>();
+        orekitAzElMeas.add(measOrekit);
+        
+        trackTask.estimateStateWithKalman(orekitAzElMeas, singleTestCase);
 
     }
 
