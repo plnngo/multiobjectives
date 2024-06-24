@@ -60,9 +60,10 @@ import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
 import org.orekit.utils.TimeStampedPVCoordinates;
 
+import lombok.Getter;
 import sensortasking.stripescanning.Tasking;
 
-
+@Getter
 public class TrackingObjective implements Objective{
 
     /** List of targets of interests with their initial condition. */
@@ -109,7 +110,7 @@ public class TrackingObjective implements Objective{
     /** Minimal angular distance between Moon and sensor pointing direction. */
     double minMoonDist = FastMath.toRadians(20.);
 
-    double sensorApartureRadius = FastMath.toRadians(1.);
+    private double sensorApartureRadius = FastMath.toRadians(1.);
 
     final TopocentricFrame stationFrame;
 
@@ -226,80 +227,27 @@ public class TrackingObjective implements Objective{
                     }
 
                     // If code reaches here, object is observable and visible
-                    //TODO: generate Measurements
+                    double readout = 7.;
+                    double exposure = 8.;
                     List<AngularDirection> simulatedMeasurements = new ArrayList<AngularDirection>();
 
-                    // TODO: Placed FOV centrally at location of satellite at beginning of tasking interval --> need to relocate to get maximised pass duration 
-                    Vector3D centerFov = new Vector3D(azElBeginTask.getAngle1(), azElBeginTask.getAngle2());
-                    Vector3D meridian = new Rotation(Vector3D.PLUS_K, sensorApartureRadius, 
-                                                     RotationConvention.VECTOR_OPERATOR).applyTo(centerFov);
-                    
-                    FieldOfView fov =                    
-                        new PolygonalFieldOfView(new Vector3D(azElBeginTask.getAngle1(), azElBeginTask.getAngle2()),
-                                                 DefiningConeType.INSIDE_CONE_TOUCHING_POLYGON_AT_EDGES_MIDDLE,
-                                                 meridian, sensorApartureRadius, 4, 0);
-
-                    GroundFieldOfViewDetector fovDetector = new GroundFieldOfViewDetector(stationFrame, fov)
-                                                                .withHandler((c, d, increasing) -> {
-                                                                    System.out.println(" Visibility on object " +
-                                                                                    candidate.getId() +
-                                                                                    (!increasing ? " begins at " : " ends at ") +
-                                                                                    c.getDate().toStringWithoutUtcOffset(utc, 3));
-                                                                    return !increasing ? Action.CONTINUE : Action.STOP;  // stop propagation when object leaves FOR
-                                                                });
-                    
-
                     // Set up modified TLE using the state at the beginning of the tasking window
-                    TLE modTleBeginTask = new FixedPointTleGenerationAlgorithm().generate(stateBeginTask.getKey(), candidate.getPseudoTle());
-                    //TLE modTleBeginTask = TLE.stateToTLE(stateBeginTask, candidate.getPseudoTle());
-                    StateVector stateVecBeginTask = ObservedObject.spacecraftStateToStateVector(stateBeginTask.getKey(), candidate.getFrame());
+                    TLE modTleBeginTask = 
+                        new FixedPointTleGenerationAlgorithm().generate(stateBeginTask.getKey(), 
+                                                                        candidate.getPseudoTle());
+                    StateVector stateVecBeginTask = 
+                        ObservedObject.spacecraftStateToStateVector(stateBeginTask.getKey(), 
+                                                                    candidate.getFrame());
                     CartesianCovariance cartCovBeginTask = 
-                        ObservedObject.stateCovToCartesianCov(stateBeginTask.getKey().getOrbit(), stateBeginTask.getValue(), candidate.getFrame());
-                    ObservedObject candidateBeginTask = new ObservedObject(candidate.getId(), stateVecBeginTask, cartCovBeginTask, stationFrame, modTleBeginTask);
-
-                    // Set up SGP4 propagator to propagate over tasking duration
-                    TLEPropagator tlePropBeginTask = TLEPropagator.selectExtrapolator(modTleBeginTask);
-                    final EventsLogger logFovPass = new EventsLogger();
-                    tlePropBeginTask.addEventDetector(logFovPass.monitorDetector(fovDetector));
-                    AbsoluteDate end = taskEpoch.shiftedBy(2. * 60.);
-                    SpacecraftState stateProp = tlePropBeginTask.propagate(end);
-                    System.out.println("Azimuth begin: " + FastMath.toDegrees(transformStateToAzEl(tlePropBeginTask.getInitialState()).getAngle1()));
-                    System.out.println("El begin: " + FastMath.toDegrees(transformStateToAzEl(tlePropBeginTask.getInitialState()).getAngle2()));
-
-                    System.out.println("Azimuth end: " + FastMath.toDegrees(transformStateToAzEl(stateProp).getAngle1()));
-                    System.out.println("El end: " + FastMath.toDegrees(transformStateToAzEl(stateProp).getAngle2()));
-
-
-
-                    
-                    System.out.println("Initial state: " + tlePropBeginTask.getInitialState().getDate());
-                    System.out.println("End date prop: " + stateProp.getOrbit().getDate());
-                    //tlePropBeginTask.propagate(taskEpoch);
-                    
-                    List<LoggedEvent> fovCrossings = logFovPass.getLoggedEvents();
-                    SpacecraftState stateEvent = fovCrossings.get(0).getState();
-                    System.out.println("Azimuth event: " + FastMath.toDegrees(transformStateToAzEl(stateEvent).getAngle1()));
-                    System.out.println("El event: " + FastMath.toDegrees(transformStateToAzEl(stateEvent).getAngle2()));
-
-                    AngularDirection azelEvent = 
-                        new AngularDirection(stationFrame, 
-                                             new double[]{transformStateToAzEl(stateEvent).getAngle1(), 
-                                                          transformStateToAzEl(stateEvent).getAngle2()}, 
-                                             AngleType.AZEL);
-                    AngularDirection azelStart = 
-                        new AngularDirection(stationFrame, 
-                                            new double[]{transformStateToAzEl(tlePropBeginTask.getInitialState()).getAngle1(), 
-                                                        transformStateToAzEl(tlePropBeginTask.getInitialState()).getAngle2()}, 
-                                            AngleType.AZEL);
-                    System.out.println("Angular distance begin to event: " + FastMath.toDegrees(azelStart.getEnclosedAngle(azelEvent)));
-
-                    System.out.println("G value event: " + fovDetector.g(fovCrossings.get(0).getState())); 
-                    System.out.println("G value before event: " + fovDetector.g(tlePropBeginTask.getInitialState()));
-                    boolean objInFovBeginTask = fovDetector.g(tlePropBeginTask.getInitialState()) < 0.;
-                    boolean objInFovEndProp = fovDetector.g(stateProp) < 0.;
-                    if (!(objInFovBeginTask && fovCrossings.size()==1 && !objInFovEndProp)) {
-                        throw new Error("Satellite does not cross through FOV as expected.");
-                    }
+                        ObservedObject.stateCovToCartesianCov(stateBeginTask.getKey().getOrbit(), 
+                                                              stateBeginTask.getValue(), 
+                                                              candidate.getFrame());
+                    ObservedObject candidateBeginTask = 
+                        new ObservedObject(candidate.getId(), stateVecBeginTask, cartCovBeginTask, 
+                                           stationFrame, modTleBeginTask);
+                    simulatedMeasurements = 
+                        generateMeasurements(candidateBeginTask, azElBeginTask, readout, 
+                                             exposure, taskEpoch);
 
                     // Transform measurements into orekit measurements
                     List<ObservedMeasurement<?>> orekitAzElMeas = new ArrayList<>();
@@ -321,6 +269,96 @@ public class TrackingObjective implements Objective{
         return new AngularDirection(null, 
                             new double[]{FastMath.toRadians(88.), FastMath.toRadians(30.)}, 
                             AngleType.AZEL);
+    }
+
+    protected List<AngularDirection> generateMeasurements(ObservedObject candidate,
+            AngularDirection pointing, double readout,
+            double exposure, AbsoluteDate taskEpoch) {
+
+        List<AngularDirection> simulatedMeasurements = new ArrayList<AngularDirection>();
+        // TODO: Placed FOV centrally at location of satellite at beginning of tasking interval --> need to relocate to get maximised pass duration 
+        Vector3D centerFov = new Vector3D(pointing.getAngle1(), pointing.getAngle2());
+        Vector3D meridian = new Rotation(Vector3D.PLUS_K, sensorApartureRadius, 
+                                            RotationConvention.VECTOR_OPERATOR).applyTo(centerFov);
+        
+        FieldOfView fov =                    
+            new PolygonalFieldOfView(new Vector3D(pointing.getAngle1(), pointing.getAngle2()),
+                                        DefiningConeType.INSIDE_CONE_TOUCHING_POLYGON_AT_EDGES_MIDDLE,
+                                        meridian, sensorApartureRadius, 4, 0);
+
+        GroundFieldOfViewDetector fovDetector = new GroundFieldOfViewDetector(stationFrame, fov)
+                                                    .withHandler(/* (c, d, increasing) -> {
+                                                        System.out.println(" Visibility on object " +
+                                                                        candidate.getId() +
+                                                                        (!increasing ? " begins at " : " ends at ") +
+                                                                        c.getDate().toStringWithoutUtcOffset(utc, 3));
+                                                        System.out.println(" --> Azimuth end: " + FastMath.toDegrees(transformStateToAzEl(c).getAngle1()));
+                                                        System.out.println("--> El end: " + FastMath.toDegrees(transformStateToAzEl(c).getAngle2()));
+                                                            // stop propagation when object leaves FOR
+                                                    } */ new ContinueOnEvent());
+        
+
+        
+
+        // Set up SGP4 propagator to propagate over tasking duration
+        TLEPropagator tlePropBeginTask = TLEPropagator.selectExtrapolator(candidate.getPseudoTle());
+        final EventsLogger logFovPass = new EventsLogger();
+        tlePropBeginTask.addEventDetector(logFovPass.monitorDetector(fovDetector));
+        AbsoluteDate end = taskEpoch.shiftedBy(taskDuration);
+
+        // Take measurements during propagation
+        double stepT = readout + exposure;    
+        SpacecraftState stateProp = tlePropBeginTask.getInitialState();
+        for (AbsoluteDate extrapDate = taskEpoch;
+            extrapDate.compareTo(end) <= 0;
+            extrapDate = extrapDate.shiftedBy(stepT))  {
+            stateProp = tlePropBeginTask.propagate(extrapDate);
+            if (fovDetector.g(stateProp) < 0./* logFovPass.getLoggedEvents().size()== 0 */) {
+                simulatedMeasurements.add(transformStateToAzEl(stateProp));
+            }
+        }
+        
+        /*System.out.println("Azimuth begin: " + FastMath.toDegrees(transformStateToAzEl(tlePropBeginTask.getInitialState()).getAngle1()));
+        System.out.println("El begin: " + FastMath.toDegrees(transformStateToAzEl(tlePropBeginTask.getInitialState()).getAngle2()));*/
+
+        System.out.println("Azimuth end: " + FastMath.toDegrees(transformStateToAzEl(stateProp).getAngle1()));
+        System.out.println("El end: " + FastMath.toDegrees(transformStateToAzEl(stateProp).getAngle2()));
+        System.out.println("Date end actually " + stateProp.getDate());
+        System.out.println("Date end " + end.toString());
+        System.out.println("Date begin " + tlePropBeginTask.getInitialState().getDate());
+
+        /*
+        System.out.println("Initial state: " + tlePropBeginTask.getInitialState().getDate());
+        System.out.println("End date prop: " + stateProp.getOrbit().getDate()); */
+        //tlePropBeginTask.propagate(taskEpoch);
+        
+        List<LoggedEvent> fovCrossings = logFovPass.getLoggedEvents();
+        /* SpacecraftState stateEvent = fovCrossings.get(0).getState();
+        System.out.println("Azimuth event: " + FastMath.toDegrees(transformStateToAzEl(stateEvent).getAngle1()));
+        System.out.println("El event: " + FastMath.toDegrees(transformStateToAzEl(stateEvent).getAngle2()));
+
+        AngularDirection azelEvent = 
+            new AngularDirection(stationFrame, 
+                                    new double[]{transformStateToAzEl(stateEvent).getAngle1(), 
+                                                transformStateToAzEl(stateEvent).getAngle2()}, 
+                                    AngleType.AZEL);
+        AngularDirection azelStart = 
+            new AngularDirection(stationFrame, 
+                                new double[]{transformStateToAzEl(tlePropBeginTask.getInitialState()).getAngle1(), 
+                                            transformStateToAzEl(tlePropBeginTask.getInitialState()).getAngle2()}, 
+                                AngleType.AZEL);
+        System.out.println("Angular distance begin to event: " + FastMath.toDegrees(azelStart.getEnclosedAngle(azelEvent)));
+*/
+        System.out.println("G value event: " + fovDetector.g(fovCrossings.get(0).getState())); 
+        System.out.println("G value before event: " + fovDetector.g(tlePropBeginTask.getInitialState())); 
+        System.out.println("G value after event: " + fovDetector.g(stateProp)); 
+
+        boolean objInFovBeginTask = fovDetector.g(tlePropBeginTask.getInitialState()) < 0.;
+        boolean objInFovEndProp = fovDetector.g(stateProp) < 0.;
+        if (!(objInFovBeginTask && fovCrossings.size()==1 && !objInFovEndProp)) {
+            throw new Error("Satellite does not cross through FOV as expected.");
+        }
+        return simulatedMeasurements;
     }
 
     protected static Map.Entry<SpacecraftState,StateCovariance> propagateStateAndCovariance(ObservedObject candidate, AbsoluteDate target){
@@ -571,6 +609,7 @@ public class TrackingObjective implements Objective{
             new AngularDirection(stationFrame, 
                                  new double[]{posTopo.getAlpha(), posTopo.getDelta()}, 
                                  AngleType.AZEL);
+        dirTopo.setDate(state.getDate());
         return dirTopo;
     }
 

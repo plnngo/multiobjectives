@@ -213,6 +213,29 @@ public class TrackingObjectiveTest {
 
     }
 
+    @Test
+    public void testGenerateMeasurements() {
+        AbsoluteDate date = 
+            new AbsoluteDate(2000, 12, 15, 16, 58, 50.208, TimeScalesFactory.getUTC());
+        generateTestObject();
+        
+        List<ObservedObject> ooi = new ArrayList<ObservedObject>();
+        ooi.add(this.singleTestCase);
+
+        // Call test function 
+        TrackingObjective trackTask = new TrackingObjective(ooi, this.topoHorizon);
+        
+        // Compute sensor pointing
+        Entry<SpacecraftState, StateCovariance> stateAndCov = 
+                        TrackingObjective.propagateStateAndCovariance(this.singleTestCase, date);
+        AngularDirection pointing = trackTask.transformStateToAzEl(stateAndCov.getKey());
+        List<AngularDirection> measurements = trackTask.generateMeasurements(singleTestCase, pointing, 7., 8., date);
+        Assert.assertEquals(1, measurements.size());
+        AngularDirection meas = measurements.get(0);
+        Assert.assertEquals(FastMath.toDegrees(pointing.getAngle1()), FastMath.toDegrees(meas.getAngle1()), 1e-16);
+        Assert.assertEquals(FastMath.toDegrees(pointing.getAngle2()), FastMath.toDegrees(meas.getAngle2()), 1e-16);
+    }
+
     /**
      * Propagate initial covariance using SGP4 to initial epoch.
      */

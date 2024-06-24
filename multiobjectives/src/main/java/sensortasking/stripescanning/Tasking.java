@@ -58,7 +58,7 @@ public class Tasking {
     final static double minSolarPhase = FastMath.toRadians(40.);
 
     /** Minimal angular distance between Moon and observation stripe. */
-    double minMoonDist = FastMath.toRadians(20.);
+    double minMoonDist = FastMath.toRadians(20.);   // TODO: change back to 90 deg
 
     /** Sun's maximal elevation angle according to nautical twilight condition. */
     double nauticalTwilight = FastMath.toRadians(-12);
