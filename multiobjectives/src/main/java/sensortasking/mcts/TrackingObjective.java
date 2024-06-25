@@ -430,7 +430,7 @@ public class TrackingObjective implements Objective{
         double detP = decomP.getDeterminant();
         double detQ = decomQ.getDeterminant();
 
-        double logDetCovQByDetCovP = FastMath.log(detQ/detP);
+        double logDetCovQByDetCovP = FastMath.log10(detQ/detP);
 
         // Compute inverse of covQ
         RealMatrix invCovQ = MatrixUtils.inverse(covQ);

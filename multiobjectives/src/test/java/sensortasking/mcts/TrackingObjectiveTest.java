@@ -215,6 +215,10 @@ public class TrackingObjectiveTest {
 
     }
 
+    /**
+     * Test {@link TrackingObjective#computeKullbackLeiblerDivergence(ObservedObject, 
+     * ObservedObject)}.
+     */
     @Test
     public void testComputeKullbackLeiblerDivergence() {
         Frame eci = FramesFactory.getGCRF();
@@ -244,9 +248,7 @@ public class TrackingObjectiveTest {
             new StateCovariance(MatrixUtils.createRealMatrix(covArray), date, eci, 
                                 OrbitType.CARTESIAN, PositionAngleType.MEAN);
         priorCov = ObservedObject.stateCovToCartesianCov(orbit , covStateCov, eci);
-        
         ObservedObject prior = new ObservedObject(0, priorState, priorCov, date, eci);
-
 
         // Define posterior object
         StateVector postState = new StateVector();
@@ -272,11 +274,10 @@ public class TrackingObjectiveTest {
             new StateCovariance(MatrixUtils.createRealMatrix(covArrayPost), date, eci, 
                                 OrbitType.CARTESIAN, PositionAngleType.MEAN);
         postCov = ObservedObject.stateCovToCartesianCov(orbitPost , covPostStateCov, eci);
-        
-
         ObservedObject post = new ObservedObject(1, postState, postCov, date, eci);
+        
         double kl = TrackingObjective.computeKullbackLeiblerDivergence(prior, post);
-        System.out.println(kl);
+        Assert.assertEquals(-9.630748875794321, kl, 1e-12);
     }
 
     @Test
