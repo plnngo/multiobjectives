@@ -35,6 +35,7 @@ import org.orekit.propagation.SpacecraftState;
 import org.orekit.propagation.StateCovariance;
 import org.orekit.propagation.analytical.tle.TLE;
 import org.orekit.propagation.analytical.tle.TLEConstants;
+import org.orekit.propagation.analytical.tle.TLEPropagator;
 import org.orekit.propagation.analytical.tle.generation.FixedPointTleGenerationAlgorithm;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.time.TimeScalesFactory;
@@ -180,7 +181,10 @@ public class TrackingObjectiveTest {
 
         // Call test function 
         TrackingObjective trackTask = new TrackingObjective(ooi, this.topoHorizon);
-        trackTask.setMicroAction(date);
+        AngularDirection pointing = trackTask.setMicroAction(date);
+        System.out.println("Azimuth: " + FastMath.toDegrees(pointing.getAngle1()));
+        System.out.println("Elevation: " + FastMath.toDegrees(pointing.getAngle2()));
+
 
         // Load TLEs from file
         /* String workingDir = System.getProperty("user.dir");
@@ -213,6 +217,77 @@ public class TrackingObjectiveTest {
         }
         reader.close(); */
 
+    }
+
+    @Test
+    public void testSetMicroAction2() {
+
+        // Epoch
+        AbsoluteDate date = new AbsoluteDate(2024, 6, 26, 0, 0, 0., TimeScalesFactory.getUTC());
+
+        // Frame
+        Frame teme = FramesFactory.getTEME();
+        Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+
+        // Set up ground station
+        GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(5.),   // Geodetic latitude
+                                              FastMath.toRadians(-172.),   // Longitude
+                                              0.);              // in [m]
+
+        // Model Earth
+        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                               Constants.WGS84_EARTH_FLATTENING,
+                                               ecef);
+        TopocentricFrame topoHorizon = new TopocentricFrame(earth, pos, "Station to observe TDRS satellite");
+
+
+        // Create list of objects of interest
+        TLE tleTdrs10 = new TLE("1 27566U 02055A   24176.82688309  .00000089  00000-0  00000-0 0  9999", 
+                                "2 27566   9.5777  45.3560 0006120 347.9755   6.7068  1.00267284 78984");
+        TLE tleTdrs11 = new TLE("1 39070U 13004A   24176.84939448  .00000087  00000-0  00000-0 0  9991", 
+                                "2 39070   2.7492  11.9730 0005934  54.3648 338.6204  1.00277276 39456");
+
+        // Compute state
+        TLEPropagator propTdrs10 = TLEPropagator.selectExtrapolator(tleTdrs10);
+        TLEPropagator propTdrs11 = TLEPropagator.selectExtrapolator(tleTdrs11);
+
+        SpacecraftState spacraftTdrs10 = propTdrs10.propagate(date);
+        SpacecraftState spacraftTdrs11 = propTdrs11.propagate(date);
+
+        StateVector stateTdrs10 = ObservedObject.spacecraftStateToStateVector(spacraftTdrs10, teme);
+        StateVector stateTdrs11 = ObservedObject.spacecraftStateToStateVector(spacraftTdrs11, teme);
+
+        // Set covariances
+        double[] covDiag = new double[]{100., 100., 100., 1., 1., 1.};
+        RealMatrix covMatrix = MatrixUtils.createRealDiagonalMatrix(covDiag);
+        StateCovariance covTeme = new StateCovariance(covMatrix, date, teme, OrbitType.CARTESIAN, PositionAngleType.MEAN);
+        
+        CartesianCovariance stateCovTdrs10 = 
+            ObservedObject.stateCovToCartesianCov(spacraftTdrs10.getOrbit(), covTeme, teme);
+        CartesianCovariance stateCovTdrs11 = 
+            ObservedObject.stateCovToCartesianCov(spacraftTdrs11.getOrbit(), covTeme, teme);
+
+        // Create list of objects of interest
+        ObservedObject tdrs10 = new ObservedObject(tleTdrs10.getSatelliteNumber(), stateTdrs10, stateCovTdrs10, teme, tleTdrs10);
+        ObservedObject tdrs11 = new ObservedObject(tleTdrs11.getSatelliteNumber(), stateTdrs11, stateCovTdrs11, teme, tleTdrs11);
+        List<ObservedObject> ooi = new ArrayList<ObservedObject>();
+        ooi.add(tdrs10);
+        ooi.add(tdrs11);
+
+/*         // Ground station
+        Transform temeToEcef = teme.getTransformTo(ecef, date);
+        PVCoordinates pvTeme = 
+            new PVCoordinates(stateTdrs11.getPositionVector(), stateTdrs11.getVelocityVector());
+        PVCoordinates pvEcef =  temeToEcef.transformPVCoordinates(pvTeme);
+        double lon = pvEcef.getPosition().getAlpha();
+        double lat = pvEcef.getPosition().getDelta();
+        System.out.println("Lat " + FastMath.toDegrees(lat));
+        System.out.println("Lon " + FastMath.toDegrees(lon)); */
+
+        TrackingObjective tracking = new TrackingObjective(ooi, topoHorizon);
+        AngularDirection pointing = tracking.setMicroAction(date);
+        System.out.println("Azimuth: " +FastMath.toDegrees(pointing.getAngle1()));
+        System.out.println("Elevation: " +FastMath.toDegrees(pointing.getAngle2()));
     }
 
     /**
@@ -275,7 +350,7 @@ public class TrackingObjectiveTest {
                                 OrbitType.CARTESIAN, PositionAngleType.MEAN);
         postCov = ObservedObject.stateCovToCartesianCov(orbitPost , covPostStateCov, eci);
         ObservedObject post = new ObservedObject(1, postState, postCov, date, eci);
-        
+
         double kl = TrackingObjective.computeKullbackLeiblerDivergence(prior, post);
         Assert.assertEquals(-9.630748875794321, kl, 1e-12);
     }
@@ -305,7 +380,12 @@ public class TrackingObjectiveTest {
         List<ObservedMeasurement<?>> orekitAzElMeas = new ArrayList<>();
         orekitAzElMeas.add(measOrekit);
         
-        trackTask.estimateStateWithKalman(orekitAzElMeas, singleTestCase);
+        ObservedObject[] results = trackTask.estimateStateWithKalman(orekitAzElMeas, singleTestCase);
+        for(int i=0; i<results.length; i++) {
+            System.out.println("Pos: " + results[i].getState().getPositionVector() + "Vel: " + results[i].getState().getVelocityVector());
+        }
+        
+        
     }
 
     @Test
@@ -322,13 +402,16 @@ public class TrackingObjectiveTest {
         
         // Compute sensor pointing
         Entry<SpacecraftState, StateCovariance> stateAndCov = 
-                        TrackingObjective.propagateStateAndCovariance(this.singleTestCase, date);
+            TrackingObjective.propagateStateAndCovariance(this.singleTestCase, date);
         AngularDirection pointing = trackTask.transformStateToAzEl(stateAndCov.getKey());
-        List<AngularDirection> measurements = trackTask.generateMeasurements(singleTestCase, pointing, 7., 8., date);
+        List<AngularDirection> measurements = 
+            trackTask.generateMeasurements(singleTestCase, pointing, 7., 8., date);
         Assert.assertEquals(1, measurements.size());
         AngularDirection meas = measurements.get(0);
-        Assert.assertEquals(FastMath.toDegrees(pointing.getAngle1()), FastMath.toDegrees(meas.getAngle1()), 1e-16);
-        Assert.assertEquals(FastMath.toDegrees(pointing.getAngle2()), FastMath.toDegrees(meas.getAngle2()), 1e-16);
+        Assert.assertEquals(FastMath.toDegrees(pointing.getAngle1()), 
+                            FastMath.toDegrees(meas.getAngle1()), 1e-16);
+        Assert.assertEquals(FastMath.toDegrees(pointing.getAngle2()), 
+                            FastMath.toDegrees(meas.getAngle2()), 1e-16);
     }
 
     /**
@@ -349,7 +432,6 @@ public class TrackingObjectiveTest {
             double[] actualRowVec = actualCov.getRow(row);
             for(int col=0; col<expectedCov.getColumnDimension(); col++) {
                 Assert.assertEquals(expectedRowVec[col], actualRowVec[col], 1e-16);
-                //System.out.println(expectedRowVec[col] + " - " + actualRowVec[col]);
             }
         }
 

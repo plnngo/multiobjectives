@@ -15,6 +15,7 @@ import org.orekit.data.DataProvidersManager;
 import org.orekit.data.DirectoryCrawler;
 import org.orekit.errors.OrekitException;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
+import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
 import org.orekit.frames.Frame;
 import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
@@ -56,8 +57,59 @@ public class App {
         DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
         manager.addProvider(new DirectoryCrawler(orekitData));
 
-        App.testPropo2();
+        //App.testPropo2();
 
+
+    }
+
+    public static void propagateCovarianceOrekitExample() {
+        Frame teme = FramesFactory.getTEME();
+        double MU = 3.986004415 * 1e14;     // in m^3/s^(-2)
+
+        // Initiate scenario
+        AbsoluteDate date = new AbsoluteDate("2016-02-13T16:00:00.0", TimeScalesFactory.getUTC());
+        Vector3D pos = new Vector3D(7526.993581890527 * 1e3, 
+                                    -9646.310100269711 * 1e3, 
+                                    1464.1104928112086 * 1e3);
+        Vector3D vel = new Vector3D(3.0337945609969803 * 1e3, 
+                                    1.715265069098717 * 1e3, 
+                                    -4.447658745923896 * 1e3);
+        PVCoordinates pv = new PVCoordinates(pos, vel);
+        CartesianOrbit orbit = new CartesianOrbit(pv, teme, date, MU);
+        final SpacecraftState stateInit = new SpacecraftState(orbit);
+
+
+        /* // Propagate from start of window to last measurement epoch without measurement update
+        TLEPropagator prop = TLEPropagator.selectExtrapolator(candidate.getPseudoTle());
+
+        // Covariance
+        final RealMatrix covInitMatrix = candidate.getCovariance().getCovarianceMatrix();
+        final StateCovariance covInit = 
+            new StateCovariance(covInitMatrix, candidate.getEpoch(), candidate.getFrame(), 
+                                OrbitType.CARTESIAN, PositionAngleType.MEAN);
+        final String stmAdditionalName = "stm";
+        final MatricesHarvester harvester = prop.setupMatricesComputation(stmAdditionalName, null, null);
+
+        final StateCovarianceMatrixProvider provider = 
+            new StateCovarianceMatrixProvider("cov", stmAdditionalName, harvester, covInit);
+
+        prop.addAdditionalStateProvider(provider);
+
+        final SpacecraftState stateEndNotUpdated = prop.propagate(lastMeasEpoch);
+        StateVector stateVecEndNotUpdate = ObservedObject.spacecraftStateToStateVector(stateEndNotUpdated, candidate.getFrame());
+        RealMatrix covProp = provider.getStateCovariance(stateEndNotUpdated).getMatrix();
+        StateCovariance stateCovEndNotUpdated = 
+            new StateCovariance(covProp, lastMeasEpoch, stateEndNotUpdated.getFrame(),       // TODO: check frame
+                                OrbitType.CARTESIAN, PositionAngleType.MEAN);
+        CartesianCovariance cartCovNotEndUpdated = 
+            ObservedObject.stateCovToCartesianCov(stateEndNotUpdated.getOrbit(), 
+                                                  stateCovEndNotUpdated, candidate.getFrame());
+
+        // State at the end of tasking without measurement updates
+        TLE pseudoTle = new FixedPointTleGenerationAlgorithm().generate(stateEndNotUpdated, 
+                                                                        candidate.getPseudoTle());
+        output[1] = new ObservedObject(candidate.getId() + 2, stateVecEndNotUpdate, cartCovNotEndUpdated, 
+                                       stationFrame, pseudoTle); */
 
     }
 

@@ -129,6 +129,12 @@ public class TrackingObjective implements Objective{
     @Override
     public AngularDirection setMicroAction(AbsoluteDate current) { 
 
+        // Output
+        double maxIG = Double.NEGATIVE_INFINITY;
+        AngularDirection pointing = new AngularDirection(stationFrame, new double[]{0., 0.},
+                                                            AngleType.AZEL);
+        ObservedObject target = null;
+
         // Iterate through list of objects of interest
         for (ObservedObject candidate : updatedTargets) {
 
@@ -165,6 +171,7 @@ public class TrackingObjective implements Objective{
                 getFORPassDuration(current, logger.getLoggedEvents(), objectAlreadyInFOR);
             // System.out.println("G value end " + visibility.g(s));
             // System.out.println("G value beginning " + visibility.g(tleProp.getInitialState()));
+            
              if (passInterval[0].equals(passInterval[1])){
                 // object doess not pass through FOR within the request time duration
                 continue;
@@ -187,12 +194,14 @@ public class TrackingObjective implements Objective{
                 AbsoluteDate taskEpoch = current;
 
                 // organise observation tasks
+                numObs = 1;
+                
                 for (int i=0; i<numObs; i++) {
 
                     Entry<SpacecraftState, StateCovariance> stateBeginTask = 
                         TrackingObjective.propagateStateAndCovariance(candidate, taskEpoch);
 
-                    RealMatrix covPropMatrix = stateBeginTask.getValue().getMatrix();
+                    //RealMatrix covPropMatrix = stateBeginTask.getValue().getMatrix();
 /*                     for (int row=0; row<covPropMatrix.getRowDimension(); row++) {
                         double[] rowVec = covPropMatrix.getRow(row);
                         for(int col=0; col<covPropMatrix.getColumnDimension(); col++) {
@@ -260,15 +269,16 @@ public class TrackingObjective implements Objective{
 
                     // Evaluate information gain
                     double iG = computeInformationGain(result[1], result[2]); 
-
+                    if (iG>maxIG) {
+                        maxIG = iG;
+                        pointing = azElBeginTask;
+                        target = candidate;
+                    }
                 }
             }
         }
-
-        // Fake data
-        return new AngularDirection(null, 
-                            new double[]{FastMath.toRadians(88.), FastMath.toRadians(30.)}, 
-                            AngleType.AZEL);
+        System.out.println("Information gain: " + maxIG);
+        return pointing;
     }
 
     protected List<AngularDirection> generateMeasurements(ObservedObject candidate,
@@ -349,9 +359,9 @@ public class TrackingObjective implements Objective{
                                 AngleType.AZEL);
         System.out.println("Angular distance begin to event: " + FastMath.toDegrees(azelStart.getEnclosedAngle(azelEvent)));
 */
-        System.out.println("G value event: " + fovDetector.g(fovCrossings.get(0).getState())); 
+/*         System.out.println("G value event: " + fovDetector.g(fovCrossings.get(0).getState())); 
         System.out.println("G value before event: " + fovDetector.g(tlePropBeginTask.getInitialState())); 
-        System.out.println("G value after event: " + fovDetector.g(stateProp)); 
+        System.out.println("G value after event: " + fovDetector.g(stateProp));  */
 
         boolean objInFovBeginTask = fovDetector.g(tlePropBeginTask.getInitialState()) < 0.;
         boolean objInFovEndProp = fovDetector.g(stateProp) < 0.;
