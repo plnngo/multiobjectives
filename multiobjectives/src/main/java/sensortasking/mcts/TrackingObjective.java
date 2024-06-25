@@ -400,7 +400,8 @@ public class TrackingObjective implements Objective{
     }
 
     private double computeInformationGain(ObservedObject prior, ObservedObject posterior) {
-        return computeJensenShannonDivergence(prior, posterior);
+        //return computeJensenShannonDivergence(prior, posterior);
+        return computeKullbackLeiblerDivergence(prior, posterior);
     }
     private double computeJensenShannonDivergence(ObservedObject prior, ObservedObject posterior) {
         // Compute mixture distribution
@@ -417,7 +418,7 @@ public class TrackingObjective implements Objective{
 
         return jsPriorPosterior;
     }
-    private double computeKullbackLeiblerDivergence(ObservedObject p, ObservedObject q) {
+    protected static double computeKullbackLeiblerDivergence(ObservedObject p, ObservedObject q) {
         
         // Retrieve covariances
         RealMatrix covP = p.getCovariance().getCovarianceMatrix();
@@ -485,17 +486,19 @@ public class TrackingObjective implements Objective{
 
         // Set initial state covariance
         RealMatrix initialP = candidate.getCovariance().getCovarianceMatrix();
-        for (int row=0; row<initialP.getRowDimension(); row++) {
+/*         for (int row=0; row<initialP.getRowDimension(); row++) {
             double[] rowVec = initialP.getRow(row);
             for(int col=0; col<initialP.getColumnDimension(); col++) {
                 System.out.print(rowVec[col] + " ");
             }
             System.out.println();
-        }
+        } */
+       initialP = MatrixUtils.createRealIdentityMatrix(6).scalarMultiply(0.0);
 
         // Set process noise
         RealMatrix Q = 
             MatrixUtils.createRealDiagonalMatrix(new double[]{1e-8, 1e-8, 1e-8, 1e-8, 1e-8, 1e-8});
+        Q = MatrixUtils.createRealIdentityMatrix(numObs).scalarMultiply(0.0);
         
         // Set propagator
         //LeastSquaresTleGenerationAlgorithm converter = new LeastSquaresTleGenerationAlgorithm();
@@ -524,7 +527,7 @@ public class TrackingObjective implements Objective{
         RealMatrix estimatedCartesianP = jacobian.multiply(estimatedP.getSubMatrix(0, 5, 0, 5))
                                                  .multiply(jacobian.transpose());       // TODO: check if sqrt of diagonal has to be taken
         StateCovariance stateCovEndUpdated = 
-            new StateCovariance(estimatedCartesianP, lastMeasEpoch, stationFrame,       // TODO: check frame
+            new StateCovariance(estimatedCartesianP, lastMeasEpoch, candidate.getFrame(),       // TODO: check frame
                                 OrbitType.CARTESIAN, PositionAngleType.MEAN);
         CartesianCovariance cartCovEndUpdated = 
             ObservedObject.stateCovToCartesianCov(estimatedO, stateCovEndUpdated, 

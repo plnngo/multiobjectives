@@ -92,7 +92,6 @@ public class ObservedObject {
                 output.setCovarianceMatrixEntry(row, col, entry);
             }
         }
-       
         return output;
     }
 }

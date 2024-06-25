@@ -27,6 +27,7 @@ import org.orekit.frames.Frame;
 import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
+import org.orekit.orbits.CartesianOrbit;
 import org.orekit.orbits.KeplerianOrbit;
 import org.orekit.orbits.OrbitType;
 import org.orekit.orbits.PositionAngleType;
@@ -215,6 +216,70 @@ public class TrackingObjectiveTest {
     }
 
     @Test
+    public void testComputeKullbackLeiblerDivergence() {
+        Frame eci = FramesFactory.getGCRF();
+        AbsoluteDate date = new AbsoluteDate();
+
+        // Define prior object
+        StateVector priorState = new StateVector();
+        priorState.setX(1);
+        priorState.setY(2);
+        priorState.setZ(3);
+        priorState.setXdot(4);
+        priorState.setYdot(5);
+        priorState.setZdot(6);
+        CartesianOrbit orbit = 
+            new CartesianOrbit(new PVCoordinates(priorState.getPositionVector(), 
+                                                 priorState.getVelocityVector()), 
+                               eci, date, Constants.WGS84_EARTH_MU);
+        CartesianCovariance priorCov = new CartesianCovariance(null);
+        double[][] covArray = new double[6][6];
+        covArray[0] = new double[]{1,8,2,3,2,7};
+        covArray[1] = new double[]{8,0,2,2,1,8};
+        covArray[2] = new double[]{2,2,-6,1,6,9};
+        covArray[3] = new double[]{3,2,1,1,8,1};
+        covArray[4] = new double[]{2,1,6,8,6,2};
+        covArray[5] = new double[]{7,8,9,1,2,3};
+        StateCovariance covStateCov = 
+            new StateCovariance(MatrixUtils.createRealMatrix(covArray), date, eci, 
+                                OrbitType.CARTESIAN, PositionAngleType.MEAN);
+        priorCov = ObservedObject.stateCovToCartesianCov(orbit , covStateCov, eci);
+        
+        ObservedObject prior = new ObservedObject(0, priorState, priorCov, date, eci);
+
+
+        // Define posterior object
+        StateVector postState = new StateVector();
+        postState.setX(2);
+        postState.setY(3);
+        postState.setZ(1);
+        postState.setXdot(1);
+        postState.setYdot(4);
+        postState.setZdot(7);
+        CartesianOrbit orbitPost = 
+            new CartesianOrbit(new PVCoordinates(postState.getPositionVector(), 
+                               postState.getVelocityVector()), 
+                               eci, date, Constants.WGS84_EARTH_MU);
+        CartesianCovariance postCov = new CartesianCovariance(null);
+        double[][] covArrayPost = new double[6][6];
+        covArrayPost[0] = new double[]{1,1,2,1,5,3};
+        covArrayPost[1] = new double[]{1,2,1,2,2,2};
+        covArrayPost[2] = new double[]{2,1,5,1,1,1};
+        covArrayPost[3] = new double[]{1,2,1,1,7,7};
+        covArrayPost[4] = new double[]{5,2,1,7,1,1};
+        covArrayPost[5] = new double[]{3,2,1,7,1,0};
+        StateCovariance covPostStateCov = 
+            new StateCovariance(MatrixUtils.createRealMatrix(covArrayPost), date, eci, 
+                                OrbitType.CARTESIAN, PositionAngleType.MEAN);
+        postCov = ObservedObject.stateCovToCartesianCov(orbitPost , covPostStateCov, eci);
+        
+
+        ObservedObject post = new ObservedObject(1, postState, postCov, date, eci);
+        double kl = TrackingObjective.computeKullbackLeiblerDivergence(prior, post);
+        System.out.println(kl);
+    }
+
+    @Test
     public void testEstimateStateWithKalman() {
         AbsoluteDate date = 
             new AbsoluteDate(2000, 12, 15, 16, 58, 50.208, TimeScalesFactory.getUTC());
@@ -225,16 +290,21 @@ public class TrackingObjectiveTest {
 
         // Call test function 
         TrackingObjective trackTask = new TrackingObjective(ooi, this.topoHorizon);
-        double[] angles = new double[]{FastMath.toRadians(90.0000000163951), 
+
+        // Compute sensor pointing
+        Entry<SpacecraftState, StateCovariance> stateAndCov = 
+                        TrackingObjective.propagateStateAndCovariance(this.singleTestCase, date);
+        AngularDirection meas = trackTask.transformStateToAzEl(stateAndCov.getKey());
+
+        /* double[] angles = new double[]{FastMath.toRadians(90.0000000163951), 
                                        FastMath.toRadians(87.78861644886392)};
-        AngularDirection meas = new AngularDirection(topoHorizon, angles, AngleType.AZEL);
+        AngularDirection meas = new AngularDirection(topoHorizon, angles, AngleType.AZEL); */
         meas.setDate(date);
         AngularAzEl measOrekit = TrackingObjective.transformAngularAzEl2OrekitMeasurements(meas, topoHorizon);
         List<ObservedMeasurement<?>> orekitAzElMeas = new ArrayList<>();
         orekitAzElMeas.add(measOrekit);
         
         trackTask.estimateStateWithKalman(orekitAzElMeas, singleTestCase);
-
     }
 
     @Test
