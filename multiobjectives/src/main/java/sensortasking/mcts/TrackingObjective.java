@@ -503,7 +503,7 @@ public class TrackingObjective implements Objective{
             }
             System.out.println();
         } */
-       initialP = MatrixUtils.createRealIdentityMatrix(6).scalarMultiply(0.0);
+       //initialP = MatrixUtils.createRealIdentityMatrix(6).scalarMultiply(0.0);
 
         // Set process noise
         RealMatrix Q = 

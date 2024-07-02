@@ -155,4 +155,24 @@ public class AngularDirection {
             new AngularDirection(frame, new double[]{moonRa, moonDec}, AngleType.RADEC);
         return pos.getEnclosedAngle(moonAngles);
     }
+
+    /**
+     * Substract angular direction other from instance, i.e. this - other.
+     * TODO: add this function to other projects.
+     * 
+     * @param other         Angular direction to be substracted from this.
+     * @return              Angular direction resulting from this minus other.
+     */
+    public AngularDirection substract(AngularDirection other) {
+        if(!this.getAngleType().equals(other.getAngleType())) {
+            throw new IllegalArgumentException("Different angle types");
+        }
+        if(!this.getFrame().equals(other.getFrame())) {
+            throw new IllegalArgumentException("Different refernece frames");
+        }
+        double angle1 = this.getAngle1() - other.getAngle1();
+        double angle2 = this.getAngle1() - other.getAngle2();
+
+        return new AngularDirection(this.frame, new double[]{angle1, angle2}, this.getAngleType());
+    }
 }
