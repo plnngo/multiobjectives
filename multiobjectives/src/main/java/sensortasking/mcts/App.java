@@ -10,10 +10,7 @@ import org.hipparchus.linear.Array2DRowRealMatrix;
 import org.hipparchus.linear.DiagonalMatrix;
 import org.hipparchus.linear.MatrixUtils;
 import org.hipparchus.linear.RealMatrix;
-import org.hipparchus.linear.RealVector;
-import org.hipparchus.ode.ODEIntegrator;
 import org.hipparchus.ode.events.Action;
-import org.hipparchus.ode.nonstiff.DormandPrince853Integrator;
 import org.hipparchus.util.FastMath;
 import org.orekit.bodies.BodyShape;
 import org.orekit.bodies.GeodeticPoint;
@@ -26,12 +23,10 @@ import org.orekit.estimation.measurements.AngularAzEl;
 import org.orekit.estimation.measurements.GroundStation;
 import org.orekit.estimation.measurements.ObservableSatellite;
 import org.orekit.estimation.measurements.ObservedMeasurement;
-import org.orekit.estimation.measurements.PV;
 import org.orekit.estimation.sequential.ConstantProcessNoise;
 import org.orekit.estimation.sequential.KalmanEstimator;
 import org.orekit.estimation.sequential.KalmanEstimatorBuilder;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
-import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
 import org.orekit.forces.ForceModel;
 import org.orekit.forces.gravity.HolmesFeatherstoneAttractionModel;
 import org.orekit.forces.gravity.potential.GravityFieldFactory;
@@ -42,7 +37,6 @@ import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
 import org.orekit.models.earth.ReferenceEllipsoid;
 import org.orekit.orbits.CartesianOrbit;
-import org.orekit.orbits.EquinoctialOrbit;
 import org.orekit.orbits.KeplerianOrbit;
 import org.orekit.orbits.Orbit;
 import org.orekit.orbits.OrbitType;
@@ -103,28 +97,39 @@ public class App {
         Vector3D velocity = new Vector3D(-500.0, 8000.0, 1000.0);
         PVCoordinates pvInit = new PVCoordinates(position, velocity);
         double mu = 3.9860047e14;
-
+        System.out.println("----- Initial condition -----");
+        System.out.println("MU [m^3/s^-2]: \t" + mu);
         AbsoluteDate initDate = AbsoluteDate.J2000_EPOCH.shiftedBy(584.);
         Orbit initialOrbit = new CartesianOrbit(pvInit, eci, initDate, mu);
+        System.out.println("Initial date: \t" + initDate);
 
         // Kalman initialisation
-        RealMatrix xbar0 = MatrixUtils.createColumnRealMatrix(new double[]{0., 0., 0.});
+        RealMatrix xbar0 = 
+            MatrixUtils.createColumnRealMatrix(new double[]{0., 0., 0., 0., 0., 0.});
         RealMatrix xhatPre = xbar0; 
 
         // Extrapolator definition
         // -----------------------
         KeplerianPropagator extrapolator = new KeplerianPropagator(initialOrbit);
+        System.out.println("Propagator: \t" + extrapolator.toString());
+        System.out.println("Frame: \t" + eci);
+        System.out.println("Position [m]: \t" + position);
+        System.out.println("Velocity [m/s]: \t" + velocity);
+        System.out.println("Initial covariance: ");
         final SpacecraftState initialState = extrapolator.getInitialState();
  
         // Initial covariance
         RealMatrix covInitMatrix = 
-        MatrixUtils.createRealDiagonalMatrix(new double[]{100*1e3, 100*1e3, 100*1e3, 
-                                                        0.1, 0.1, 0.1});
-        StateCovariance covInit = new StateCovariance(covInitMatrix, initDate, eci, OrbitType.CARTESIAN, PositionAngleType.MEAN);
+            MatrixUtils.createRealDiagonalMatrix(new double[]{100*1e3, 100*1e3, 100*1e3, 
+                                                              0.1, 0.1, 0.1});
+        StateCovariance covInit = 
+            new StateCovariance(covInitMatrix, initDate, eci, OrbitType.CARTESIAN, 
+                                PositionAngleType.MEAN);
         final String stmAdditionalName = "stm";
         final MatricesHarvester harvester = 
             extrapolator.setupMatricesComputation(stmAdditionalName, null, null);
- 
+        printCovariance(covInitMatrix);
+        
         // Set up covariance matrix provider and add it to the propagator
         final StateCovarianceMatrixProvider providerCov = 
             new StateCovarianceMatrixProvider("covariance", stmAdditionalName, harvester, covInit);
@@ -132,6 +137,9 @@ public class App {
 
         // State transition matrix
         final AbsoluteDate target = initialState.getDate().shiftedBy(initialState.getKeplerianPeriod());
+        System.out.println("Target date: \t" + target);
+        System.out.println("Propagation duration [s]: \t" + initialState.getKeplerianPeriod());
+        System.out.println("----- Propagation -----");
         SpacecraftState finalOrbit = extrapolator.propagate(target);
         RealMatrix dYdY0 = harvester.getStateTransitionMatrix(finalOrbit);
         System.out.println("STM at " + finalOrbit.getDate());
@@ -140,11 +148,26 @@ public class App {
         RealMatrix predictedCov = dYdY0.multiply(covInitMatrix).multiplyTransposed(dYdY0);
         printCovariance(predictedCov);
 
+        // Process noise
+        RealMatrix Q = 
+            MatrixUtils.createRealDiagonalMatrix(new double[]{1e-12, 1e-12, 1e-12});
+        RealMatrix gamma = getGammaMatrix(initDate, target);
+        RealMatrix mappedAcc = gamma.multiply(Q).multiplyTransposed(gamma);
+        System.out.println("Process noise Q:");
+        printCovariance(Q);
+        System.out.println("Mapped unmodelled accelerations:");
+        printCovariance(mappedAcc);
+        System.out.println("Predicted covariance incl unmodelled accelerations (i.e. including process noise): ");
+        predictedCov = predictedCov.add(mappedAcc);
+        printCovariance(predictedCov);
+
+
+
         RealMatrix xbar = dYdY0.multiply(xhatPre);
 
-        // Direct covariance of orekit
+/*         // Direct covariance of orekit
         System.out.println("Predicted covariance through covariance provider: ");
-        printCovariance(providerCov.getStateCovariance(finalOrbit).getMatrix());
+        printCovariance(providerCov.getStateCovariance(finalOrbit).getMatrix()); */
 
         // Predicted state
         Vector3D predictedPos = finalOrbit.getPVCoordinates().getPosition();
@@ -153,11 +176,13 @@ public class App {
             new double[]{predictedPos.getX(), predictedPos.getY(), predictedPos.getZ(),
                          predictedVel.getX(), predictedVel.getY(), predictedVel.getZ()};
         RealMatrix predictedStateColumnVec = new Array2DRowRealMatrix(dataPredictedState);
-        
+        System.out.println("Propagated state vector [m] or [m/s]");
+        printCovariance(predictedStateColumnVec);
 
         // Set up station
-        Transform eciToEcef = eci.getTransformTo(ecef, initDate);       // TODO: change date to measurement epoch
-        PVCoordinates pvEcef = eciToEcef.transformPVCoordinates(pvInit);
+        Transform eciToEcef = eci.getTransformTo(ecef, target);       
+        PVCoordinates pvEcef = 
+            eciToEcef.transformPVCoordinates(new PVCoordinates(predictedPos, predictedVel));
         double lon = pvEcef.getPosition().getAlpha();
         double lat = pvEcef.getPosition().getDelta();
 
@@ -168,29 +193,40 @@ public class App {
                                                Constants.WGS84_EARTH_FLATTENING,
                                                ecef);
         TopocentricFrame topoHorizon = new TopocentricFrame(earth, station, "New Station");
-        Transform horizonToEci = topoHorizon.getTransformTo(eci, initDate);  // TODO: change date to measurement epoch
+        Transform horizonToEci = topoHorizon.getTransformTo(eci, target);  
         Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
-        System.out.println(FastMath.toDegrees(coordinatesStationEci.getAlpha()));
+/*         System.out.println(FastMath.toDegrees(coordinatesStationEci.getAlpha()));
         System.out.println(FastMath.toDegrees(coordinatesStationEci.getDelta()));
         System.out.println(FastMath.toDegrees(lat));
-        System.out.println(FastMath.toDegrees(lon));
+        System.out.println(FastMath.toDegrees(lon)); */
 
-        Transform eciToTopo = new Transform(initDate, coordinatesStationEci);
+        Transform eciToTopo = new Transform(initDate, coordinatesStationEci.negate());
         Frame topoCentric = new Frame(eci, eciToTopo, "Topocentric", true);
 
         // Generate real measurement
-        PVCoordinates pvTopo = eciToTopo.transformPVCoordinates(pvInit);
+        PVCoordinates pvTopo = 
+            eciToTopo.transformPVCoordinates(new PVCoordinates(predictedPos, predictedVel));
         double ra = pvTopo.getPosition().getAlpha();
         double dec = pvTopo.getPosition().getDelta();
         AngularDirection realRaDec = new AngularDirection(topoCentric, new double[]{ra, dec}, AngleType.RADEC);
         RealMatrix R = 
             MatrixUtils.createRealDiagonalMatrix(new double[]{FastMath.pow(1./206265, 2), 
                                                               FastMath.pow(1./206265, 2)});
-        // TODO: Include process noise
-        Vector3D posEci = pvInit.getPosition();
-        Vector3D posTopo = posEci.subtract(coordinatesStationEci);
-        AngularDirection radec = predictMeasurement(posTopo, eci); 
-        RealMatrix H = getObservationPartialDerivative(radec, posTopo);
+        System.out.println("----- Measurement update -----");
+        System.out.println("Measurement frame: \t" + realRaDec.getFrame());
+        System.out.println("Measured right ascension [rad]: \t" + ra);
+        System.out.println("Measured declination [rad]: \t" + dec);
+        System.out.println("Measurement epoch: \t" + target);
+
+  
+
+        Vector3D posTopo = predictedPos.subtract(coordinatesStationEci);
+        AngularDirection radec = predictMeasurement(posTopo, topoCentric); 
+        // AngularDirection predictRaDec = 
+        //     radec.transformReference(topoCentric, initDate, AngleType.RADEC);
+        RealMatrix H = getObservationPartialDerivative(posTopo, false);
+        System.out.println("Observation matrix H:");
+        printCovariance(H);
 
         // Measurement error
         AngularDirection residuals = realRaDec.substract(radec);
@@ -203,6 +239,8 @@ public class App {
         RealMatrix covInMeasSpace = H.multiply(predictedCov).multiplyTransposed(H);
         RealMatrix kalmanGain = predictedCov.multiplyTransposed(H)
                                             .multiply(MatrixUtils.inverse(covInMeasSpace.add(R)));
+        System.out.println("Kalman Gain");
+        printCovariance(kalmanGain);
 
         // Correction
         RealMatrix xhat = xbar.add(kalmanGain.multiply(residualMatrix.subtract(H.multiply(xbar))));
@@ -213,15 +251,35 @@ public class App {
         RealMatrix iMinusKgH = identity.subtract(kalmanGain.multiply(H));
         RealMatrix updatedCov = 
             iMinusKgH.multiply(predictedCov).multiplyTransposed(iMinusKgH).add(kRkT); // add process noise to predicted cov
+
+        System.out.println("---- After Kalman update: -----");
+        System.out.println("Frame: \t" + topoCentric);
+        System.out.println("Date: \t" + target);
+        System.out.println("Updated state:");
+        printCovariance(updatedState);
+        System.out.println("Updated state covariance");
+        printCovariance(updatedCov);
     }
 
-    private static RealMatrix getObservationPartialDerivative(AngularDirection radec, Vector3D posTopo) {
+    private static RealMatrix getGammaMatrix(AbsoluteDate initDate, AbsoluteDate target) {
+        RealMatrix gamma = MatrixUtils.createRealMatrix(6, 3);
+        double deltaT = target.durationFrom(initDate);
+        for(int i=0; i<gamma.getColumnDimension(); i++ ) {
+            gamma.setEntry(i, i, FastMath.pow(deltaT, 2)/2);
+            gamma.setEntry(i+3, i, deltaT);
+        }
+        System.out.println("Gamma");
+        printCovariance(gamma);
+        return gamma;
+    }
+
+    private static RealMatrix getObservationPartialDerivative(Vector3D posTopo, boolean withRange) {
         double range = posTopo.getNorm();
         
         double h11 = posTopo.getX()/range;
         double h12 = posTopo.getY()/range;
         double h13 = posTopo.getZ()/range;
-        double h21 = -posTopo.getY()/(FastMath.pow(posTopo.getY(), 2) 
+        double h21 = -posTopo.getY()/(FastMath.pow(posTopo.getX(), 2) 
                         * (1 + FastMath.pow(posTopo.getY()/posTopo.getX(), 2)));
         double h22 = 1./(posTopo.getX() * (1 + FastMath.pow(posTopo.getY()/posTopo.getX(), 2)));
         double h31 = - posTopo.getZ() * posTopo.getX()
@@ -232,23 +290,36 @@ public class App {
                             * FastMath.sqrt(1 - FastMath.pow(posTopo.getZ()/range,2)));
         double h33 = (1/range - FastMath.pow(posTopo.getZ(),2)/FastMath.pow(range, 3))
                         / FastMath.sqrt(1 - FastMath.pow(posTopo.getZ()/range, 2));
-
-        double[][] data = new double[3][6];
-        data[0] = new double[]{h11, h12, h13, 0., 0., 0.};
-        data[1] = new double[]{h21, h22, 0., 0., 0., 0.};
-        data[2] = new double[]{h31, h32, h33, 0., 0., 0.};
-        RealMatrix obsPartialDeriv = MatrixUtils.createRealMatrix(data);
-        return obsPartialDeriv;
+/*         System.out.println("H21: " + h21);
+        System.out.println("H22: " + h22);
+        System.out.println("H31: " + h31);
+        System.out.println("H32: " + h32);
+        System.out.println("H33: " + h33); */
+        if (withRange) {
+            double[][] data = new double[3][6];
+            data[0] = new double[]{h11, h12, h13, 0., 0., 0.};
+            data[1] = new double[]{h21, h22, 0., 0., 0., 0.};
+            data[2] = new double[]{h31, h32, h33, 0., 0., 0.};
+            RealMatrix obsPartialDeriv = MatrixUtils.createRealMatrix(data);
+            return obsPartialDeriv;
+        } else {
+            double[][] data = new double[2][6];
+            data[0] = new double[]{h21, h22, 0., 0., 0., 0.};
+            data[1] = new double[]{h31, h32, h33, 0., 0., 0.};
+            RealMatrix obsPartialDeriv = MatrixUtils.createRealMatrix(data);
+            return obsPartialDeriv;
+        }
+        
     }
 
-    private static AngularDirection predictMeasurement(Vector3D posTopo, Frame eci) {
+    private static AngularDirection predictMeasurement(Vector3D posTopo, Frame frame) {
     
         // Observation parameters
         double range = posTopo.getNorm();
         double ra = FastMath.atan(posTopo.getY()/posTopo.getX());
         double dec = FastMath.asin(posTopo.getZ()/range);
 
-        AngularDirection raDec = new AngularDirection(eci, new double[]{ra, dec}, AngleType.RADEC);
+        AngularDirection raDec = new AngularDirection(frame, new double[]{ra, dec}, AngleType.RADEC);
         return raDec;
     }
 
