@@ -121,9 +121,9 @@ public class TrackingObjective implements Objective{
 
     final public double MU = Constants.WGS84_EARTH_MU;
 
-    final TopocentricFrame stationHorizon;
+    TopocentricFrame stationHorizon;
 
-    final Frame topoInertial;
+    Frame topoInertial;
 
 
     public TrackingObjective(List<ObservedObject> targets, TopocentricFrame horizon, Frame topocentric) {
@@ -137,6 +137,14 @@ public class TrackingObjective implements Objective{
         this.stationHorizon = horizon;
         this.topoInertial = topocentric;
 
+    }
+
+    public void setStationHorizonFrame(TopocentricFrame frame){
+        this.stationHorizon = frame;
+    }
+
+    public void setTopoInertialFrame(Frame frame) {
+        this.topoInertial = frame;
     }
     
     public AngularDirection setMicroActionMultiMeasurements(AbsoluteDate current) { 
@@ -523,9 +531,9 @@ public class TrackingObjective implements Objective{
             new double[]{predictedPos.getX(), predictedPos.getY(), predictedPos.getZ(),
                          predictedVel.getX(), predictedVel.getY(), predictedVel.getZ()};
         RealMatrix predictedStateColumnVec = new Array2DRowRealMatrix(dataPredictedState);
-        System.out.println("Predicted");
+/*         System.out.println("Predicted");
         App.printCovariance(predictedStateColumnVec);
-        App.printCovariance(predictedCov);
+        App.printCovariance(predictedCov); */
 
         // Measurement
         Transform toTopo = 
@@ -557,9 +565,9 @@ public class TrackingObjective implements Objective{
         RealMatrix iMinusKgH = identity.subtract(kalmanGain.multiply(H));
         RealMatrix updatedCov = 
             iMinusKgH.multiply(predictedCov).multiplyTransposed(iMinusKgH).add(kRkT);
-        System.out.println("Corrected:");
+/*         System.out.println("Corrected:");
         App.printCovariance(updatedState);
-        App.printCovariance(updatedCov);
+        App.printCovariance(updatedCov); */
         
         // Set up output prediction
         StateVector predState = ObservedObject.spacecraftStateToStateVector(predicted, predicted.getFrame());
@@ -844,8 +852,8 @@ public class TrackingObjective implements Objective{
                                            s.getDate().toStringWithoutUtcOffset(utc, 3));
                         return increasing ? Action.CONTINUE : Action.STOP;  // stop propagation when object leaves FOR
                     });
-        // set up eclipse detector
-        EclipseDetector eclipseDetector = new EclipseDetector(sun, Constants.SUN_RADIUS, earth)
+            // set up eclipse detector
+            EclipseDetector eclipseDetector = new EclipseDetector(sun, Constants.SUN_RADIUS, earth)
                                                 .withMaxCheck(60.0)
                                                 .withThreshold(1.0e-3)
                                                 .withHandler(new ContinueOnEvent())
@@ -855,7 +863,8 @@ public class TrackingObjective implements Objective{
             Vector3D pos = candidate.getState().getPositionVector();
             Vector3D vel = candidate.getState().getVelocityVector();
             PVCoordinates pv = new PVCoordinates(pos, vel);
-            Orbit initialOrbit = new CartesianOrbit(pv, candidate.getFrame(), current, MU);
+            Orbit initialOrbit = new CartesianOrbit(pv, candidate.getFrame(), 
+                                     candidate.getEpoch(), MU);
             KeplerianPropagator kepPropo = new KeplerianPropagator(initialOrbit);
             
             // Add event to be detected
@@ -884,8 +893,8 @@ public class TrackingObjective implements Objective{
 
             // Transform spacecraft state into sensor pointing direction
             AngularDirection raDecPointing = transformStateToPointing(predState, topoInertial);
-            System.out.println("RA sensor: " + FastMath.toDegrees(raDecPointing.getAngle1()));
-            System.out.println("DEC sensor: " + FastMath.toDegrees(raDecPointing.getAngle2()));
+            // System.out.println("RA of " + candidate.getId() + ": " + FastMath.toDegrees(raDecPointing.getAngle1()));
+            // System.out.println("DEC of " + candidate.getId() + ": "  + FastMath.toDegrees(raDecPointing.getAngle2()));
 
             boolean goodSolarPhase = 
                 Tasking.checkSolarPhaseCondition(targetDate, raDecPointing);
@@ -912,9 +921,21 @@ public class TrackingObjective implements Objective{
             if (iG>maxIG) {
                 maxIG = iG;
                 pointing = raDecPointing;
-                target = candidate;
+                target = predAndCorr[1];
             }
         }
+        // Update targeted candidate in the list of objects of interest
+        for(ObservedObject candidate : updatedTargets) {
+            if(candidate.getId() == target.getId()) {
+                System.out.println("---");
+                System.out.println("Point at " + candidate.getId());
+                candidate.setState(target.getState());
+                candidate.setCovariance(target.getCovariance());
+                candidate.setEpoch(targetDate);
+                break;
+            }
+        }
+
         return pointing;
     }
 

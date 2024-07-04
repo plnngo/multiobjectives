@@ -271,8 +271,8 @@ public class App {
             gamma.setEntry(i, i, FastMath.pow(deltaT, 2)/2);
             gamma.setEntry(i+3, i, deltaT);
         }
-        System.out.println("Gamma");
-        printCovariance(gamma);
+/*         System.out.println("Gamma");
+        printCovariance(gamma); */
         return gamma;
     }
 

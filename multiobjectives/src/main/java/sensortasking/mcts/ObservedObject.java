@@ -53,6 +53,22 @@ public class ObservedObject {
         this.pseudoTle = tle;
     }
 
+    public void setState(StateVector newState) {
+        this.state = newState;
+    }
+
+    public void setCovariance(CartesianCovariance newCovariance) {
+        this.covariance = newCovariance;
+    }
+
+    public void setEpoch(AbsoluteDate newEpoch) {
+        this.epoch = newEpoch;
+    }
+
+    public void setFrame(Frame newFrame) {
+        this.frame = newFrame;
+    }
+
     public void setTle(TLE pseudoTle) {
         this.pseudoTle = pseudoTle;
     }

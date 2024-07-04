@@ -29,7 +29,6 @@ import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
 import org.orekit.orbits.CartesianOrbit;
 import org.orekit.orbits.KeplerianOrbit;
-import org.orekit.orbits.Orbit;
 import org.orekit.orbits.OrbitType;
 import org.orekit.orbits.PositionAngleType;
 import org.orekit.propagation.SpacecraftState;
@@ -299,11 +298,27 @@ public class TrackingObjectiveTest {
         Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
         Transform eciToTopo = new Transform(target, coordinatesStationEci.negate());
         Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
-
         TrackingObjective tracking = new TrackingObjective(ooi, topohorizon, topocentric);
-        AngularDirection pointing = tracking.setMicroAction(current);
-        System.out.println("Azimuth: " + FastMath.toDegrees(pointing.getAngle1()));
-        System.out.println("Elevation: " + FastMath.toDegrees(pointing.getAngle2()));
+
+        for (int simulation=0; simulation<10; simulation++) {
+            AngularDirection pointing = tracking.setMicroAction(current);
+            System.out.println("Epoch: " + target);
+            System.out.println("RA: " + FastMath.toDegrees(pointing.getAngle1()));
+            System.out.println("DEC: " + FastMath.toDegrees(pointing.getAngle2()));
+            System.out.println("Frame: " + pointing.getFrame().toString());
+
+            // Prepare for next simulation
+            current = target.shiftedBy(4. + 7.); // wait half exposer time and read out time
+            target = current.shiftedBy(100.);
+
+            // Extract new station position
+            horizonToEci = topohorizon.getTransformTo(j2000, target);  // date has to be the measurement epoch
+            coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
+            eciToTopo = new Transform(target, coordinatesStationEci.negate());
+            topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
+            tracking.setTopoInertialFrame(topocentric);
+        }
+        
     }
 
     @Test
