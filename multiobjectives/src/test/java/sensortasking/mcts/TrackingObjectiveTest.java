@@ -226,15 +226,15 @@ public class TrackingObjectiveTest {
     public void testSetMicroAction2() {
 
         // Epoch
-        AbsoluteDate date = new AbsoluteDate(2024, 6, 26, 0, 0, 0., TimeScalesFactory.getUTC());
+        AbsoluteDate current = new AbsoluteDate(2024, 6, 24, 12, 0, 0., TimeScalesFactory.getUTC());
+        //AbsoluteDate current = new AbsoluteDate(2024, 12, 24, 12, 0, 0., TimeScalesFactory.getUTC());
+        AbsoluteDate target = current.shiftedBy(100.);
 
         // Frame
-        Frame teme = FramesFactory.getTEME();
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
         Frame j2000 = FramesFactory.getEME2000();
 
-        // Set up ground station
-        GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(5.),   // Geodetic latitude
+/*         GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(5.),   // Geodetic latitude
                                               FastMath.toRadians(-172.),   // Longitude
                                               0.);              // in [m]
 
@@ -242,8 +242,7 @@ public class TrackingObjectiveTest {
         BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
                                                Constants.WGS84_EARTH_FLATTENING,
                                                ecef);
-        TopocentricFrame topoHorizon = new TopocentricFrame(earth, pos, "Station to observe TDRS satellite");
-
+        TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "Station to observe TDRS satellite"); */
 
         // Create list of objects of interest
         TLE tleTdrs10 = new TLE("1 27566U 02055A   24176.82688309  .00000089  00000-0  00000-0 0  9999", 
@@ -255,43 +254,56 @@ public class TrackingObjectiveTest {
         TLEPropagator propTdrs10 = TLEPropagator.selectExtrapolator(tleTdrs10);
         TLEPropagator propTdrs11 = TLEPropagator.selectExtrapolator(tleTdrs11);
 
-        SpacecraftState spacraftTdrs10 = propTdrs10.propagate(date);
-        SpacecraftState spacraftTdrs11 = propTdrs11.propagate(date);
+        SpacecraftState spacraftTdrs10 = propTdrs10.propagate(current);
+        SpacecraftState spacraftTdrs11 = propTdrs11.propagate(current);
 
-        StateVector stateTdrs10 = ObservedObject.spacecraftStateToStateVector(spacraftTdrs10, teme);
-        StateVector stateTdrs11 = ObservedObject.spacecraftStateToStateVector(spacraftTdrs11, teme);
+        StateVector stateTdrs10 = ObservedObject.spacecraftStateToStateVector(spacraftTdrs10, j2000);
+        StateVector stateTdrs11 = ObservedObject.spacecraftStateToStateVector(spacraftTdrs11, j2000);
 
         // Set covariances
         double[] covDiag = new double[]{100., 100., 100., 1., 1., 1.};
         RealMatrix covMatrix = MatrixUtils.createRealDiagonalMatrix(covDiag);
-        StateCovariance covTeme = new StateCovariance(covMatrix, date, teme, OrbitType.CARTESIAN, PositionAngleType.MEAN);
+        StateCovariance covEci = new StateCovariance(covMatrix, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
         
         CartesianCovariance stateCovTdrs10 = 
-            ObservedObject.stateCovToCartesianCov(spacraftTdrs10.getOrbit(), covTeme, teme);
+            ObservedObject.stateCovToCartesianCov(spacraftTdrs10.getOrbit(), covEci, j2000);
         CartesianCovariance stateCovTdrs11 = 
-            ObservedObject.stateCovToCartesianCov(spacraftTdrs11.getOrbit(), covTeme, teme);
+            ObservedObject.stateCovToCartesianCov(spacraftTdrs11.getOrbit(), covEci, j2000);
 
         // Create list of objects of interest
-        ObservedObject tdrs10 = new ObservedObject(tleTdrs10.getSatelliteNumber(), stateTdrs10, stateCovTdrs10, teme, tleTdrs10);
-        ObservedObject tdrs11 = new ObservedObject(tleTdrs11.getSatelliteNumber(), stateTdrs11, stateCovTdrs11, teme, tleTdrs11);
+        ObservedObject tdrs10 = new ObservedObject(tleTdrs10.getSatelliteNumber(), stateTdrs10, stateCovTdrs10, current, j2000);
+        ObservedObject tdrs11 = new ObservedObject(tleTdrs11.getSatelliteNumber(), stateTdrs11, stateCovTdrs11, current, j2000);
         List<ObservedObject> ooi = new ArrayList<ObservedObject>();
         ooi.add(tdrs10);
         ooi.add(tdrs11);
 
-/*         // Ground station
-        Transform temeToEcef = teme.getTransformTo(ecef, date);
-        PVCoordinates pvTeme = 
-            new PVCoordinates(stateTdrs11.getPositionVector(), stateTdrs11.getVelocityVector());
-        PVCoordinates pvEcef =  temeToEcef.transformPVCoordinates(pvTeme);
+        // Ground station
+        PVCoordinates pvEcef =  spacraftTdrs11.getPVCoordinates(ecef);
         double lon = pvEcef.getPosition().getAlpha();
         double lat = pvEcef.getPosition().getDelta();
         System.out.println("Lat " + FastMath.toDegrees(lat));
-        System.out.println("Lon " + FastMath.toDegrees(lon)); */
+        System.out.println("Lon " + FastMath.toDegrees(lon));
+/*         GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(5.),   // Geodetic latitude
+                                              FastMath.toRadians(-172.),   // Longitude
+                                              0.);              // in [m] */
+        GeodeticPoint pos = new GeodeticPoint(lat,   // Geodetic latitude
+                                              lon,   // Longitude
+                                              0.);              // in [m]
+        // Model Earth
+        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                               Constants.WGS84_EARTH_FLATTENING,
+                                               ecef);
+        TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "Station to observe TDRS satellite");
 
-        TrackingObjective tracking = new TrackingObjective(ooi, topoHorizon, null);
-        AngularDirection pointing = tracking.setMicroAction(date);
-        System.out.println("Azimuth: " +FastMath.toDegrees(pointing.getAngle1()));
-        System.out.println("Elevation: " +FastMath.toDegrees(pointing.getAngle2()));
+        Transform horizonToEci = topohorizon.getTransformTo(j2000, target);  // date has to be the measurement epoch
+        Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
+        Transform eciToTopo = new Transform(target, coordinatesStationEci.negate());
+        Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
+
+        TrackingObjective tracking = new TrackingObjective(ooi, topohorizon, topocentric);
+        AngularDirection pointing = tracking.setMicroAction(current);
+        System.out.println("Azimuth: " + FastMath.toDegrees(pointing.getAngle1()));
+        System.out.println("Elevation: " + FastMath.toDegrees(pointing.getAngle2()));
     }
 
     @Test

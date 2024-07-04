@@ -826,7 +826,6 @@ public class TrackingObjective implements Objective{
     public AngularDirection setMicroAction(AbsoluteDate current) {
         // Output
         double maxIG = Double.NEGATIVE_INFINITY;
-        // TODO: change to radec
         AngularDirection pointing = new AngularDirection(topoInertial, new double[]{0., 0.},
                                                             AngleType.RADEC);
         ObservedObject target = null;

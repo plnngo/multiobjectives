@@ -318,7 +318,7 @@ public class App {
     
         // Observation parameters
         double range = posTopo.getNorm();
-        double ra = FastMath.atan(posTopo.getY()/posTopo.getX());
+        double ra = FastMath.atan2(posTopo.getY(), posTopo.getX());
         double dec = FastMath.asin(posTopo.getZ()/range);
 
         AngularDirection raDec = new AngularDirection(frame, new double[]{ra, dec}, AngleType.RADEC);
