@@ -122,21 +122,21 @@ public class App {
         RealMatrix covInitMatrix = 
             MatrixUtils.createRealDiagonalMatrix(new double[]{100*1e3, 100*1e3, 100*1e3, 
                                                               0.1, 0.1, 0.1});
-        StateCovariance covInit = 
+       /*  StateCovariance covInit = 
             new StateCovariance(covInitMatrix, initDate, eci, OrbitType.CARTESIAN, 
-                                PositionAngleType.MEAN);
+                                PositionAngleType.MEAN); */
         final String stmAdditionalName = "stm";
         final MatricesHarvester harvester = 
             extrapolator.setupMatricesComputation(stmAdditionalName, null, null);
         printCovariance(covInitMatrix);
         
         // Set up covariance matrix provider and add it to the propagator
-        final StateCovarianceMatrixProvider providerCov = 
+/*         final StateCovarianceMatrixProvider providerCov = 
             new StateCovarianceMatrixProvider("covariance", stmAdditionalName, harvester, covInit);
-        extrapolator.addAdditionalStateProvider(providerCov);
+        extrapolator.addAdditionalStateProvider(providerCov); */
 
         // State transition matrix
-        final AbsoluteDate target = initialState.getDate().shiftedBy(initialState.getKeplerianPeriod());
+        final AbsoluteDate target = initialState.getDate().shiftedBy(100.);
         System.out.println("Target date: \t" + target);
         System.out.println("Propagation duration [s]: \t" + initialState.getKeplerianPeriod());
         System.out.println("----- Propagation -----");
@@ -161,8 +161,6 @@ public class App {
         predictedCov = predictedCov.add(mappedAcc);
         printCovariance(predictedCov);
 
-
-
         RealMatrix xbar = dYdY0.multiply(xhatPre);
 
 /*         // Direct covariance of orekit
@@ -185,6 +183,11 @@ public class App {
             eciToEcef.transformPVCoordinates(new PVCoordinates(predictedPos, predictedVel));
         double lon = pvEcef.getPosition().getAlpha();
         double lat = pvEcef.getPosition().getDelta();
+       /*  System.out.println("Latitude [rad]: \t" + lat);
+        System.out.println("Longitude [rad]: \t" + lon);
+        System.out.println("Altitude [m]: \t" + 0.);
+        System.out.println("Earth equatorial radius [m]: \t" + Constants.WGS84_EARTH_EQUATORIAL_RADIUS);
+        System.out.println("Earth flattening: \t" + Constants.WGS84_EARTH_FLATTENING); */
 
         GeodeticPoint station = new GeodeticPoint(lat,   // Geodetic latitude
                                               lon,   // Longitude
@@ -200,7 +203,7 @@ public class App {
         System.out.println(FastMath.toDegrees(lat));
         System.out.println(FastMath.toDegrees(lon)); */
 
-        Transform eciToTopo = new Transform(initDate, coordinatesStationEci.negate());
+        Transform eciToTopo = new Transform(target, coordinatesStationEci.negate());
         Frame topoCentric = new Frame(eci, eciToTopo, "Topocentric", true);
 
         // Generate real measurement
@@ -261,7 +264,7 @@ public class App {
         printCovariance(updatedCov);
     }
 
-    private static RealMatrix getGammaMatrix(AbsoluteDate initDate, AbsoluteDate target) {
+    public static RealMatrix getGammaMatrix(AbsoluteDate initDate, AbsoluteDate target) {
         RealMatrix gamma = MatrixUtils.createRealMatrix(6, 3);
         double deltaT = target.durationFrom(initDate);
         for(int i=0; i<gamma.getColumnDimension(); i++ ) {
@@ -273,7 +276,7 @@ public class App {
         return gamma;
     }
 
-    private static RealMatrix getObservationPartialDerivative(Vector3D posTopo, boolean withRange) {
+    public static RealMatrix getObservationPartialDerivative(Vector3D posTopo, boolean withRange) {
         double range = posTopo.getNorm();
         
         double h11 = posTopo.getX()/range;
@@ -309,10 +312,9 @@ public class App {
             RealMatrix obsPartialDeriv = MatrixUtils.createRealMatrix(data);
             return obsPartialDeriv;
         }
-        
     }
 
-    private static AngularDirection predictMeasurement(Vector3D posTopo, Frame frame) {
+    public static AngularDirection predictMeasurement(Vector3D posTopo, Frame frame) {
     
         // Observation parameters
         double range = posTopo.getNorm();
@@ -664,7 +666,7 @@ public class App {
 
     }
 
-    private static void printCovariance(final RealMatrix covariance) {
+    public static void printCovariance(final RealMatrix covariance) {
 
         // Create a string builder
         final StringBuilder covToPrint = new StringBuilder();

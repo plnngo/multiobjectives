@@ -79,8 +79,8 @@ public class ObservedObject {
     }
 
     public static CartesianCovariance stateCovToCartesianCov(Orbit orbit, StateCovariance stateCov, 
-                                                      Frame stationFrame) {
-        stateCov = stateCov.changeCovarianceFrame(orbit, stationFrame);
+                                                      Frame reference) {
+        stateCov = stateCov.changeCovarianceFrame(orbit, reference);
 
         CartesianCovariance output = new CartesianCovariance(null);
         
