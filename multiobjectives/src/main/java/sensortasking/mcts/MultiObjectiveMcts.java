@@ -73,32 +73,36 @@ public class MultiObjectiveMcts {
   
     /**
      * Given the initial node {@code root}, the next child is selected based on the Upper 
-     * Confidence Bound criteria until a leaf node is reached that does not hold any child nodes.
+     * Confidence Bound criteria until the termination condition is reached given by 
+     * {@link #endCampaign}.
      * 
-     * @param root              Initial node.
-     * @return                  List of selected node that fulfill UCB criteria.
+     * @param current           Initial node.
+     * @return                  Last node that is selected according to UCB criteria.
      */
-    public List<Node> select(Node root) {
+    public Node select(Node current) {
 
         // Declare output
-        List<Node> episode = new ArrayList<Node>();
+        //List<Node> episode = new ArrayList<Node>();
 
         
-        List<Node> children = root.getChildren();
+        List<Node> children = current.getChildren();
+        // check progressive widening condition
+        while(children.size() <= FastMath.pow(current.getNumVisits(), alpha)) {
+            // allow expansion of new node
+            DecisionNode leaf = expand((DecisionNode) current);
+            List<Node> simulated = simulate(leaf, endCampaign);
+            backpropagate(leaf, simulated.get(simulated.size()-1));
+            children = current.getChildren();
+        } 
 
-        while(root.getEpoch().compareTo(endCampaign) <= 0) {
-            // check progressive widening condition
-            if(children.size() <= FastMath.pow(root.getNumVisits(), alpha)) {
-                // allow expansion of new node
-                DecisionNode leaf = expand((DecisionNode) root);
-                List<Node> simulated = simulate(leaf, endCampaign);
-                backpropagate(leaf, simulated.get(simulated.size()-1));
-            } 
-
+        if (current.getEpoch().compareTo(endCampaign) <= 0) {
+            Node nextChild = selectChild(current);
+            return select(nextChild);
+        } else {
+            return current;
         }
-
-        
-        Node current = root;
+       
+       /*  Node current = current;
         episode.add(current);
         while(!children.isEmpty() && !Objects.isNull(children)) {
 
@@ -107,7 +111,7 @@ public class MultiObjectiveMcts {
             children = current.getChildren();
             episode.add(current);
         }
-        return episode;
+        return episode; */
     }
 
     /**
