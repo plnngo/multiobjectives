@@ -1,11 +1,16 @@
 package sensortasking.mcts;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
+import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.util.FastMath;
+import org.orekit.frames.Frame;
+import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
+import org.orekit.frames.Transform;
 import org.orekit.time.AbsoluteDate;
 
 import lombok.Getter;
@@ -21,7 +26,7 @@ public class MultiObjectiveMcts {
     Node initial;
 
     /** Objectives. */
-    final List<Objective> objectives;
+    static List<String> objectives = new ArrayList<String>(Arrays.asList("SEARCH", "TRACK"));
 
     /** Start date.*/
     final AbsoluteDate startCampaign;
@@ -35,6 +40,19 @@ public class MultiObjectiveMcts {
     /** Topocentric horizon frame. */
     final TopocentricFrame stationFrame;
 
+    /** Earth centered Earth fixed frame. */
+    final Frame j2000 = FramesFactory.getEME2000();
+
+    /** Tuning parameter (0;1) for progressive widening */
+    final static double alpha = 0.7;
+
+    /** List of objects of interest to be tracked. */
+    List<ObservedObject> trackedObjects = new ArrayList<ObservedObject>();
+
+    /** List of objects that have been detected.*/
+    List<ObservedObject> detectedObjects = new ArrayList<ObservedObject>();
+
+
     /** Basic constructor.
      * 
      * @param descisionTree
@@ -42,11 +60,11 @@ public class MultiObjectiveMcts {
      * @param start
      * @param end
      */
-    public MultiObjectiveMcts(Node descisionTree, List<Objective> objectives,
+    public MultiObjectiveMcts(Node descisionTree, List<String> objectives,
                               AbsoluteDate start, AbsoluteDate end, TopocentricFrame stationFrame) {
 
         this.initial = descisionTree;
-        this.objectives = objectives;
+        MultiObjectiveMcts.objectives = objectives;
         this.startCampaign = start;
         this.endCampaign = end;
         this.stationFrame = stationFrame;
@@ -60,15 +78,28 @@ public class MultiObjectiveMcts {
      * @param root              Initial node.
      * @return                  List of selected node that fulfill UCB criteria.
      */
-    public static List<Node> select(Node root) {
+    public List<Node> select(Node root) {
 
         // Declare output
         List<Node> episode = new ArrayList<Node>();
 
+        
+        List<Node> children = root.getChildren();
+
+        while(root.getEpoch().compareTo(endCampaign) <= 0) {
+            // check progressive widening condition
+            if(children.size() <= FastMath.pow(root.getNumVisits(), alpha)) {
+                // allow expansion of new node
+                DecisionNode leaf = expand((DecisionNode) root);
+                List<Node> simulated = simulate(leaf, endCampaign);
+                backpropagate(leaf, simulated.get(simulated.size()-1));
+            } 
+
+        }
+
+        
         Node current = root;
         episode.add(current);
-        List<Node> children = current.getChildren();
-        
         while(!children.isEmpty() && !Objects.isNull(children)) {
 
             // travers the tree until a leaf node is reached
@@ -79,10 +110,18 @@ public class MultiObjectiveMcts {
         return episode;
     }
 
+    /**
+     * Expand decision tree at the given leaf node by two further nodes, i.e. a new chance and a 
+     * new decision node .
+     * 
+     * @param leaf              Current decision leaf node.
+     * @return                  Next decision leaf node that is added to the decision tree together
+     *                          with its parent chance node. 
+     */
     public DecisionNode expand(DecisionNode leaf){
 
         //Node leaf = selected.get(selected.size()-1);
-        String nodeType = leaf.getClass().getSimpleName();
+        //String nodeType = leaf.getClass().getSimpleName();
         ChanceNode expandedChance = null;
         DecisionNode expandedDecision = null;
         
@@ -102,9 +141,9 @@ public class MultiObjectiveMcts {
         switch (indexSelectedObjective) {
             case 0:
                 // Macro action = search
-                for (Objective macro : this.objectives) {
-                    if (macro.getClass().getSimpleName().equals("SearchObjective")) {
-                        objective = macro;
+                for (String macro : MultiObjectiveMcts.objectives) {
+                    if (macro.equals("SEARCH")) {
+                        objective = new SearchObjective();
                         break;
                     }
                 }
@@ -113,9 +152,39 @@ public class MultiObjectiveMcts {
 
             case 1:
                 // Macro action = track
-                for (Objective macro : this.objectives) {
-                    if (macro.getClass().getSimpleName().equals("TrackingObjective")) {
-                        objective = macro;
+                for (String macro : MultiObjectiveMcts.objectives) {
+                    if (macro.equals("TRACK")) {
+                        AbsoluteDate measEpoch = 
+                            leaf.getEpoch().shiftedBy(TrackingObjective.allocation 
+                                                        + TrackingObjective.settling 
+                                                        + TrackingObjective.preparation 
+                                                        + TrackingObjective.exposure/2);
+
+                        // Extract new station position
+                        Transform horizonToEci = stationFrame.getTransformTo(j2000, measEpoch); 
+                        Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
+                        Transform eciToTopo = new Transform(measEpoch, coordinatesStationEci.negate());
+                        Frame topoInertial = new Frame(j2000, eciToTopo, "Topocentric", true);
+
+                        // make sure that tree does not get expanded by the same node that already exist among siblings
+                        List<ObservedObject> ooi = this.trackedObjects;
+                        for(Node sibling : leaf.getChildren()) {
+                            ChanceNode chance = (ChanceNode)sibling;
+                            if (chance.getMacro().getClass().getName().equals("TrackingObjective")) {
+                                TrackingObjective track = (TrackingObjective)chance.getMacro();
+                                long idAlreadyTracked = track.getLastUpdated();
+                                int index = -1;
+                                for(int i=0; i<ooi.size(); i++) {
+                                    if (ooi.get(i).getId() == idAlreadyTracked) {
+                                        index = i;
+                                        break;
+                                    }
+                                }
+                                ooi.remove(index);
+                            }
+                        }
+
+                        objective = new TrackingObjective(ooi, stationFrame, topoInertial);
                         break;
                     }
                 }
@@ -199,10 +268,11 @@ public class MultiObjectiveMcts {
         AbsoluteDate currentEpoch = leaf.getEpoch();
 
         while(currentEpoch.compareTo(campaignEndDate) <= 0) {
-            current = expand(current);
+            current = expand(current);              // TODO: check that actual decision tree does not get expanded by simulated nodes
             episode.add(current);
             currentEpoch = current.getEpoch();
         }
+        leaf.clearChildren();       // make sure that decision tree is not expanded by simulated nodes
         return episode;
     }
 
@@ -211,18 +281,30 @@ public class MultiObjectiveMcts {
      * newest expanded node, i.e. simulated nodes (including termination node) do not get added to  
      * the decision tree and do not need to get updated.
      * 
-     * @param selected          List of nodes that has been filled by calling {@link #select()}.
+     * @param leaf              Current leaf node of the decision tree (not including simulated nodes).
      * @param last              Termination node.
      */
-    public void backpropagate(List<Node> selected, Node last) {
+    public void backpropagate(Node leaf, Node last) {
 
         // Search for corresponding node in tree
-        Node findCurrent = this.initial;
+        Node findCurrent = leaf.getParent();
+        
+        while (!findCurrent.equals(this.initial)) {
+            findCurrent.incrementNumVisits();
+            double updatedUtility = findCurrent.getUtility() + last.getUtility();
+            findCurrent.setUtility(updatedUtility); 
+            findCurrent = findCurrent.getParent();
+        }
+        // Update root too
+        double updatedUtility = this.initial.getUtility() + last.getUtility();
+        this.initial.setUtility(updatedUtility); 
+
+        /* Node findCurrent = this.initial;
         findCurrent.incrementNumVisits();
         double updatedUtility = findCurrent.getUtility() + last.getUtility();
         findCurrent.setUtility(updatedUtility);
-        for (int i=1; i<selected.size(); i++) {
-            int ancestorIndex = findCurrent.getChildren().indexOf(selected.get(i));
+        for (int i=1; i<leaf.size(); i++) {
+            int ancestorIndex = findCurrent.getChildren().indexOf(leaf.get(i));
             findCurrent = findCurrent.getChildren().get(ancestorIndex);
 
             // Update status of ancestor node
@@ -230,6 +312,7 @@ public class MultiObjectiveMcts {
             updatedUtility = findCurrent.getUtility() + last.getUtility();
             findCurrent.setUtility(updatedUtility);
         }
+        this.initial = findCurrent; */
     }
 
     /**

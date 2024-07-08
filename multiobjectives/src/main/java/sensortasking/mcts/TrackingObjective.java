@@ -101,6 +101,14 @@ public class TrackingObjective implements Objective{
     /** Tasking duration for an observation in [sec]. */
     final double taskDuration = 2 * 60.;
 
+    long lastUpdated = Long.MIN_VALUE;
+
+    static double readout = 7.;
+    static double exposure = 8.;
+    static double allocation = 60.;
+    static double settling = 30.;
+    static double preparation = 6.;
+
     /** Sun. */
     final static CelestialBody sun = CelestialBodyFactory.getSun();
 
@@ -259,8 +267,7 @@ public class TrackingObjective implements Objective{
                     }
 
                     // If code reaches here, object is observable and visible
-                    double readout = 7.;
-                    double exposure = 8.;
+                    
                     List<AngularDirection> simulatedMeasurements = new ArrayList<AngularDirection>();
 
                     // Set up modified TLE using the state at the beginning of the tasking window
@@ -760,7 +767,8 @@ public class TrackingObjective implements Objective{
     @Override
     public AbsoluteDate[] getExecusionDuration(AbsoluteDate current) {
         //return 60.*5.;
-        AbsoluteDate[] interval = new AbsoluteDate[]{current, current};
+        double taskDuration = allocation+ settling + preparation + exposure + readout;
+        AbsoluteDate[] interval = new AbsoluteDate[]{current, current.shiftedBy(taskDuration)};
 /*         if (this.loggedFORpasses.size() == 2) {
             // object is going to enter and exit FOR within upcoming 15min
             interval = new AbsoluteDate[]{this.loggedFORpasses.get(0).getDate(), 
@@ -837,7 +845,8 @@ public class TrackingObjective implements Objective{
         AngularDirection pointing = new AngularDirection(topoInertial, new double[]{0., 0.},
                                                             AngleType.RADEC);
         ObservedObject target = null;
-        AbsoluteDate targetDate = current.shiftedBy(maxPropDuration);
+        AbsoluteDate targetDate = 
+            current.shiftedBy(allocation + settling + preparation + exposure/2);    // shift by 100s
 
         // Iterate through list of objects of interest
         for (ObservedObject candidate : updatedTargets) {
@@ -932,6 +941,7 @@ public class TrackingObjective implements Objective{
                 candidate.setState(target.getState());
                 candidate.setCovariance(target.getCovariance());
                 candidate.setEpoch(targetDate);
+                this.lastUpdated = candidate.getId();
                 break;
             }
         }

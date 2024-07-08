@@ -61,4 +61,8 @@ public class Node {
     public void setEpoch(AbsoluteDate epoch) {
         this.epoch = epoch;
     }
+
+    public void clearChildren() {
+        this.children = new ArrayList<Node>();
+    }
 }

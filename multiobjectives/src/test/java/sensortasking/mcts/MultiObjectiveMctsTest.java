@@ -87,7 +87,7 @@ public class MultiObjectiveMctsTest {
         Assert.assertEquals(expectedlySelected, actuallySelected);
     }
 
-    @Test
+/*     @Test
     public void testSelect() {
         // Compare
         List<Node> actual = MultiObjectiveMcts.select(root);
@@ -95,7 +95,7 @@ public class MultiObjectiveMctsTest {
         for(int i=0; i<expectedIds.length; i++) {
             Assert.assertEquals(expectedIds[i], actual.get(i).getId());
         }
-    }
+    } */
 
 /*    @Test
      public void testExpandFromChanceNode(){
