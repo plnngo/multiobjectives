@@ -813,7 +813,7 @@ public class TrackingObjective implements Objective{
 
     @Override
     public List<ObservedObject> propagateOutcome() {
-        // Fake data
+/*         // Fake data
         StateVector state = new StateVector();
         state.setX(150.);
         state.setY(250.);
@@ -827,8 +827,8 @@ public class TrackingObjective implements Objective{
         
         ObservedObject obj = new ObservedObject(345, state, cov, new AbsoluteDate(), stationHorizon);
         List<ObservedObject> out = new ArrayList<ObservedObject>();
-        out.add(obj);
-        return out;
+        out.add(obj); */
+        return updatedTargets;
     }
     @Override
     public AngularDirection setMicroAction(AbsoluteDate current) {

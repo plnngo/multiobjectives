@@ -79,107 +79,106 @@ public class MultiObjectiveMcts {
         return episode;
     }
 
-    public Node expand(Node leaf){
+    public DecisionNode expand(DecisionNode leaf){
 
         //Node leaf = selected.get(selected.size()-1);
         String nodeType = leaf.getClass().getSimpleName();
-        Node toBeAdded = null;
-        if (nodeType.equals("ChanceNode")){
-            // Need to propagate the environment under the selected macro/micro action pair
-            ChanceNode castedLeaf = (ChanceNode) leaf;
-            Objective objective = castedLeaf.getMacro();  
-            List<ObservedObject> propEnviroment = objective.propagateOutcome();    
+        ChanceNode expandedChance = null;
+        DecisionNode expandedDecision = null;
+        
+        // Expand by Chance node first
+        // Need to sample a new pair of macro and micro action
+        //DecisionNode castedLeaf = (DecisionNode) leaf;
+        double[] weights = leaf.getWeights();
 
-            // Update 
-            DecisionNode grandparent = (DecisionNode) leaf.getParent();
-            double[] priorTimeResources = grandparent.getTimeResources();
-            double[] postTimeResources = new double[priorTimeResources.length];
-            double[] postWeights = new double[grandparent.getWeights().length];
-
-            // Compute post observation duration
-            double priorTobs = 0;
-            for (int i=0; i<priorTimeResources.length; i++) {
-                priorTobs += priorTimeResources[i];
-            }
-            AbsoluteDate[] obsTimeInterval = castedLeaf.getExecutionDuration();
-            double executionDuration = obsTimeInterval[1].durationFrom(obsTimeInterval[0]);
-            double postTobs = priorTobs - executionDuration;
-
-             // Update weights
-             for (int i=0; i<postWeights.length; i++) {
-                postWeights[i] = priorTimeResources[i]/postTobs;
-            }
-
-            String objectiveType = objective.getClass().getSimpleName();
-            if (objectiveType.equals("SearchObjective")) {
-                // Update time resources
-                postTimeResources[0] = priorTimeResources[0] - executionDuration;
-                
-               // Correct weight update for given objective
-                postWeights[0] = postTimeResources[0]/postTobs;
-
-            } else if(objectiveType.equals("TrackingObjective")) {
-                // Update time resources
-                postTimeResources[1] = priorTimeResources[1] - executionDuration;
-
-                // Correct weight update for given objective
-                postWeights[1] = postTimeResources[1]/postTobs;
-            }else {
-                throw new IllegalAccessError("Unkown objective.");
-            }
-            AbsoluteDate propEpoch = castedLeaf.getEpoch().shiftedBy(executionDuration);
-            toBeAdded = new DecisionNode(0., 0, castedLeaf.getMicro(), postWeights, 
-                                                      postTimeResources, propEpoch, propEnviroment);
-            leaf.setChild(toBeAdded);    
-            //selected.add(toBeAdded);
-
-        } else if (nodeType.equals("DecisionNode")) {
-            // Need to sample a new pair of macro and micro action
-            DecisionNode castedLeaf = (DecisionNode) leaf;
-            double[] weights = castedLeaf.getWeights();
-
-            // Generate array filled with indexes representing the objective IDs
-            int[] indexObjective = new int[weights.length];
-            for (int i=0; i<weights.length; i++) {
-                indexObjective[i] = i;
-            }
-            int indexSelectedObjective = 
-                WeightedRandomNumberPicker.pickNumber(indexObjective, weights);
-            Objective objective;
-            switch (indexSelectedObjective) {
-                case 0:
-                    // Macro action = search
-                    for (Objective macro : this.objectives) {
-                        if (macro.getClass().getSimpleName().equals("SearchObjective")) {
-                            objective = macro;
-                            break;
-                        }
-                    }
-                    objective = null;
-                    break;
-
-                case 1:
-                    // Macro action = track
-                    for (Objective macro : this.objectives) {
-                        if (macro.getClass().getSimpleName().equals("TrackingObjective")) {
-                            objective = macro;
-                            break;
-                        }
-                    }
-                    objective = null;
-
-                default:
-                    throw new IllegalAccessError("Unkown objective.");
-            }
-
-            AngularDirection pointing = objective.setMicroAction(castedLeaf.getEpoch());
-            toBeAdded = new ChanceNode(objective.getExecusionDuration(castedLeaf.getEpoch()), 0., 0, objective, pointing, leaf);   
-            //selected.add(toBeAdded);
-
-        } else {
-            throw new IllegalArgumentException("Unknown node type");
+        // Generate array filled with indexes representing the objective IDs
+        int[] indexObjective = new int[weights.length];
+        for (int i=0; i<weights.length; i++) {
+            indexObjective[i] = i;
         }
-        return toBeAdded;
+        int indexSelectedObjective = 
+            WeightedRandomNumberPicker.pickNumber(indexObjective, weights);
+        Objective objective;
+        switch (indexSelectedObjective) {
+            case 0:
+                // Macro action = search
+                for (Objective macro : this.objectives) {
+                    if (macro.getClass().getSimpleName().equals("SearchObjective")) {
+                        objective = macro;
+                        break;
+                    }
+                }
+                objective = null;
+                break;
+
+            case 1:
+                // Macro action = track
+                for (Objective macro : this.objectives) {
+                    if (macro.getClass().getSimpleName().equals("TrackingObjective")) {
+                        objective = macro;
+                        break;
+                    }
+                }
+                objective = null;
+
+            default:
+                throw new IllegalAccessError("Unknown objective.");
+        }
+
+        AngularDirection pointing = objective.setMicroAction(leaf.getEpoch());
+        expandedChance = new ChanceNode(objective.getExecusionDuration(leaf.getEpoch()), 
+                                        0., 0, objective, pointing, leaf);   
+        //selected.add(toBeAdded);
+
+        // Expand by Decision node too
+        // Need to propagate the environment under the selected macro/micro action pair
+        List<ObservedObject> propEnviroment = objective.propagateOutcome();    
+
+        // Update 
+        //DecisionNode grandparent = (DecisionNode) leaf.getParent();
+        double[] priorTimeResources = leaf.getTimeResources();
+        double[] postTimeResources = new double[priorTimeResources.length];
+        double[] postWeights = new double[leaf.getWeights().length];
+
+        // Compute post observation duration
+        double priorTobs = 0;
+        for (int i=0; i<priorTimeResources.length; i++) {
+            priorTobs += priorTimeResources[i];
+        }
+        AbsoluteDate[] obsTimeInterval = expandedChance.getExecutionDuration();
+        double executionDuration = obsTimeInterval[1].durationFrom(obsTimeInterval[0]);
+        double postTobs = priorTobs - executionDuration;
+
+            // Update weights
+            for (int i=0; i<postWeights.length; i++) {
+            postWeights[i] = priorTimeResources[i]/postTobs;
+        }
+
+        String objectiveType = objective.getClass().getSimpleName();
+        if (objectiveType.equals("SearchObjective")) {
+            // Update time resources
+            postTimeResources[0] = priorTimeResources[0] - executionDuration;
+            
+            // Correct weight update for given objective
+            postWeights[0] = postTimeResources[0]/postTobs;
+
+        } else if(objectiveType.equals("TrackingObjective")) {
+            // Update time resources
+            postTimeResources[1] = priorTimeResources[1] - executionDuration;
+
+            // Correct weight update for given objective
+            postWeights[1] = postTimeResources[1]/postTobs;
+        }else {
+            throw new IllegalAccessError("Unknown objective.");
+        }
+        AbsoluteDate propEpoch = leaf.getEpoch().shiftedBy(executionDuration);
+        expandedDecision = new DecisionNode(0., 0, expandedChance.getMicro(), postWeights, 
+                                                    postTimeResources, propEpoch, propEnviroment);
+        leaf.setChild(expandedChance);  
+        expandedChance.setChild(expandedDecision);  
+        //selected.add(toBeAdded);
+        
+        return expandedDecision;
     }
 
     /**
@@ -190,13 +189,13 @@ public class MultiObjectiveMcts {
      * @param campaignEndDate   End of observation campaign.
      * @return                  List of nodes that have been simulated during roll-out.
      */
-    public List<Node> simulate(Node leaf, AbsoluteDate campaignEndDate) {
+    public List<Node> simulate(DecisionNode leaf, AbsoluteDate campaignEndDate) {
 
         // Declare output
         List<Node> episode = new ArrayList<Node>();
         episode.add(leaf);
 
-        Node current = leaf;
+        DecisionNode current = leaf;
         AbsoluteDate currentEpoch = leaf.getEpoch();
 
         while(currentEpoch.compareTo(campaignEndDate) <= 0) {
