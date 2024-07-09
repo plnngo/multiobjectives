@@ -1,15 +1,40 @@
 package sensortasking.mcts;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
+import org.hipparchus.geometry.euclidean.threed.Vector3D;
+import org.hipparchus.linear.MatrixUtils;
+import org.hipparchus.linear.RealMatrix;
+import org.hipparchus.util.FastMath;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.orekit.bodies.BodyShape;
+import org.orekit.bodies.GeodeticPoint;
+import org.orekit.bodies.OneAxisEllipsoid;
 import org.orekit.data.DataContext;
 import org.orekit.data.DataProvidersManager;
 import org.orekit.data.DirectoryCrawler;
+import org.orekit.files.ccsds.ndm.cdm.StateVector;
+import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
+import org.orekit.frames.Frame;
+import org.orekit.frames.FramesFactory;
+import org.orekit.frames.TopocentricFrame;
+import org.orekit.frames.Transform;
+import org.orekit.orbits.OrbitType;
+import org.orekit.orbits.PositionAngleType;
+import org.orekit.propagation.SpacecraftState;
+import org.orekit.propagation.StateCovariance;
+import org.orekit.propagation.analytical.tle.TLE;
+import org.orekit.propagation.analytical.tle.TLEPropagator;
 import org.orekit.time.AbsoluteDate;
+import org.orekit.time.TimeScalesFactory;
+import org.orekit.utils.Constants;
+import org.orekit.utils.IERSConventions;
+import org.orekit.utils.PVCoordinates;
 
 public class MultiObjectiveMctsTest {
 
@@ -194,4 +219,104 @@ public class MultiObjectiveMctsTest {
             Assert.assertEquals(11, updatedEpisode.get(i).getUtility(),1e-16);
         }
     } */
+
+    @Test
+    public void testSelectTdrs() {
+
+        // Epoch
+        AbsoluteDate current = new AbsoluteDate(2024, 7, 12, 12, 0, 0., TimeScalesFactory.getUTC());
+        AbsoluteDate endCampaign = current.shiftedBy(60.*10.);
+
+        // Frame
+        Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+        Frame j2000 = FramesFactory.getEME2000();
+
+        // Create list of objects of interest
+        TLE tleTdrs05 = new TLE("1 21639U 91054B   24190.31993666 -.00000307  00000-0  00000-0 0  9990", 
+                                "2 21639  14.1597 358.9539 0002937 207.3422 133.3222  1.00277803120606");      
+        TLE tleTdrs06 = new TLE("1 22314U 93003B   24190.32793498 -.00000302  00000-0  00000-0 0  9994",
+                                "2 22314  14.1631   2.2562 0011972 156.4976 200.1996  1.00268889115292");
+        TLE tleTdrs12 = new TLE("1 39504U 14004A   24190.25733250 -.00000273  00000-0  00000-0 0  9996", 
+                                "2 39504   3.5544   3.9152 0003777 189.8619 144.5768  1.00276604 37168");
+        TLE tleTdrs13 = new TLE("1 42915U 17047A   24190.33472274 -.00000099  00000-0  00000-0 0  9997", 
+                                "2 42915   3.6233 345.0954 0017520 118.0871 292.6285  1.00272287 25247");
+
+        // Compute state
+        TLEPropagator propTdrs05 = TLEPropagator.selectExtrapolator(tleTdrs05);
+        TLEPropagator propTdrs06 = TLEPropagator.selectExtrapolator(tleTdrs06);
+        TLEPropagator propTdrs12 = TLEPropagator.selectExtrapolator(tleTdrs12);
+        TLEPropagator propTdrs13 = TLEPropagator.selectExtrapolator(tleTdrs13);
+
+        SpacecraftState spacecraftTdrs05 = propTdrs05.propagate(current);
+        SpacecraftState spacecraftTdrs06 = propTdrs06.propagate(current);
+        SpacecraftState spacecraftTdrs12 = propTdrs12.propagate(current);
+        SpacecraftState spacecraftTdrs13 = propTdrs13.propagate(current);
+
+        StateVector stateTdrs05 = ObservedObject.spacecraftStateToStateVector(spacecraftTdrs05, j2000);
+        StateVector stateTdrs06 = ObservedObject.spacecraftStateToStateVector(spacecraftTdrs06, j2000);
+        StateVector stateTdrs12 = ObservedObject.spacecraftStateToStateVector(spacecraftTdrs12, j2000);
+        StateVector stateTdrs13 = ObservedObject.spacecraftStateToStateVector(spacecraftTdrs13, j2000);
+
+        // Set covariances
+        double[] covDiag = new double[]{100., 100., 100., 1., 1., 1.};
+        RealMatrix covMatrix = MatrixUtils.createRealDiagonalMatrix(covDiag);
+        StateCovariance covEci = new StateCovariance(covMatrix, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
+
+        CartesianCovariance stateCovTdrs05 =
+            ObservedObject.stateCovToCartesianCov(spacecraftTdrs05.getOrbit(), covEci, j2000); 
+        CartesianCovariance stateCovTdrs06 =
+            ObservedObject.stateCovToCartesianCov(spacecraftTdrs06.getOrbit(), covEci, j2000); 
+        CartesianCovariance stateCovTdrs12 = 
+            ObservedObject.stateCovToCartesianCov(spacecraftTdrs12.getOrbit(), covEci, j2000);
+        CartesianCovariance stateCovTdrs13 = 
+            ObservedObject.stateCovToCartesianCov(spacecraftTdrs13.getOrbit(), covEci, j2000);
+
+        // Create list of objects of interest
+        ObservedObject tdrs05 = new ObservedObject(tleTdrs05.getSatelliteNumber(), stateTdrs05, stateCovTdrs05, current, j2000);
+        ObservedObject tdrs06 = new ObservedObject(tleTdrs06.getSatelliteNumber(), stateTdrs06, stateCovTdrs06, current, j2000);
+        ObservedObject tdrs12 = new ObservedObject(tleTdrs12.getSatelliteNumber(), stateTdrs12, stateCovTdrs12, current, j2000);
+        ObservedObject tdrs13 = new ObservedObject(tleTdrs13.getSatelliteNumber(), stateTdrs13, stateCovTdrs13, current, j2000);
+        List<ObservedObject> ooi = new ArrayList<ObservedObject>();
+        ooi.add(tdrs05);
+        ooi.add(tdrs06);
+        ooi.add(tdrs12);
+        ooi.add(tdrs13);
+
+         // Ground station
+        PVCoordinates pvEcef =  spacecraftTdrs13.getPVCoordinates(ecef);
+        double lon = pvEcef.getPosition().getAlpha();
+        double lat = pvEcef.getPosition().getDelta();
+        System.out.println("Lat " + FastMath.toDegrees(lat));
+        System.out.println("Lon " + FastMath.toDegrees(lon));
+        GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(6.),   // Geodetic latitude
+                                              FastMath.toRadians(-37.),   // Longitude
+                                              0.);              // in [m]
+        // Model Earth
+        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                               Constants.WGS84_EARTH_FLATTENING,
+                                               ecef);
+        TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "Station to observe TDRS satellite");
+        Transform horizonToEci = topohorizon.getTransformTo(j2000, current);  // date has to be the measurement epoch
+        Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
+        Transform eciToTopo = new Transform(current, coordinatesStationEci.negate());
+        Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
+
+
+        List<String> objectives = new ArrayList<String>(Arrays.asList("SEARCH", "TRACK"));
+
+        // Initialise root node
+        double initUtility = 1.;
+        int numVisits = 1;
+        AngularDirection initPointing = 
+            new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
+        double[] initWeights = new double[]{0., 1.};
+        double[] initTimeResources = new double[]{0., endCampaign.durationFrom(current)};
+        Node root = new DecisionNode(initUtility, numVisits, initPointing, initWeights, 
+                                     initTimeResources, current, ooi);
+        MultiObjectiveMcts mctsTracking = 
+            new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, ooi, 
+                                   new ArrayList<ObservedObject>());
+        mctsTracking.select(root);
+
+    }
 }

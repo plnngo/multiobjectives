@@ -1,0 +1,6 @@
+TODO:
+- expand two nodes
+- write progressive widening function
+- write single objective MCTS
+	- BUG: in simulation(), returned episode weird --> nodes do not alternate between chance and decision nodes --> Fixed
+	- BUG: utility values not set

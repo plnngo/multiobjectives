@@ -61,13 +61,16 @@ public class MultiObjectiveMcts {
      * @param end
      */
     public MultiObjectiveMcts(Node descisionTree, List<String> objectives,
-                              AbsoluteDate start, AbsoluteDate end, TopocentricFrame stationFrame) {
+                              AbsoluteDate start, AbsoluteDate end, TopocentricFrame stationFrame,
+                              List<ObservedObject> trackedObjects, List<ObservedObject> detectedObjects) {
 
         this.initial = descisionTree;
         MultiObjectiveMcts.objectives = objectives;
         this.startCampaign = start;
         this.endCampaign = end;
         this.stationFrame = stationFrame;
+        this.trackedObjects = trackedObjects;
+        this.detectedObjects = detectedObjects;
     }
 
   
@@ -89,6 +92,7 @@ public class MultiObjectiveMcts {
         // check progressive widening condition
         while(children.size() <= FastMath.pow(current.getNumVisits(), alpha)) {
             // allow expansion of new node
+            System.out.println("Expansion phase");
             DecisionNode leaf = expand((DecisionNode) current);
             List<Node> simulated = simulate(leaf, endCampaign);
             backpropagate(leaf, simulated.get(simulated.size()-1));
@@ -156,8 +160,8 @@ public class MultiObjectiveMcts {
 
             case 1:
                 // Macro action = track
-                for (String macro : MultiObjectiveMcts.objectives) {
-                    if (macro.equals("TRACK")) {
+                // for (String macro : MultiObjectiveMcts.objectives) {
+                //     if (macro.equals("TRACK")) {
                         AbsoluteDate measEpoch = 
                             leaf.getEpoch().shiftedBy(TrackingObjective.allocation 
                                                         + TrackingObjective.settling 
@@ -190,9 +194,9 @@ public class MultiObjectiveMcts {
 
                         objective = new TrackingObjective(ooi, stationFrame, topoInertial);
                         break;
-                    }
-                }
-                objective = null;
+                //    }
+                //}
+                //objective = null;
 
             default:
                 throw new IllegalAccessError("Unknown objective.");
@@ -246,8 +250,7 @@ public class MultiObjectiveMcts {
         }
         AbsoluteDate propEpoch = leaf.getEpoch().shiftedBy(executionDuration);
         expandedDecision = new DecisionNode(0., 0, expandedChance.getMicro(), postWeights, 
-                                                    postTimeResources, propEpoch, propEnviroment);
-        leaf.setChild(expandedChance);  
+                                                    postTimeResources, propEpoch, propEnviroment);  
         expandedChance.setChild(expandedDecision);  
         //selected.add(toBeAdded);
         
@@ -263,20 +266,21 @@ public class MultiObjectiveMcts {
      * @return                  List of nodes that have been simulated during roll-out.
      */
     public List<Node> simulate(DecisionNode leaf, AbsoluteDate campaignEndDate) {
-
+        System.out.println("Simulation phase:");
         // Declare output
-        List<Node> episode = new ArrayList<Node>();
+        List<Node> episode = new ArrayList<Node>(); // TODO: not necessary to store in an arry because node holds all the descendants
         episode.add(leaf);
 
         DecisionNode current = leaf;
         AbsoluteDate currentEpoch = leaf.getEpoch();
 
         while(currentEpoch.compareTo(campaignEndDate) <= 0) {
-            current = expand(current);              // TODO: check that actual decision tree does not get expanded by simulated nodes
+            current = expand(current);              
+            episode.add(current.getParent());
             episode.add(current);
             currentEpoch = current.getEpoch();
         }
-        leaf.clearChildren();       // make sure that decision tree is not expanded by simulated nodes
+        leaf.clearChildren();       
         return episode;
     }
 
@@ -288,20 +292,26 @@ public class MultiObjectiveMcts {
      * @param leaf              Current leaf node of the decision tree (not including simulated nodes).
      * @param last              Termination node.
      */
-    public void backpropagate(Node leaf, Node last) {
+    public Node backpropagate(Node leaf, Node last) {
 
         // Search for corresponding node in tree
-        Node findCurrent = leaf.getParent();
+        //Node findCurrent = leaf.getParent();
         
-        while (!findCurrent.equals(this.initial)) {
-            findCurrent.incrementNumVisits();
-            double updatedUtility = findCurrent.getUtility() + last.getUtility();
-            findCurrent.setUtility(updatedUtility); 
-            findCurrent = findCurrent.getParent();
+        if (!leaf.equals(this.initial)) {
+            leaf.incrementNumVisits();
+            double updatedUtility = leaf.getUtility() + last.getUtility();
+            leaf.setUtility(updatedUtility); 
+            return backpropagate(leaf.getParent(), last);
+        } else {
+            // Update root too
+            this.initial.incrementNumVisits();
+            double updatedUtility = this.initial.getUtility() + last.getUtility();
+            this.initial.setUtility(updatedUtility);
+            return this.initial;
         }
-        // Update root too
+/*         // Update root too
         double updatedUtility = this.initial.getUtility() + last.getUtility();
-        this.initial.setUtility(updatedUtility); 
+        this.initial.setUtility(updatedUtility);  */
 
         /* Node findCurrent = this.initial;
         findCurrent.incrementNumVisits();

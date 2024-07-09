@@ -938,6 +938,9 @@ public class TrackingObjective implements Objective{
             if(candidate.getId() == target.getId()) {
                 System.out.println("---");
                 System.out.println("Point at " + candidate.getId());
+                System.out.println(targetDate);
+                System.out.println("RA [deg]: " + FastMath.toDegrees(pointing.getAngle1()));
+                System.out.println("DEC [deg]: " + FastMath.toDegrees(pointing.getAngle2()));
                 candidate.setState(target.getState());
                 candidate.setCovariance(target.getCovariance());
                 candidate.setEpoch(targetDate);
