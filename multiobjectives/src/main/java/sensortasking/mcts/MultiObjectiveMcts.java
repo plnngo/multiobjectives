@@ -272,13 +272,18 @@ public class MultiObjectiveMcts {
         episode.add(leaf);
 
         DecisionNode current = leaf;
-        AbsoluteDate currentEpoch = leaf.getEpoch();
+        double measDuration = TrackingObjective.allocation 
+                                + TrackingObjective.settling 
+                                + TrackingObjective.preparation 
+                                + TrackingObjective.exposure
+                                + TrackingObjective.readout;
+        AbsoluteDate currentEndMeasEpoch = current.getEpoch().shiftedBy(measDuration);
 
-        while(currentEpoch.compareTo(campaignEndDate) <= 0) {
+        while(currentEndMeasEpoch.compareTo(campaignEndDate) <= 0) {
             current = expand(current);              
             episode.add(current.getParent());
             episode.add(current);
-            currentEpoch = current.getEpoch();
+            currentEndMeasEpoch = current.getEpoch().shiftedBy(measDuration);
         }
         leaf.clearChildren();       
         return episode;
@@ -296,6 +301,25 @@ public class MultiObjectiveMcts {
 
         // Search for corresponding node in tree
         //Node findCurrent = leaf.getParent();
+
+        // Compute utlity value of last node
+        DecisionNode lastDecision = (DecisionNode) last;
+        double[] leftResources = lastDecision.getTimeResources();
+        double[] initWeights = ((DecisionNode)this.initial).getWeights();
+        double obsCampaignDuration = endCampaign.durationFrom(startCampaign);
+        double[] lastUtility = new double[2];
+        double totalUtility = 0.;
+        for(int i=0; i<lastUtility.length; i++) {
+            if(initWeights[i] == 0) {
+                // objective not selected
+                lastUtility[i] = 0.;
+            } else {
+                // TODO: handle case when left resources is exactly zero
+                lastUtility[i] = initWeights[i] * obsCampaignDuration / leftResources[i];
+                totalUtility += lastUtility[i];
+            }
+        }
+        last.setUtility(totalUtility);
         
         if (!leaf.equals(this.initial)) {
             leaf.incrementNumVisits();
