@@ -4,4 +4,4 @@ TODO:
 - write single objective MCTS
 	- BUG: in simulation(), returned episode weird --> nodes do not alternate between chance and decision nodes --> Fixed
 	- BUG: utility values not set --> Fixed
-	- BUG: in expansion phase, attempt to cast chance node into decision node
+	- BUG: in expansion phase, attempt to cast chance node into decision node --> problem most likely related to tdrs13 (not observable)

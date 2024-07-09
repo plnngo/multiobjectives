@@ -90,17 +90,33 @@ public class MultiObjectiveMcts {
         
         List<Node> children = current.getChildren();
         // check progressive widening condition
-        while(children.size() <= FastMath.pow(current.getNumVisits(), alpha)) {
-            // allow expansion of new node
-            System.out.println("Expansion phase");
-            DecisionNode leaf = expand((DecisionNode) current);
-            List<Node> simulated = simulate(leaf, endCampaign);
-            backpropagate(leaf, simulated.get(simulated.size()-1));
-            children = current.getChildren();
-        } 
+        if(current.getClass().getSimpleName().equals("DecisionNode")) {
+            while(children.size() <= FastMath.pow(current.getNumVisits(), alpha)) {
+                // allow expansion of new node
+                //System.out.println("Expansion phase");
+                DecisionNode leaf = expand((DecisionNode) current);
+                List<Node> simulated = simulate(leaf, endCampaign);
+                backpropagate(leaf, simulated.get(simulated.size()-1));
+                children = current.getChildren();
+            } 
+        }
 
         if (current.getEpoch().compareTo(endCampaign) <= 0) {
             Node nextChild = selectChild(current);
+            
+            if(nextChild.getClass().getSimpleName().equals("ChanceNode")) {
+                System.out.println("---");
+                System.out.println("Selected node");
+                ChanceNode chanceSelected = (ChanceNode) nextChild;
+                if(chanceSelected.getMacro().getClass().getSimpleName().equals("TrackingObjective")) {
+                    TrackingObjective macro = (TrackingObjective)chanceSelected.getMacro();
+                    System.out.println(macro.getLastUpdated());
+                    System.out.println(chanceSelected.getMicro().getDate());
+                    System.out.println("RA: " + FastMath.toDegrees(chanceSelected.getMicro().getAngle1()));
+                    System.out.println("DEC: " + FastMath.toDegrees(chanceSelected.getMicro().getAngle2()));
+
+                }
+            }
             return select(nextChild);
         } else {
             return current;
@@ -205,6 +221,7 @@ public class MultiObjectiveMcts {
         AngularDirection pointing = objective.setMicroAction(leaf.getEpoch());
         expandedChance = new ChanceNode(objective.getExecusionDuration(leaf.getEpoch()), 
                                         0., 0, objective, pointing, leaf);   
+        expandedChance.setId(leaf.getId()+leaf.getChildren().size());
         //selected.add(toBeAdded);
 
         // Expand by Decision node too
@@ -251,7 +268,10 @@ public class MultiObjectiveMcts {
         AbsoluteDate propEpoch = leaf.getEpoch().shiftedBy(executionDuration);
         expandedDecision = new DecisionNode(0., 0, expandedChance.getMicro(), postWeights, 
                                                     postTimeResources, propEpoch, propEnviroment);  
-        expandedChance.setChild(expandedDecision);  
+        expandedChance.setChild(expandedDecision); 
+        expandedDecision.setId(expandedChance.getId()+expandedChance.getChildren().size());
+         
+        
         //selected.add(toBeAdded);
         
         return expandedDecision;
@@ -266,7 +286,7 @@ public class MultiObjectiveMcts {
      * @return                  List of nodes that have been simulated during roll-out.
      */
     public List<Node> simulate(DecisionNode leaf, AbsoluteDate campaignEndDate) {
-        System.out.println("Simulation phase:");
+        //System.out.println("Simulation phase:");
         // Declare output
         List<Node> episode = new ArrayList<Node>(); // TODO: not necessary to store in an arry because node holds all the descendants
         episode.add(leaf);

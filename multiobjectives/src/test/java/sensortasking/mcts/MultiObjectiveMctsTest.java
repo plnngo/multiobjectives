@@ -316,7 +316,7 @@ public class MultiObjectiveMctsTest {
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, ooi, 
                                    new ArrayList<ObservedObject>());
-        mctsTracking.select(root);
-
+        Node rootUpdated = mctsTracking.select(root);
+        rootUpdated.getChildren();
     }
 }

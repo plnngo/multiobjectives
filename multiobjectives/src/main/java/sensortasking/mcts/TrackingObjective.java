@@ -936,11 +936,11 @@ public class TrackingObjective implements Objective{
         // Update targeted candidate in the list of objects of interest
         for(ObservedObject candidate : updatedTargets) {
             if(candidate.getId() == target.getId()) {
-                System.out.println("---");
+                /* System.out.println("---");
                 System.out.println("Point at " + candidate.getId());
                 System.out.println(targetDate);
                 System.out.println("RA [deg]: " + FastMath.toDegrees(pointing.getAngle1()));
-                System.out.println("DEC [deg]: " + FastMath.toDegrees(pointing.getAngle2()));
+                System.out.println("DEC [deg]: " + FastMath.toDegrees(pointing.getAngle2())); */
                 candidate.setState(target.getState());
                 candidate.setCovariance(target.getCovariance());
                 candidate.setEpoch(targetDate);
