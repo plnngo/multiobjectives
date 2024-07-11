@@ -1,12 +1,11 @@
 package sensortasking.mcts;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.orekit.time.AbsoluteDate;
 
-import lombok.Getter;
 
-@Getter
 public class DecisionNode extends Node{
 
     /** Sensor pointing location. */
@@ -32,5 +31,28 @@ public class DecisionNode extends Node{
         super.numVisits = numVisits;
         this.propEnvironment = propEnvironment;
         super.setEpoch(epoch);
+    }
+
+    public void setPropEnvironment(List<ObservedObject> environment) {
+        this.propEnvironment = environment;
+    }
+
+    public double[] getWeights() {
+        return this.weights;
+    }
+
+    public double[] getTimeResources() {
+        return this.timeResources;
+    }
+
+    public List<ObservedObject> getPropEnvironment() {
+        List<ObservedObject> out = new ArrayList<ObservedObject>();
+        for(ObservedObject obj : this.propEnvironment) {
+            ObservedObject copy = new ObservedObject(obj.getId(), obj.getState(), 
+                                                     obj.getCovariance(), obj.getEpoch(), 
+                                                     obj.getFrame());
+            out.add(copy);
+        }
+        return out;
     }
 }

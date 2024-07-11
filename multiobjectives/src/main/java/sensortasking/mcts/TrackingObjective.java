@@ -836,7 +836,15 @@ public class TrackingObjective implements Objective{
         ObservedObject obj = new ObservedObject(345, state, cov, new AbsoluteDate(), stationHorizon);
         List<ObservedObject> out = new ArrayList<ObservedObject>();
         out.add(obj); */
-        return updatedTargets;
+        // return copy of updated targets
+        List<ObservedObject> out = new ArrayList<ObservedObject>();
+        for (ObservedObject obj : this.updatedTargets) {
+            ObservedObject copy = new ObservedObject(obj.getId(), obj.getState(), 
+                                                     obj.getCovariance(), obj.getEpoch(), 
+                                                     obj.getFrame());
+            out.add(copy);
+        }
+        return out;
     }
     @Override
     public AngularDirection setMicroAction(AbsoluteDate current) {

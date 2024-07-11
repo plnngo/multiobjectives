@@ -47,7 +47,7 @@ public class MultiObjectiveMcts {
     final static double alpha = 0.7;
 
     /** List of objects of interest to be tracked. */
-    List<ObservedObject> trackedObjects = new ArrayList<ObservedObject>();
+    final List<ObservedObject> trackedObjects;
 
     /** List of objects that have been detected.*/
     List<ObservedObject> detectedObjects = new ArrayList<ObservedObject>();
@@ -94,7 +94,7 @@ public class MultiObjectiveMcts {
             while(children.size() <= FastMath.pow(current.getNumVisits(), alpha)) {
                 // allow expansion of new node
                 //System.out.println("Expansion phase");
-                DecisionNode leaf = expand((DecisionNode) current);
+                DecisionNode leaf = expand((DecisionNode) current, false);
                 List<Node> simulated = simulate(leaf, endCampaign);
                 backpropagate(leaf, simulated.get(simulated.size()-1));
                 children = current.getChildren();
@@ -139,10 +139,12 @@ public class MultiObjectiveMcts {
      * new decision node .
      * 
      * @param leaf              Current decision leaf node.
+     * @param simulationPhase   True if we are in simulation phase, false if only a node is simply 
+     *                          expanded.
      * @return                  Next decision leaf node that is added to the decision tree together
      *                          with its parent chance node. 
      */
-    public DecisionNode expand(DecisionNode leaf){
+    public DecisionNode expand(DecisionNode leaf, boolean simulationPhase){
 
         //Node leaf = selected.get(selected.size()-1);
         //String nodeType = leaf.getClass().getSimpleName();
@@ -191,10 +193,10 @@ public class MultiObjectiveMcts {
                         Frame topoInertial = new Frame(j2000, eciToTopo, "Topocentric", true);
 
                         // make sure that tree does not get expanded by the same node that already exist among siblings
-                        List<ObservedObject> ooi = this.trackedObjects;
+                        List<ObservedObject> ooi = new ArrayList<>(leaf.getPropEnvironment());
                         for(Node sibling : leaf.getChildren()) {
                             ChanceNode chance = (ChanceNode)sibling;
-                            if (chance.getMacro().getClass().getName().equals("TrackingObjective")) {
+                            if (chance.getMacro().getClass().getSimpleName().equals("TrackingObjective")) {
                                 TrackingObjective track = (TrackingObjective)chance.getMacro();
                                 long idAlreadyTracked = track.getLastUpdated();
                                 int index = -1;
@@ -218,7 +220,9 @@ public class MultiObjectiveMcts {
                 throw new IllegalAccessError("Unknown objective.");
         }
 
+        List<ObservedObject> restore = leaf.getPropEnvironment();
         AngularDirection pointing = objective.setMicroAction(leaf.getEpoch());
+        leaf.setPropEnvironment(restore);
         expandedChance = new ChanceNode(objective.getExecusionDuration(leaf.getEpoch()), 
                                         0., 0, objective, pointing, leaf);   
         expandedChance.setId(leaf.getId()+leaf.getChildren().size());
@@ -226,7 +230,27 @@ public class MultiObjectiveMcts {
 
         // Expand by Decision node too
         // Need to propagate the environment under the selected macro/micro action pair
-        List<ObservedObject> propEnviroment = objective.propagateOutcome();    
+        List<ObservedObject> propEnviroment = objective.propagateOutcome();  
+        
+        // Add object that was not considered for tracking back to propEnvironment
+        for(int parent=0; parent<leaf.getPropEnvironment().size(); parent++) {
+            long idParent = leaf.getPropEnvironment().get(parent).getId();
+            boolean found = false;
+            for(int child=0; child<propEnviroment.size(); child++) {
+                if (idParent == propEnviroment.get(child).getId()) {
+                    found = true;
+                }
+            }
+            if(!found) {
+                ObservedObject notTargeted = 
+                    new ObservedObject(idParent, leaf.getPropEnvironment().get(parent).getState(),
+                                       leaf.getPropEnvironment().get(parent).getCovariance(), 
+                                       leaf.getPropEnvironment().get(parent).getEpoch(), 
+                                       leaf.getPropEnvironment().get(parent).getFrame());
+                propEnviroment.add(notTargeted);
+            }
+        }
+
 
         // Update 
         //DecisionNode grandparent = (DecisionNode) leaf.getParent();
@@ -287,6 +311,7 @@ public class MultiObjectiveMcts {
      */
     public List<Node> simulate(DecisionNode leaf, AbsoluteDate campaignEndDate) {
         //System.out.println("Simulation phase:");
+        List<ObservedObject> restore = leaf.getPropEnvironment();
         // Declare output
         List<Node> episode = new ArrayList<Node>(); // TODO: not necessary to store in an arry because node holds all the descendants
         episode.add(leaf);
@@ -300,12 +325,13 @@ public class MultiObjectiveMcts {
         AbsoluteDate currentEndMeasEpoch = current.getEpoch().shiftedBy(measDuration);
 
         while(currentEndMeasEpoch.compareTo(campaignEndDate) <= 0) {
-            current = expand(current);              
+            current = expand(current, true);              
             episode.add(current.getParent());
             episode.add(current);
             currentEndMeasEpoch = current.getEpoch().shiftedBy(measDuration);
         }
-        leaf.clearChildren();       
+        leaf.clearChildren();  
+        leaf.setPropEnvironment(restore);     
         return episode;
     }
 
