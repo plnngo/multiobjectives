@@ -95,6 +95,10 @@ public class MultiObjectiveMcts {
                 // allow expansion of new node
                 //System.out.println("Expansion phase");
                 DecisionNode leaf = expand((DecisionNode) current, false);
+                if(leaf.getEpoch().compareTo(endCampaign) >= 0) {
+                    // already reached end of campaign
+                    return current;
+                }
                 List<Node> simulated = simulate(leaf, endCampaign);
                 backpropagate(leaf, simulated.get(simulated.size()-1));
                 children = current.getChildren();
@@ -114,7 +118,7 @@ public class MultiObjectiveMcts {
                     System.out.println(chanceSelected.getMicro().getDate());
                     System.out.println("RA: " + FastMath.toDegrees(chanceSelected.getMicro().getAngle1()));
                     System.out.println("DEC: " + FastMath.toDegrees(chanceSelected.getMicro().getAngle2()));
-
+                    System.out.println("Utility of root node " + this.initial.getUtility());
                 }
             }
             return select(nextChild);
@@ -231,7 +235,7 @@ public class MultiObjectiveMcts {
         // Expand by Decision node too
         // Need to propagate the environment under the selected macro/micro action pair
         List<ObservedObject> propEnviroment = objective.propagateOutcome();  
-        
+
         // Add object that was not considered for tracking back to propEnvironment
         for(int parent=0; parent<leaf.getPropEnvironment().size(); parent++) {
             long idParent = leaf.getPropEnvironment().get(parent).getId();
