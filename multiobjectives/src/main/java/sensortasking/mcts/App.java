@@ -27,6 +27,7 @@ import org.orekit.estimation.sequential.ConstantProcessNoise;
 import org.orekit.estimation.sequential.KalmanEstimator;
 import org.orekit.estimation.sequential.KalmanEstimatorBuilder;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
+import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
 import org.orekit.forces.ForceModel;
 import org.orekit.forces.gravity.HolmesFeatherstoneAttractionModel;
 import org.orekit.forces.gravity.potential.GravityFieldFactory;
@@ -83,7 +84,146 @@ public class App {
         //App.propagateKeplerianDynamics();
         //App.propagateCovarianceOrekitExample();
         //App.compareNormalPropWithKalmanPrediction();
-        App.setUpOwnKalmanFilter();
+        //App.setUpOwnKalmanFilter();
+        //App.compareCovTdrs();
+        App.computeKLTest();
+    }
+
+    public static void computeKLTest(){
+        AbsoluteDate current = new AbsoluteDate(2024, 7, 12, 12, 0, 0., TimeScalesFactory.getUTC());
+        Frame j2000 = FramesFactory.getEME2000();
+        StateVector stateTdrs06 = new StateVector();
+        stateTdrs06.setX(0);
+        stateTdrs06.setY(0);
+        stateTdrs06.setZ(0);
+        stateTdrs06.setXdot(0.);
+        stateTdrs06.setYdot(0.);
+        stateTdrs06.setZdot(0.);
+        double[][] covTdrs06 = new double[][]{{1.089069137e+01,  3.932080271e-04,  1.212906835e-04,  6.061128286e-03, -4.371574651e-05, -1.062480316e-05}, 
+                                              {3.932080271e-04,  1.089299148e+01,  5.335210837e-04, -4.293052288e-05,  6.046219894e-03, -1.240590757e-05}, 
+                                              {1.212906835e-04,  5.335210837e-04,  1.089138795e+01, -1.042713288e-05, -1.239788328e-05,  6.094452513e-03}, 
+                                              {6.061128286e-03, -4.293052288e-05, -1.042713288e-05,  1.746924049e-05, -8.127589483e-07, -1.966839084e-07}, 
+                                              {-4.371574651e-05,  6.046219894e-03, -1.239788328e-05, -8.127589483e-07,  1.725364983e-05, -2.393026485e-07}, 
+                                              {-1.062480316e-05, -1.240590757e-05,  6.094452513e-03, -1.966839084e-07, -2.393026485e-07,  1.817916197e-05}};
+        RealMatrix covMatrixTdrs06 = new Array2DRowRealMatrix(covTdrs06);
+        StateCovariance covEciTdrs06 = new StateCovariance(covMatrixTdrs06, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
+        CartesianCovariance stateCovTdrs06 =
+            ObservedObject.stateCovToCartesianCov(new CartesianOrbit(new PVCoordinates(), j2000, current, Constants.WGS84_EARTH_MU), covEciTdrs06, j2000);
+        ObservedObject tdrs06 = new ObservedObject((long)22314, stateTdrs06, stateCovTdrs06, current, j2000);
+
+        double[][] covTdrs12 = new double[][]{{1.089421296e+01, -1.230485775e-03, -7.039752463e-05,  6.071024929e-03, -4.337845954e-05, -2.508471831e-06}, 
+                                              {-1.230485775e-03,  1.089376735e+01, -7.727588323e-05, -4.256149661e-05,  6.035841690e-03, -3.687197998e-06}, 
+                                              {-7.039752463e-05, -7.727588323e-05,  1.089513608e+01, -2.457682925e-06, -3.681825771e-06,  6.099439413e-03}, 
+                                              {6.071024929e-03, -4.256149661e-05, -2.457682925e-06,  1.761880737e-05, -7.971860323e-07, -4.548130930e-08}, 
+                                              {-4.337845954e-05,  6.035841690e-03, -3.681825771e-06, -7.971860323e-07,  1.705092379e-05, -6.861016326e-08}, 
+                                              {-2.508471831e-06, -3.687197998e-06,  6.099439413e-03, -4.548130930e-08, -6.861016326e-08,  1.823488755e-05}};
+        RealMatrix covMatrixTdrs12 = new Array2DRowRealMatrix(covTdrs12);
+        StateCovariance covEciTdrs12 = new StateCovariance(covMatrixTdrs12, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
+        CartesianCovariance stateCovTdrs12 =
+            ObservedObject.stateCovToCartesianCov(new CartesianOrbit(new PVCoordinates(), j2000, current, Constants.WGS84_EARTH_MU), covEciTdrs12, j2000);
+        ObservedObject tdrs12 = new ObservedObject((long)39504, stateTdrs06, stateCovTdrs12, current, j2000);
+
+        double distance = TrackingObjective.computeKullbackLeiblerDivergence(tdrs06, tdrs12);
+        System.out.println(distance);
+        double distance1 = TrackingObjective.computeKullbackLeiblerDivergence(tdrs12, tdrs06);
+        System.out.println(distance1);
+
+    }
+
+    public static void compareCovTdrs() {
+
+        final double MU = Constants.WGS84_EARTH_MU;
+
+        // Frame
+        Frame j2000 = FramesFactory.getEME2000();
+
+        // Time
+        AbsoluteDate current = new AbsoluteDate(2024, 7, 12, 12, 0, 0., TimeScalesFactory.getUTC());
+        AbsoluteDate target = current.shiftedBy(100.);
+
+        TLE tleTdrs06 = new TLE("1 22314U 93003B   24190.32793498 -.00000302  00000-0  00000-0 0  9994",
+                                "2 22314  14.1631   2.2562 0011972 156.4976 200.1996  1.00268889115292");
+        TLE tleTdrs12 = new TLE("1 39504U 14004A   24190.25733250 -.00000273  00000-0  00000-0 0  9996", 
+                                "2 39504   3.5544   3.9152 0003777 189.8619 144.5768  1.00276604 37168");
+        TLEPropagator propTdrs06 = TLEPropagator.selectExtrapolator(tleTdrs06);
+        TLEPropagator propTdrs12 = TLEPropagator.selectExtrapolator(tleTdrs12);
+        SpacecraftState spacecraftTdrs06 = propTdrs06.propagate(current);
+        SpacecraftState spacecraftTdrs12 = propTdrs12.propagate(current);
+        StateVector stateTdrs06 = ObservedObject.spacecraftStateToStateVector(spacecraftTdrs06, j2000);
+        StateVector stateTdrs12 = ObservedObject.spacecraftStateToStateVector(spacecraftTdrs12, j2000);
+
+        double[][] covTdrs06 = new double[][]{{0.009855827555408531, 1.0287018380692445E-7, 3.910267644855593E-8, 4.318775659506618E-6, 3.082546456689512E-8, 7.3708924118463976E-9},
+                                              {1.0287018380692445E-7, 0.009857910682561545, 2.2022442149622472E-7, 3.161755497050027E-8, 4.31510301473182E-6, 8.135870183215624E-9},
+                                              {3.910267644855593E-8, 2.2022442149622472E-7, 0.009857088533581772, 7.570742600210252E-9, 8.144511266654299E-9, 4.2834614349166915E-6},
+                                              {4.318775659506618E-6, 3.161755497050027E-8, 7.570742600210252E-9, 1.746275349153637E-8, -8.194811351938942E-10, -1.983493667495804E-10},
+                                              {3.082546456689512E-8, 4.31510301473182E-6, 8.144511266654299E-9, -8.194811351938942E-10, 1.7236789470442757E-8, -2.4269048963433104E-10},
+                                              {7.3708924118463976E-9, 8.135870183215624E-9, 4.2834614349166915E-6, -1.983493667495804E-10, -2.4269048963433104E-10, 1.8175062188421707E-8}};
+        RealMatrix covMatrixTdrs06 = new Array2DRowRealMatrix(covTdrs06);
+        StateCovariance covEciTdrs06 = new StateCovariance(covMatrixTdrs06, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
+
+        double[][] covTdrs12 = new double[][]{{0.009855823497499241, -8.671670864459313E-8, 2.5731929906032663E-9, 4.312988285731713E-6, 3.1286742156174934E-8, 1.7377594871342673E-9},
+                                              {-8.671670864459313E-8, 0.009857965268260518, 5.843499034914995E-8, 3.210358716654692E-8, 4.322741590079748E-6, 2.3545012547055407E-9},
+                                              {2.5731929906032663E-9, 5.843499034914995E-8, 0.009857038107963734, 1.7885410467659128E-9, 2.3598727028774496E-9, 4.281608195160761E-6},
+                                              {4.312988285731713E-6, 3.210358716654692E-8, 1.7885410467659128E-9, 1.7612360625313363E-8, -8.025283878518984E-10, -4.580050494765601E-11},
+                                              {3.1286742156174934E-8, 4.322741590079748E-6, 2.3598727028774496E-9, -8.025283878518984E-10, 1.7031938068152258E-8, -6.947660259826142E-11},
+                                              {1.7377594871342673E-9, 2.3545012547055407E-9, 4.281608195160761E-6, -4.580050494765601E-11, -6.947660259826142E-11, 1.8230352837789837E-8}};
+        RealMatrix covMatrixTdrs12 = new Array2DRowRealMatrix(covTdrs12);
+        StateCovariance covEciTdrs12 = new StateCovariance(covMatrixTdrs12, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
+        System.out.println("Cov of 22314 at 12:00:00Z");
+        printCovariance(covMatrixTdrs06);
+        System.out.println("Cov of 39504 at 12:00:00Z");
+        printCovariance(covMatrixTdrs12);
+
+        double[][] covTdrs06Updated = new double[][]{{1.091880233e-02, -1.104827227e-06, -2.835158215e-07,  6.550795828e-06, -4.474692859e-08, -1.146659434e-08 },
+                                              {-1.104827227e-06,  1.091918088e-02, -2.388409647e-07, -4.395265274e-08,  6.557581554e-06, -1.064896282e-08 },
+                                              {-2.835158215e-07, -2.388409647e-07,  1.092005053e-02, -1.126619983e-08, -1.065186403e-08,  6.596425001e-06 },
+                                              {6.550795828e-06, -4.395265274e-08, -1.126619983e-08,  2.720910739e-08, -8.133050173e-10, -2.089233442e-10},
+                                              {-4.474692859e-08,  6.557581554e-06, -1.065186403e-08, -8.133050173e-10,  2.748543707e-08, -1.905437092e-10},
+                                              {-1.146659434e-08, -1.064896282e-08,  6.596425001e-06, -2.089233442e-10, -1.905437092e-10,  2.818008389e-08}};
+        RealMatrix covMatrixTdrs06Updated = new Array2DRowRealMatrix(covTdrs06Updated);
+        System.out.println("Cov of 22314 at 12:01:40Z updated");
+        printCovariance(covMatrixTdrs06Updated);
+
+        // Process noise
+        RealMatrix Q = 
+            MatrixUtils.createRealDiagonalMatrix(new double[]{1e-12, 1e-12, 1e-12});
+        RealMatrix gamma = App.getGammaMatrix(current, target);
+        RealMatrix mappedAcc = gamma.multiply(Q).multiplyTransposed(gamma);
+
+        // Keplerian propagator
+        PVCoordinates pvTdrs06 = new PVCoordinates(stateTdrs06.getPositionVector(), stateTdrs06.getVelocityVector());
+        Orbit orbitTdrs06 = new CartesianOrbit(pvTdrs06, j2000, target, MU);
+        KeplerianPropagator kepPropo06 = new KeplerianPropagator(orbitTdrs06);
+        PVCoordinates pvTdrs12 = new PVCoordinates(stateTdrs12.getPositionVector(), stateTdrs12.getVelocityVector());
+        Orbit orbitTdrs12 = new CartesianOrbit(pvTdrs12, j2000, target, MU);
+        KeplerianPropagator kepPropo12 = new KeplerianPropagator(orbitTdrs12);
+        final String stmName = "stm";
+        final MatricesHarvester harvester12 = 
+            kepPropo12.setupMatricesComputation(stmName, null, null);
+
+        
+        final MatricesHarvester harvester06 = 
+            kepPropo06.setupMatricesComputation(stmName, null, null);  
+
+        final StateCovarianceMatrixProvider providerCov06 = 
+            new StateCovarianceMatrixProvider("covariance", stmName, harvester06, covEciTdrs06);
+        kepPropo06.addAdditionalStateProvider(providerCov06);
+        final StateCovarianceMatrixProvider providerCov12 = 
+            new StateCovarianceMatrixProvider("covariance", stmName, harvester12, covEciTdrs12);
+        kepPropo12.addAdditionalStateProvider(providerCov12);
+
+        SpacecraftState predState06 = kepPropo06.propagate(target);
+        SpacecraftState predState12 = kepPropo12.propagate(target);
+
+        // Extract propagated covariance
+        RealMatrix propCovTdrs06 = providerCov06.getStateCovariance(predState06).getMatrix().add(mappedAcc);
+        System.out.println("Cov of 22314 at 12:01:40Z propagated");
+        printCovariance(propCovTdrs06);
+        
+
+
+
+
     }
 
     public static void setUpOwnKalmanFilter(){

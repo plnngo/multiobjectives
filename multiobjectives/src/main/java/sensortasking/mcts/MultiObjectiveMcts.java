@@ -3,7 +3,6 @@ package sensortasking.mcts;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.util.FastMath;
@@ -101,6 +100,14 @@ public class MultiObjectiveMcts {
                 }
                 List<Node> simulated = simulate(leaf, endCampaign);
                 backpropagate(leaf, simulated.get(simulated.size()-1));
+                if(leaf.getId() == 2) {
+                    for (ObservedObject candidate : leaf.getPropEnvironment()) {
+                        if(candidate.getId()==22314) {
+                            System.out.println("Updated covariance of 22314 at " + candidate.getEpoch());
+                            App.printCovariance(candidate.getCovariance().getCovarianceMatrix());
+                        }
+                    }
+                }
                 children = current.getChildren();
             } 
         }
@@ -118,6 +125,7 @@ public class MultiObjectiveMcts {
                     System.out.println(chanceSelected.getMicro().getDate());
                     System.out.println("RA: " + FastMath.toDegrees(chanceSelected.getMicro().getAngle1()));
                     System.out.println("DEC: " + FastMath.toDegrees(chanceSelected.getMicro().getAngle2()));
+                    
                     System.out.println("Utility of root node " + this.initial.getUtility());
                 }
             }

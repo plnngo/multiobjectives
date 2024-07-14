@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.Array2DRowRealMatrix;
+import org.hipparchus.linear.DiagonalMatrix;
 import org.hipparchus.linear.RealMatrix;
 import org.hipparchus.util.FastMath;
 import org.junit.Assert;
@@ -225,7 +226,7 @@ public class MultiObjectiveMctsTest {
 
         // Epoch
         AbsoluteDate current = new AbsoluteDate(2024, 7, 12, 12, 0, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60.*10.);
+        AbsoluteDate endCampaign = current.shiftedBy(60.*5.);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -261,13 +262,16 @@ public class MultiObjectiveMctsTest {
 /*         double[] covDiag = new double[]{100., 100., 100., 1., 1., 1.};
         RealMatrix covMatrix = MatrixUtils.createRealDiagonalMatrix(covDiag);
         StateCovariance covEci = new StateCovariance(covMatrix, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN); */
+/*         double[] covTdrs05 = new double[]{100., 100., 100., 1., 1., 1.};
+        RealMatrix covMatrixTdrs05 = new DiagonalMatrix(covTdrs05); */
+
         double[][] covTdrs05 = new double[][]{{0.009855904759351372, 4.078127311069879E-7, 9.875741320556275E-8, 4.328235954545346E-6, 2.9071094424474166E-8, 7.50553956976887E-9},
                                               {4.078127311069879E-7, 0.009857835750718295, 2.03608156883521E-7, 2.98649724447625E-8, 4.306014824614407E-6, 6.301496942467037E-9},
                                               {9.875741320556275E-8, 2.03608156883521E-7, 0.009857086380024797, 7.70583422336434E-9, 6.298597666057694E-9, 4.283086978472644E-6},
                                               {4.328235954545346E-6, 2.98649724447625E-8, 7.70583422336434E-9, 1.7207377721346993E-8, -8.212503178246334E-10, -2.109541457159083E-10},
                                               {2.9071094424474166E-8, 4.306014824614407E-6, 6.298597666057694E-9, -8.212503178246334E-10, 1.7482251900748092E-8, -1.9276823004892938E-10},
                                               {7.50553956976887E-9, 6.301496942467037E-9, 4.283086978472644E-6, -2.109541457159083E-10, -1.9276823004892938E-10, 1.818503320357093E-8}};
-        RealMatrix covMatrixTdrs05 = new Array2DRowRealMatrix(covTdrs05);
+        RealMatrix covMatrixTdrs05 = (new Array2DRowRealMatrix(covTdrs05)).scalarMultiply(1e3);
         StateCovariance covEciTdrs05 = new StateCovariance(covMatrixTdrs05, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
 
         double[][] covTdrs06 = new double[][]{{0.009855827555408531, 1.0287018380692445E-7, 3.910267644855593E-8, 4.318775659506618E-6, 3.082546456689512E-8, 7.3708924118463976E-9},
@@ -276,7 +280,9 @@ public class MultiObjectiveMctsTest {
                                               {4.318775659506618E-6, 3.161755497050027E-8, 7.570742600210252E-9, 1.746275349153637E-8, -8.194811351938942E-10, -1.983493667495804E-10},
                                               {3.082546456689512E-8, 4.31510301473182E-6, 8.144511266654299E-9, -8.194811351938942E-10, 1.7236789470442757E-8, -2.4269048963433104E-10},
                                               {7.3708924118463976E-9, 8.135870183215624E-9, 4.2834614349166915E-6, -1.983493667495804E-10, -2.4269048963433104E-10, 1.8175062188421707E-8}};
-        RealMatrix covMatrixTdrs06 = new Array2DRowRealMatrix(covTdrs06);
+        /* double[] covTdrs06 = new double[]{110., 110., 110., 1.0, 1.0, 1.0};
+        RealMatrix covMatrixTdrs06 = new DiagonalMatrix(covTdrs06); */
+        RealMatrix covMatrixTdrs06 = (new Array2DRowRealMatrix(covTdrs06)).scalarMultiply(1e3);
         StateCovariance covEciTdrs06 = new StateCovariance(covMatrixTdrs06, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
 
         double[][] covTdrs12 = new double[][]{{0.009855823497499241, -8.671670864459313E-8, 2.5731929906032663E-9, 4.312988285731713E-6, 3.1286742156174934E-8, 1.7377594871342673E-9},
@@ -285,7 +291,9 @@ public class MultiObjectiveMctsTest {
                                               {4.312988285731713E-6, 3.210358716654692E-8, 1.7885410467659128E-9, 1.7612360625313363E-8, -8.025283878518984E-10, -4.580050494765601E-11},
                                               {3.1286742156174934E-8, 4.322741590079748E-6, 2.3598727028774496E-9, -8.025283878518984E-10, 1.7031938068152258E-8, -6.947660259826142E-11},
                                               {1.7377594871342673E-9, 2.3545012547055407E-9, 4.281608195160761E-6, -4.580050494765601E-11, -6.947660259826142E-11, 1.8230352837789837E-8}};
-        RealMatrix covMatrixTdrs12 = new Array2DRowRealMatrix(covTdrs12);
+/*         double[] covTdrs12 = new double[]{90., 90., 90., 1.0, 1.0, 1.0};
+        RealMatrix covMatrixTdrs12 = new DiagonalMatrix(covTdrs12); */
+        RealMatrix covMatrixTdrs12 = (new Array2DRowRealMatrix(covTdrs12)).scalarMultiply(1e3);
         StateCovariance covEciTdrs12 = new StateCovariance(covMatrixTdrs12, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
 
         

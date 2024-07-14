@@ -303,6 +303,7 @@ public class TrackingObjective implements Objective{
                         maxIG = iG;
                         pointing = azElBeginTask;
                         target = candidate;
+                        
                     }
                 }
             }
@@ -522,7 +523,7 @@ public class TrackingObjective implements Objective{
 
         // Process noise
         RealMatrix Q = 
-            MatrixUtils.createRealDiagonalMatrix(new double[]{1e-12, 1e-12, 1e-12});
+            MatrixUtils.createRealDiagonalMatrix(new double[]{1e-8, 1e-8, 1e-8});
         RealMatrix gamma = App.getGammaMatrix(candidate.getEpoch(), predicted.getDate());
         RealMatrix mappedAcc = gamma.multiply(Q).multiplyTransposed(gamma);
 
@@ -934,11 +935,17 @@ public class TrackingObjective implements Objective{
                                                                   FastMath.pow(1./206265, 2)});
             ObservedObject[] predAndCorr = 
                 estimateStateWithOwnKalman(realRaDec, R, predState, harvester, candidate);
-            double iG = computeInformationGain(predAndCorr[0], predAndCorr[1]); 
+            double iG = computeInformationGain(predAndCorr[0], predAndCorr[1]);
+            if (predAndCorr[0].getId() == 22314) {
+                System.out.println("Predicted covariance of 22314 at " + predAndCorr[0].getEpoch());
+                App.printCovariance(predAndCorr[0].getCovariance().getCovarianceMatrix());
+            }
+            //System.out.println("Information gain: " + iG);
             if (iG>maxIG) {
                 maxIG = iG;
                 pointing = raDecPointing;
                 target = predAndCorr[1];
+                //App.printCovariance(target.getCovariance().getCovarianceMatrix());
             }
         }
         // Update targeted candidate in the list of objects of interest
