@@ -13,6 +13,8 @@ import org.orekit.frames.Transform;
 import org.orekit.time.AbsoluteDate;
 
 import lombok.Getter;
+import sensortasking.stripescanning.Stripe;
+import sensortasking.stripescanning.Tasking;
 import tools.WeightedRandomNumberPicker;
 
 @Getter
@@ -51,6 +53,14 @@ public class MultiObjectiveMcts {
     /** List of objects that have been detected.*/
     List<ObservedObject> detectedObjects = new ArrayList<ObservedObject>();
 
+    /** Stripe for searching objective. */
+    final Stripe scanStripe; 
+
+    /** Number of exposures within stripe scanning algorithm. */
+    final int numExpo = 5;
+
+    /** Observation station (TODO: implement sensor for tracking objective). */
+    final Sensor sensor;
 
     /** Basic constructor.
      * 
@@ -61,7 +71,8 @@ public class MultiObjectiveMcts {
      */
     public MultiObjectiveMcts(Node descisionTree, List<String> objectives,
                               AbsoluteDate start, AbsoluteDate end, TopocentricFrame stationFrame,
-                              List<ObservedObject> trackedObjects, List<ObservedObject> detectedObjects) {
+                              List<ObservedObject> trackedObjects, List<ObservedObject> detectedObjects,
+                              Sensor sensor) {
 
         this.initial = descisionTree;
         MultiObjectiveMcts.objectives = objectives;
@@ -70,9 +81,22 @@ public class MultiObjectiveMcts {
         this.stationFrame = stationFrame;
         this.trackedObjects = trackedObjects;
         this.detectedObjects = detectedObjects;
+        this.sensor = sensor;
+
+        this.scanStripe = computeScanStripe();
     }
 
   
+    private Stripe computeScanStripe() {
+
+        Tasking survey = new Tasking(sensor, this.startCampaign, this.endCampaign, this.numExpo);
+        Stripe[] stripes = survey.computeScanStripes();
+
+        // TODO: select fixed stripe that does not enter earth shadow
+        return stripes[1];
+    }
+
+
     /**
      * Given the initial node {@code root}, the next child is selected based on the Upper 
      * Confidence Bound criteria until the termination condition is reached given by 
@@ -181,7 +205,7 @@ public class MultiObjectiveMcts {
                 // Macro action = search
                 for (String macro : MultiObjectiveMcts.objectives) {
                     if (macro.equals("SEARCH")) {
-                        objective = new SearchObjective();
+                        objective = new SearchObjective(stationFrame, scanStripe, numExpo, sensor);
                         break;
                     }
                 }

@@ -103,6 +103,7 @@ public class TrackingObjective implements Objective{
 
     long lastUpdated = Long.MIN_VALUE;
 
+    // TODO implement as sensor object
     static double readout = 7.;
     static double exposure = 8.;
     static double allocation = 60.;
@@ -760,15 +761,9 @@ public class TrackingObjective implements Objective{
     }
 
     @Override
-    public double getUtility() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getUtility'");
-    }
-
-    @Override
     public AbsoluteDate[] getExecusionDuration(AbsoluteDate current) {
         //return 60.*5.;
-        double taskDuration = allocation+ settling + preparation + exposure + readout;
+        double taskDuration = allocation + settling + preparation + exposure + readout;
         AbsoluteDate[] interval = new AbsoluteDate[]{current, current.shiftedBy(taskDuration)};
 /*         if (this.loggedFORpasses.size() == 2) {
             // object is going to enter and exit FOR within upcoming 15min
@@ -822,21 +817,6 @@ public class TrackingObjective implements Objective{
 
     @Override
     public List<ObservedObject> propagateOutcome() {
-/*         // Fake data
-        StateVector state = new StateVector();
-        state.setX(150.);
-        state.setY(250.);
-        state.setZ(350.);
-
-        CartesianCovariance cov = new CartesianCovariance(null);
-        for (int pos=0; pos<3; pos++) {
-            cov.setCovarianceMatrixEntry(pos, pos, 15.);
-            cov.setCovarianceMatrixEntry(pos+3, pos+3, 150.);
-        }
-        
-        ObservedObject obj = new ObservedObject(345, state, cov, new AbsoluteDate(), stationHorizon);
-        List<ObservedObject> out = new ArrayList<ObservedObject>();
-        out.add(obj); */
         // return copy of updated targets
         List<ObservedObject> out = new ArrayList<ObservedObject>();
         for (ObservedObject obj : this.updatedTargets) {

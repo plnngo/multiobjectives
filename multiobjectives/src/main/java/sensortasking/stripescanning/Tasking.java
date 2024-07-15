@@ -150,7 +150,7 @@ public class Tasking {
      * @return                  Set of fixed and re-observation stripes. First half contains fixed,
      *                          second half the related re-obs stripes.
      */
-    protected Stripe[] computeScanStripes() {
+    public Stripe[] computeScanStripes() {
 
         // Set up Earth
         OneAxisEllipsoid oblateEarth = 

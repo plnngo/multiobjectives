@@ -11,10 +11,6 @@ public interface Objective {
 
     public AngularDirection setMicroAction(AbsoluteDate current);
 
-    //public double computeGain();
-
-    public double getUtility();
-
     public AbsoluteDate[] getExecusionDuration(AbsoluteDate current);
 
     public List<ObservedObject> propagateOutcome();    

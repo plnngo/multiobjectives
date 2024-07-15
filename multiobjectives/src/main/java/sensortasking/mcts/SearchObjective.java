@@ -3,41 +3,93 @@ package sensortasking.mcts;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hipparchus.util.FastMath;
-import org.orekit.files.ccsds.ndm.cdm.StateVector;
-import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
-import org.orekit.frames.FramesFactory;
+import org.orekit.frames.TopocentricFrame;
 import org.orekit.time.AbsoluteDate;
 
 import lombok.Getter;
+import sensortasking.stripescanning.Stripe;
 
 @Getter
 public class SearchObjective implements Objective{
 
+    TopocentricFrame stationHorizon;
+
+    Stripe scan;
+
+    int numExpo;
+
+    Sensor sensor;
+
+    List<AngularDirection> schedule;
+
+    // TODO implement as sensor object
+    static double readout = 7.;
+    static double exposure = 8.;
+    static double allocation = 60.;
+    static double settling = 30.;
+    static double preparation = 6.;
+
+    public SearchObjective(TopocentricFrame horizon, Stripe scan, int numExpo, Sensor sensor) {
+        this.stationHorizon = horizon;
+        this.scan = scan;
+        this.numExpo = numExpo;
+        this.sensor = sensor;
+    }
+
 
     @Override
     public AngularDirection setMicroAction(AbsoluteDate current) {
-        return new AngularDirection(null, new double[]{FastMath.toRadians(30.),  
-                                    FastMath.toRadians(50.)}, AngleType.AZEL);
+
+        List<AngularDirection> stripe = callStripeScan(current);
+        return stripe.get(0);
     }
 
-/*     @Override
-    public double computeGain() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'computeGain'");
-    } */
 
-    @Override
-    public double getUtility() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getUtility'");
+    private List<AngularDirection> callStripeScan(AbsoluteDate start) {
+
+        // Declare output
+        List<AngularDirection> schedule = new ArrayList<AngularDirection>();
+
+        // reposition to scan stripe
+        AbsoluteDate arriveAtStripe = start.shiftedBy(allocation + settling + preparation);
+        AbsoluteDate nextPointing = arriveAtStripe.shiftedBy(exposure/2.);
+
+        // reposition inside scan stripe
+        double reposDuration = this.scan.getReposInStripeT();
+
+        // Set pointing direction and target date
+        for (int i=0; i<scan.getNumDecFields(); i++) {
+            
+            for (int j=0; j<this.numExpo; j++) {
+                AngularDirection decField = scan.getPosField(i);
+                
+                // In same declination field 
+                decField.setDate(nextPointing);
+                schedule.add(decField);
+                nextPointing = nextPointing.shiftedBy(exposure/2. + sensor.getReadoutT());
+            }
+           
+            // last measurement does not require extra time for read out (already covered by repos)
+            nextPointing = nextPointing.shiftedBy(reposDuration - sensor.getReadoutT());
+        }
+
+/*         double scanDuration = this.scan.getStripeT(this.numExpo);
+        double decFieldDuration = 
+            this.numExpo * sensor.getExposureT() + (this.numExpo - 1) * sensor.getReadoutT(); */
+        
+        this.schedule = schedule;
+        return schedule;
     }
 
     @Override
     public AbsoluteDate[] getExecusionDuration(AbsoluteDate current) {
-        // TODO Auto-generated method stub
-        //return 5.*60.;
-        return null;
+        AbsoluteDate lastMeas = this.schedule.get(this.schedule.size()-1).getDate();
+        AbsoluteDate firstMeas = this.schedule.get(0).getDate();
+        double stripeT = lastMeas.durationFrom(firstMeas);
+        double taskDuration = allocation + settling + preparation + sensor.getExposureT() 
+                                + stripeT + sensor.getReadoutT();
+        AbsoluteDate[] interval = new AbsoluteDate[]{current, current.shiftedBy(taskDuration)};
+        return interval;
     }
 
     @Override
