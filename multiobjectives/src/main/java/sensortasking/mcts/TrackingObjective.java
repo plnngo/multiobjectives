@@ -829,6 +829,7 @@ public class TrackingObjective implements Objective{
     }
     @Override
     public AngularDirection setMicroAction(AbsoluteDate current) {
+
         // Output
         double maxIG = Double.NEGATIVE_INFINITY;
         AngularDirection pointing = new AngularDirection(topoInertial, new double[]{0., 0.},
@@ -917,8 +918,8 @@ public class TrackingObjective implements Objective{
                 estimateStateWithOwnKalman(realRaDec, R, predState, harvester, candidate);
             double iG = computeInformationGain(predAndCorr[0], predAndCorr[1]);
             if (predAndCorr[0].getId() == 22314) {
-                System.out.println("Predicted covariance of 22314 at " + predAndCorr[0].getEpoch());
-                App.printCovariance(predAndCorr[0].getCovariance().getCovarianceMatrix());
+                //System.out.println("Predicted covariance of 22314 at " + predAndCorr[0].getEpoch());
+                //App.printCovariance(predAndCorr[0].getCovariance().getCovarianceMatrix());
             }
             //System.out.println("Information gain: " + iG);
             if (iG>maxIG) {
@@ -930,6 +931,10 @@ public class TrackingObjective implements Objective{
         }
         // Update targeted candidate in the list of objects of interest
         for(ObservedObject candidate : updatedTargets) {
+            if (Objects.isNull(target)) {
+                // none of the considered taregts is observable
+                return null;
+            }
             if(candidate.getId() == target.getId()) {
                 /* System.out.println("---");
                 System.out.println("Point at " + candidate.getId());

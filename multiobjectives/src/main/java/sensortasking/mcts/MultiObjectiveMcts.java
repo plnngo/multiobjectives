@@ -3,6 +3,7 @@ package sensortasking.mcts;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.util.FastMath;
@@ -83,7 +84,8 @@ public class MultiObjectiveMcts {
         this.detectedObjects = detectedObjects;
         this.sensor = sensor;
 
-        this.scanStripe = computeScanStripe();
+        this.scanStripe = null;
+        //this.scanStripe = computeScanStripe();
     }
 
   
@@ -114,24 +116,33 @@ public class MultiObjectiveMcts {
         List<Node> children = current.getChildren();
         // check progressive widening condition
         if(current.getClass().getSimpleName().equals("DecisionNode")) {
-            while(children.size() <= FastMath.pow(current.getNumVisits(), alpha)) {
+            boolean expandable = true;
+            while(children.size() <= FastMath.pow(current.getNumVisits(), alpha) && expandable) {
                 // allow expansion of new node
                 //System.out.println("Expansion phase");
+
                 DecisionNode leaf = expand((DecisionNode) current, false);
-                if(leaf.getEpoch().compareTo(endCampaign) >= 0) {
+                if (Objects.isNull(leaf)){
+                    // objects not observable 
+                    children = current.getChildren();
+                    expandable = false;
+                    continue;
+
+                } else if (leaf.getEpoch().compareTo(endCampaign) >= 0) {
                     // already reached end of campaign
                     return current;
                 }
+                expandable = true;
                 List<Node> simulated = simulate(leaf, endCampaign);
                 backpropagate(leaf, simulated.get(simulated.size()-1));
-                if(leaf.getId() == 2) {
+                /* if(leaf.getId() == 2) {
                     for (ObservedObject candidate : leaf.getPropEnvironment()) {
                         if(candidate.getId()==22314) {
-                            System.out.println("Updated covariance of 22314 at " + candidate.getEpoch());
-                            App.printCovariance(candidate.getCovariance().getCovarianceMatrix());
+                            //System.out.println("Updated covariance of 22314 at " + candidate.getEpoch());
+                            //App.printCovariance(candidate.getCovariance().getCovarianceMatrix());
                         }
                     }
-                }
+                } */
                 children = current.getChildren();
             } 
         }
@@ -259,6 +270,10 @@ public class MultiObjectiveMcts {
         List<ObservedObject> restore = leaf.getPropEnvironment();
         AngularDirection pointing = objective.setMicroAction(leaf.getEpoch());
         leaf.setPropEnvironment(restore);
+        if (Objects.isNull(pointing)) {
+            // none of the considered targets was observable --> no expansion possible
+            return null;
+        }
         expandedChance = new ChanceNode(objective.getExecusionDuration(leaf.getEpoch()), 
                                         0., 0, objective, pointing, leaf);   
         expandedChance.setId(leaf.getId()+leaf.getChildren().size());
@@ -286,7 +301,6 @@ public class MultiObjectiveMcts {
                 propEnviroment.add(notTargeted);
             }
         }
-
 
         // Update 
         //DecisionNode grandparent = (DecisionNode) leaf.getParent();
@@ -339,17 +353,23 @@ public class MultiObjectiveMcts {
 
     /**
      * Roll out the decision tree until termination condition is met given by the end of the 
-     * observation campaign.
+     * observation campaign. In case a searching action has been selected previously, an empty
+     * list will be returned because there is no need for a simulation phase. 
      * 
      * @param leaf              Current leaf node of the decision tree.
      * @param campaignEndDate   End of observation campaign.
      * @return                  List of nodes that have been simulated during roll-out.
      */
     public List<Node> simulate(DecisionNode leaf, AbsoluteDate campaignEndDate) {
+
+        if(((ChanceNode)leaf.getParent()).getMacro().getClass().getSimpleName()
+                                         .equals("SearchObjective")) {
+            return new ArrayList<Node>();
+        }
         //System.out.println("Simulation phase:");
         List<ObservedObject> restore = leaf.getPropEnvironment();
         // Declare output
-        List<Node> episode = new ArrayList<Node>(); // TODO: not necessary to store in an arry because node holds all the descendants
+        List<Node> episode = new ArrayList<Node>(); // TODO: not necessary to store in an array because node holds all the descendants
         episode.add(leaf);
 
         DecisionNode current = leaf;
@@ -381,10 +401,16 @@ public class MultiObjectiveMcts {
      */
     public Node backpropagate(Node leaf, Node last) {
 
-        // Search for corresponding node in tree
-        //Node findCurrent = leaf.getParent();
-
-        // Compute utlity value of last node
+        if (Objects.isNull(last)) {
+            // no simulation was performed
+            DecisionNode leafDecision = (DecisionNode) leaf;
+            last = new DecisionNode(leaf.getUtility(), leaf.getNumVisits(), 
+                                    ((ChanceNode)leaf.getParent()).getMicro(), 
+                                    leafDecision.getWeights(), leafDecision.getTimeResources(), 
+                                    leaf.getEpoch(), leafDecision.getPropEnvironment());
+            leaf = leaf.getParent();
+        }
+        // Compute utility value of last node
         DecisionNode lastDecision = (DecisionNode) last;
         double[] leftResources = lastDecision.getTimeResources();
         double[] initWeights = ((DecisionNode)this.initial).getWeights();

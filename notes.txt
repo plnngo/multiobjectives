@@ -6,4 +6,7 @@ TODO:
 	- BUG: utility values not set --> Fixed
 	- BUG: in expansion phase, attempt to cast chance node into decision node --> problem most likely related to tdrs13 (not observable) --> Fixed (expansion only on decision node)
 	- BUG: propergated environment updated in a weird way. Objects that are not selected for sensor tasking are propagated to random epochs and orbit information is also updated --> fixed
-	- BUG: final utility of root node is negative --> fixed (ecpanded to far beyond end campaign)
+	- BUG: final utility of root node is negative --> fixed (expanded too far beyond end campaign)
+	- BUG: MCTS selects same nodes sequentially even though object's uncertainty should have shrinked down --> Adjust KF parameters
+	- BUG: solar phase condition not met after 2024-07-12T12:25:43.000Z so that there is no target that can be selected --> fixed (don't expand node if target is not observable)
+	- BUG: algorithm stuck on object 22314
