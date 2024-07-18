@@ -221,11 +221,65 @@ public class MultiObjectiveMctsTest {
     } */
 
     @Test
+    public void testOnlySearch() {
+
+        // Epoch
+        AbsoluteDate current = new AbsoluteDate(2024, 7, 12, 12, 24, 0., TimeScalesFactory.getUTC());
+        AbsoluteDate endCampaign = current.shiftedBy(60.*10.);
+
+        // Frame
+        Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+        Frame j2000 = FramesFactory.getEME2000();
+
+        // Ground station
+        GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(6.),   // Geodetic latitude
+                                              FastMath.toRadians(-37.),   // Longitude
+                                              0.);              // in [m]
+
+        double readout = 7.;
+        double exposure = 8.;
+        double allocation = 60.;
+        double settling = 30.;
+        double preparation = 6.;
+        double cutOff = FastMath.toRadians(5.);
+        double slewT = 9.;
+        Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
+        double slewVel = fov.getHeight()/slewT;
+        Sensor sensor = new Sensor("TDRS Station", fov, pos, exposure, readout, slewVel, cutOff, settling);
+
+        // Model Earth
+        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                               Constants.WGS84_EARTH_FLATTENING,
+                                               ecef);
+        TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "TDRS Station");
+        Transform horizonToEci = topohorizon.getTransformTo(j2000, current);  // date has to be the measurement epoch
+        Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
+        Transform eciToTopo = new Transform(current, coordinatesStationEci.negate());
+        Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
+
+        // Initialise root node
+        List<String> objectives = new ArrayList<String>(Arrays.asList("SEARCH", "TRACK"));
+        double initUtility = 1.;
+        int numVisits = 1;
+        AngularDirection initPointing = 
+            new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
+        double[] initWeights = new double[]{1., 0.};
+        double[] initTimeResources = new double[]{endCampaign.durationFrom(current), 0.};
+        Node root = new DecisionNode(initUtility, numVisits, initPointing, initWeights, 
+                                     initTimeResources, current, new ArrayList<ObservedObject>());
+        MultiObjectiveMcts mctsTracking = 
+            new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, null, 
+                                   new ArrayList<ObservedObject>(), sensor);
+        Node lastLeaf = mctsTracking.select(root);
+
+
+    }
+    @Test
     public void testSelectTdrs() {
 
         // Epoch
         AbsoluteDate current = new AbsoluteDate(2024, 7, 12, 12, 24, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60.*60.);
+        AbsoluteDate endCampaign = current.shiftedBy(60.*10.);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -316,7 +370,7 @@ public class MultiObjectiveMctsTest {
         ooi.add(tdrs12);
         //ooi.add(tdrs13);
 
-         // Ground station
+        // Ground station
         PVCoordinates pvEcef =  spacecraftTdrs13.getPVCoordinates(ecef);
         double lon = pvEcef.getPosition().getAlpha();
         double lat = pvEcef.getPosition().getDelta();

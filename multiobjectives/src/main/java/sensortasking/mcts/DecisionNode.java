@@ -2,6 +2,7 @@ package sensortasking.mcts;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import org.orekit.time.AbsoluteDate;
 
@@ -47,12 +48,18 @@ public class DecisionNode extends Node{
 
     public List<ObservedObject> getPropEnvironment() {
         List<ObservedObject> out = new ArrayList<ObservedObject>();
-        for(ObservedObject obj : this.propEnvironment) {
-            ObservedObject copy = new ObservedObject(obj.getId(), obj.getState(), 
-                                                     obj.getCovariance(), obj.getEpoch(), 
-                                                     obj.getFrame());
-            out.add(copy);
+
+        // TODO: remove new ArrayList<ObservedObject>() as soon Search objective has implemented IOD
+        if (Objects.isNull(this.propEnvironment)) {
+            return new ArrayList<ObservedObject>();
+        } else {
+            for(ObservedObject obj : this.propEnvironment) {
+                ObservedObject copy = new ObservedObject(obj.getId(), obj.getState(), 
+                                                         obj.getCovariance(), obj.getEpoch(), 
+                                                         obj.getFrame());
+                out.add(copy);
+            }
+            return out;
         }
-        return out;
     }
 }

@@ -84,8 +84,8 @@ public class MultiObjectiveMcts {
         this.detectedObjects = detectedObjects;
         this.sensor = sensor;
 
-        this.scanStripe = null;
-        //this.scanStripe = computeScanStripe();
+        //this.scanStripe = null;
+        this.scanStripe = computeScanStripe();
     }
 
   
@@ -134,7 +134,11 @@ public class MultiObjectiveMcts {
                 }
                 expandable = true;
                 List<Node> simulated = simulate(leaf, endCampaign);
-                backpropagate(leaf, simulated.get(simulated.size()-1));
+                if (simulated.size() != 0) {
+                    backpropagate(leaf, simulated.get(simulated.size()-1));
+                } else {
+                    backpropagate(leaf, null);
+                }
                 /* if(leaf.getId() == 2) {
                     for (ObservedObject candidate : leaf.getPropEnvironment()) {
                         if(candidate.getId()==22314) {
@@ -214,14 +218,14 @@ public class MultiObjectiveMcts {
         switch (indexSelectedObjective) {
             case 0:
                 // Macro action = search
-                for (String macro : MultiObjectiveMcts.objectives) {
-                    if (macro.equals("SEARCH")) {
+                // for (String macro : MultiObjectiveMcts.objectives) {
+                //     if (macro.equals("SEARCH")) {
                         objective = new SearchObjective(stationFrame, scanStripe, numExpo, sensor);
                         break;
-                    }
-                }
-                objective = null;
-                break;
+                    //}
+/*                 } */
+/*                 objective = null;
+                break; */
 
             case 1:
                 // Macro action = track
@@ -403,11 +407,34 @@ public class MultiObjectiveMcts {
 
         if (Objects.isNull(last)) {
             // no simulation was performed
+
+            if (!leaf.equals(this.initial)) {
+
+                // In case leaf is initial node
+                leaf.incrementNumVisits();
+                double[] leftResources = ((DecisionNode)leaf).getTimeResources();
+                double[] initWeights = ((DecisionNode)this.initial).getWeights();
+                double obsCampaignDuration = endCampaign.durationFrom(startCampaign);
+                double[] lastUtility = new double[2];
+                double totalUtility = 0.;
+                for(int i=0; i<lastUtility.length; i++) {
+                    if(initWeights[i] == 0) {
+                        // objective not selected
+                        lastUtility[i] = 0.;
+                    } else {
+                        // TODO: handle case when left resources is exactly zero
+                        lastUtility[i] = initWeights[i] * obsCampaignDuration / leftResources[i];
+                        totalUtility += lastUtility[i];
+                    }
+                }
+                leaf.setUtility(totalUtility);
+            }
+
             DecisionNode leafDecision = (DecisionNode) leaf;
             last = new DecisionNode(leaf.getUtility(), leaf.getNumVisits(), 
                                     ((ChanceNode)leaf.getParent()).getMicro(), 
                                     leafDecision.getWeights(), leafDecision.getTimeResources(), 
-                                    leaf.getEpoch(), leafDecision.getPropEnvironment());
+                                    leaf.getEpoch(), new ArrayList<ObservedObject>()); // TODO: fill propEnvironment with IOD results of detections
             leaf = leaf.getParent();
         }
         // Compute utility value of last node
@@ -441,24 +468,6 @@ public class MultiObjectiveMcts {
             this.initial.setUtility(updatedUtility);
             return this.initial;
         }
-/*         // Update root too
-        double updatedUtility = this.initial.getUtility() + last.getUtility();
-        this.initial.setUtility(updatedUtility);  */
-
-        /* Node findCurrent = this.initial;
-        findCurrent.incrementNumVisits();
-        double updatedUtility = findCurrent.getUtility() + last.getUtility();
-        findCurrent.setUtility(updatedUtility);
-        for (int i=1; i<leaf.size(); i++) {
-            int ancestorIndex = findCurrent.getChildren().indexOf(leaf.get(i));
-            findCurrent = findCurrent.getChildren().get(ancestorIndex);
-
-            // Update status of ancestor node
-            findCurrent.incrementNumVisits();
-            updatedUtility = findCurrent.getUtility() + last.getUtility();
-            findCurrent.setUtility(updatedUtility);
-        }
-        this.initial = findCurrent; */
     }
 
     /**

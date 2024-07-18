@@ -9,4 +9,4 @@ TODO:
 	- BUG: final utility of root node is negative --> fixed (expanded too far beyond end campaign)
 	- BUG: MCTS selects same nodes sequentially even though object's uncertainty should have shrinked down --> Adjust KF parameters
 	- BUG: solar phase condition not met after 2024-07-12T12:25:43.000Z so that there is no target that can be selected --> fixed (don't expand node if target is not observable)
-	- BUG: algorithm stuck on object 22314
+	- BUG: algorithm stuck on object 22314 --> stuck because it is the only object that is observable --> no bug!
