@@ -112,7 +112,6 @@ public class MultiObjectiveMcts {
         // Declare output
         //List<Node> episode = new ArrayList<Node>();
 
-        
         List<Node> children = current.getChildren();
         // check progressive widening condition
         if(current.getClass().getSimpleName().equals("DecisionNode")) {
@@ -166,6 +165,10 @@ public class MultiObjectiveMcts {
                     System.out.println("DEC: " + FastMath.toDegrees(chanceSelected.getMicro().getAngle2()));
                     
                     System.out.println("Utility of root node " + this.initial.getUtility());
+                } else {
+                    System.out.println("Scanning stripe, first pointing direction:");
+                    System.out.println("RA in EME2000: " + FastMath.toDegrees(chanceSelected.getMicro().getAngle1()));
+                    System.out.println("DEC in EME2000: " + FastMath.toDegrees(chanceSelected.getMicro().getAngle2()));
                 }
             }
             return select(nextChild);
@@ -217,15 +220,15 @@ public class MultiObjectiveMcts {
         Objective objective;
         switch (indexSelectedObjective) {
             case 0:
-                // Macro action = search
-                // for (String macro : MultiObjectiveMcts.objectives) {
-                //     if (macro.equals("SEARCH")) {
-                        objective = new SearchObjective(stationFrame, scanStripe, numExpo, sensor);
-                        break;
-                    //}
-/*                 } */
-/*                 objective = null;
-                break; */
+                // make sure that tree does not get expanded by the same node that already exist among siblings
+                for(Node sibling : leaf.getChildren()) {
+                    ChanceNode chance = (ChanceNode)sibling;
+                    if (chance.getMacro().getClass().getSimpleName().equals("SearchObjective")) {
+                        return null; // Search is already performed by another sibling
+                    }
+                }
+                objective = new SearchObjective(stationFrame, scanStripe, numExpo, sensor);
+                break;
 
             case 1:
                 // Macro action = track

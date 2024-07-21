@@ -84,7 +84,8 @@ public class Tasking {
     final int maxIterations = 30;
 
     /** Geocentric Celestial Reference Frame. */
-    final Frame eci = FramesFactory.getGCRF();
+    //final Frame eci = FramesFactory.getGCRF();
+    final static Frame eci = FramesFactory.getEME2000();
 
     /** Sphere around Earth with radius same as of a GEO. */
     final OneAxisEllipsoid geoSphere = new OneAxisEllipsoid(geoRadius, 0., eci);
@@ -156,7 +157,7 @@ public class Tasking {
         OneAxisEllipsoid oblateEarth = 
             new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
                                  Constants.WGS84_EARTH_FLATTENING,
-                                 FramesFactory.getGCRF());                 
+                                 eci);                 
 
         int numDecFields = computeNumberDeclinationFieldsLeakproof();
         //int numDecFields = computeNumberDeclinationFields();
@@ -189,7 +190,9 @@ public class Tasking {
                                      int numDecFields) {
 
         // Create geosynchronous sphere in eci
-        Frame eci = FramesFactory.getGCRF();
+        //Frame eci = FramesFactory.getGCRF();
+        //Frame eci = FramesFactory.getEME2000();
+
         OneAxisEllipsoid geoSphere = new OneAxisEllipsoid(geoRadius, 0., eci);
 
         // multiple of stripe duration 
@@ -299,7 +302,7 @@ public class Tasking {
                                               int numDecFields) {
 
         // Create geosynchronous sphere in eci
-        Frame eci = FramesFactory.getGCRF();
+        //Frame eci = FramesFactory.getGCRF();
         OneAxisEllipsoid geoSphere = new OneAxisEllipsoid(geoRadius, 0., eci);
 
         // multiple of stripe duration 
@@ -379,7 +382,7 @@ public class Tasking {
      */
     protected static boolean checkInEarthShadow(AngularDirection toCheck, AbsoluteDate date) {
 
-        Frame eci = FramesFactory.getGCRF();
+        //Frame eci = FramesFactory.getGCRF();
 
         // Set up boundary condition parameters
         double rGeo = 42164 * 1e3;                      // GEO radius in [m] 
@@ -413,7 +416,8 @@ public class Tasking {
     protected Stripe[] computeFixedRAs(OneAxisEllipsoid oblateEarth, int numDecFields)
                                      throws IllegalArgumentException {
 
-        Frame eci = FramesFactory.getGCRF();
+        //Frame eci = FramesFactory.getGCRF();
+        //Frame eci = FramesFactory.getEME2000();
         Vector3D stationEci = this.sensor.getSensorPosEci(this.start);
 
         // Get all bodies and their position that affect visibility condition
@@ -509,7 +513,7 @@ public class Tasking {
                                     OneAxisEllipsoid geoSphere, Plane laplace, AbsoluteDate date) 
                                     throws IllegalArgumentException {
                                     
-        Frame eci = FramesFactory.getGCRF();
+        //Frame eci = FramesFactory.getGCRF();
         AngularDirection midStripe = 
             setStripeMidPoint(ra, stationEci, geoSphere, laplace, date);
 
@@ -647,7 +651,7 @@ public class Tasking {
                                                         OneAxisEllipsoid geoSphere, Plane laplace,
                                                         AbsoluteDate date) {
 
-        Frame eci = FramesFactory.getGCRF();
+        //Frame eci = FramesFactory.getGCRF();
 
         // Shift ra to [-pi,pi] interval to be able to build up the plane
         if(ra>FastMath.PI) {
@@ -687,7 +691,7 @@ public class Tasking {
     public double[] getEarthShadowBoundariesRAs(CelestialBody sun, OneAxisEllipsoid earth,
                                                 AbsoluteDate date) {
 
-        Frame eci = FramesFactory.getGCRF();
+        //Frame eci = FramesFactory.getGCRF();
 
         // Check if body shape is defined wrt GCRF
         if(eci.equals(earth.getBodyFrame())) {
@@ -729,7 +733,7 @@ public class Tasking {
                                                                 OneAxisEllipsoid earth, 
                                                                 AbsoluteDate date) {
 
-        Frame eci = FramesFactory.getGCRF();
+        //Frame eci = FramesFactory.getGCRF();
 
         // Plane perpendicular to sun vector
         Vector3D sunPosEci = sun.getPVCoordinates(date, eci).getPosition();
@@ -814,7 +818,7 @@ public class Tasking {
                     Vector3D stationEci = this.sensor.getSensorPosEci(startSlot);
 
                     // Create geosynchronous sphere in eci
-                    Frame eci = FramesFactory.getGCRF();
+                    //Frame eci = FramesFactory.getGCRF();
                     OneAxisEllipsoid geoSphere = new OneAxisEllipsoid(geoRadius, 0., eci);
 
                     // Create Laplace plane in topocentric inertial frame
@@ -987,7 +991,7 @@ public class Tasking {
             int numDecFields =  reObs.getNumDecFields();
 
             // Create geosynchronous sphere in eci
-            Frame eci = FramesFactory.getGCRF();
+            //Frame eci = FramesFactory.getGCRF();
             OneAxisEllipsoid geoSphere = new OneAxisEllipsoid(geoRadius, 0., eci);
 
             // Create Laplace plane in topocentric inertial frame
@@ -1154,13 +1158,13 @@ public class Tasking {
         Vector3D zEcliptic = new Vector3D(0, 0, 1);
 
         // Convert into Earth centered inertial frame
-        Frame gcrf = FramesFactory.getGCRF();
-        Transform ecliptic2gcrf = ecliptic.getTransformTo(gcrf, date);
+        //Frame gcrf = FramesFactory.getGCRF();
+        Transform ecliptic2gcrf = ecliptic.getTransformTo(eci, date);
         Vector3D zGcrf = new Vector3D(0, 0, 1);
         Vector3D zEclipticInGcrf = 
             ecliptic2gcrf.transformVector(zEcliptic);   // ignoring translation
 
-        // Compute Laplace normal in GCRF
+        // Compute Laplace normal in ECI
         double tiltLaplace = FastMath.toRadians(7.5);
         Vector3D rotAxis = Vector3D.crossProduct(zGcrf, zEclipticInGcrf);
         //System.out.println(rotAxis.normalize());
@@ -1169,8 +1173,8 @@ public class Tasking {
         Vector3D laplaceNormalInGcrf = rot.applyTo(zGcrf);
 
         // Convert to destination frame 
-        Transform gcrf2dest = gcrf.getTransformTo(dest, date);
-        Vector3D earthCenterDestFrame = gcrf2dest.transformPosition(Vector3D.ZERO);
+        Transform eci2dest = eci.getTransformTo(dest, date);
+        Vector3D earthCenterDestFrame = eci2dest.transformPosition(Vector3D.ZERO);
         Plane laplace  = new Plane(earthCenterDestFrame, laplaceNormalInGcrf, tolerance);
         
         // Transform equator plane from itrf into gcrf

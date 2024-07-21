@@ -1,6 +1,9 @@
 package sensortasking.mcts;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -224,7 +227,7 @@ public class MultiObjectiveMctsTest {
     public void testOnlySearch() {
 
         // Epoch
-        AbsoluteDate current = new AbsoluteDate(2024, 7, 12, 12, 24, 0., TimeScalesFactory.getUTC());
+        AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
         AbsoluteDate endCampaign = current.shiftedBy(60.*10.);
 
         // Frame
@@ -235,7 +238,6 @@ public class MultiObjectiveMctsTest {
         GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(6.),   // Geodetic latitude
                                               FastMath.toRadians(-37.),   // Longitude
                                               0.);              // in [m]
-
         double readout = 7.;
         double exposure = 8.;
         double allocation = 60.;
@@ -271,17 +273,115 @@ public class MultiObjectiveMctsTest {
             new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, null, 
                                    new ArrayList<ObservedObject>(), sensor);
         Node lastLeaf = mctsTracking.select(root);
+        ChanceNode child = (ChanceNode)lastLeaf.getChildren().get(0);
+        List<AngularDirection> tasks = ((SearchObjective)child.getMacro()).getSchedule();
+
+        // Extract observable objects
+        List<TLE> observables = getGEOSat(current);
+
+        // Perform tasks
+        List<AngularDirection> actualMeas = new ArrayList<AngularDirection>();
+
+        for(AngularDirection task: tasks) {
+            AbsoluteDate epoch = task.getDate();
+            double[] raRange = new double[]{task.getAngle1() - fov.getWidth()/2, 
+                                            task.getAngle1() + fov.getWidth()/2};
+            double[] decRange = new double[]{task.getAngle2() - fov.getHeight()/2,
+                                             task.getAngle2() + fov.getHeight()/2};
+
+            for(TLE candidate : observables) {
+                TLEPropagator prop = TLEPropagator.selectExtrapolator(candidate);
+                Vector3D propPos = prop.propagate(epoch).getPVCoordinates(j2000).getPosition();
+                AngularDirection anglePos = 
+                    new AngularDirection(j2000, 
+                                        new double[]{propPos.getAlpha(), propPos.getDelta()}, 
+                                        AngleType.RADEC);
+                boolean inDecField = checkInAngularRange(anglePos, raRange, decRange);
+
+                // Extract measurement if object is in FOV
+                if(inDecField) {
+                    anglePos.setDate(epoch);
+                    actualMeas.add(anglePos);
+                    System.out.println(candidate.getSatelliteNumber() + " at " + epoch);
+                }
+            }
+        }
+
     }
+
+    private static boolean checkInAngularRange(AngularDirection obj, double[] raRange, double[] decRange) {
+        double ra = obj.getAngle1() ;
+        if(ra< 0.) {
+            ra += 2*FastMath.PI;
+        }
+
+        if(raRange[0] < ra && ra < raRange[1] 
+                && decRange[0] < obj.getAngle2() && obj.getAngle2() < decRange[1]) {
+                    return true;
+            }
+        return false;
+    }
+    public List<TLE> getGEOSat(AbsoluteDate current){
+
+        // Frame
+        Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+
+        String workingDir = System.getProperty("user.dir");
+        String nameFile = "\\geo_21072024.txt";
+        List<TLE> filtered = new ArrayList<TLE>();
+        try (BufferedReader br = new BufferedReader(new FileReader(workingDir + nameFile))) {
+            String line;
+            String line1 = "";
+            while ((line = br.readLine()) != null) {
+                if(line.startsWith("1")) {
+                    line1 = line;
+                } else if(line.startsWith("2")) {
+                    TLE candidate = new TLE(line1, line);
+                    TLEPropagator prop = TLEPropagator.selectExtrapolator(candidate);
+                    SpacecraftState state = prop.propagate(current);
+                    PVCoordinates pvEcef =  state.getPVCoordinates(ecef);
+                    double lon = FastMath.toDegrees(pvEcef.getPosition().getAlpha());
+                    double lat = FastMath.toDegrees(pvEcef.getPosition().getDelta());
+
+                    // Longitude and latitude filter
+                    if((-10. <= lat && lat <= 15.) && (-50. <= lon && lon <= -25.)) {
+                        filtered.add(candidate);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        System.out.println("Number of observable satellites: " + filtered.size());
+        return filtered;
+    }
+
     @Test
     public void testSelectTdrs() {
 
         // Epoch
-        AbsoluteDate current = new AbsoluteDate(2024, 7, 12, 12, 24, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60.*10.);
+        AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
+        AbsoluteDate endCampaign = current.shiftedBy(60.*20.);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
         Frame j2000 = FramesFactory.getEME2000();
+
+        // Ground station
+        GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(6.),   // Geodetic latitude
+                                              FastMath.toRadians(-37.),   // Longitude
+                                              0.);              // in [m]
+        double readout = 7.;
+        double exposure = 8.;
+        double allocation = 60.;
+        double settling = 30.;
+        double preparation = 6.;
+        double cutOff = FastMath.toRadians(5.);
+        double slewT = 9.;
+        Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
+        double slewVel = fov.getHeight()/slewT;
+        Sensor sensor = new Sensor("TDRS Station", fov, pos, exposure, readout, slewVel, settling, cutOff);
 
         // Create list of objects of interest
         TLE tleTdrs05 = new TLE("1 21639U 91054B   24190.31993666 -.00000307  00000-0  00000-0 0  9990", 
@@ -368,15 +468,6 @@ public class MultiObjectiveMctsTest {
         ooi.add(tdrs12);
         //ooi.add(tdrs13);
 
-        // Ground station
-        PVCoordinates pvEcef =  spacecraftTdrs13.getPVCoordinates(ecef);
-        double lon = pvEcef.getPosition().getAlpha();
-        double lat = pvEcef.getPosition().getDelta();
-        System.out.println("Lat " + FastMath.toDegrees(lat));
-        System.out.println("Lon " + FastMath.toDegrees(lon));
-        GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(6.),   // Geodetic latitude
-                                              FastMath.toRadians(-37.),   // Longitude
-                                              0.);              // in [m]
         // Model Earth
         BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
                                                Constants.WGS84_EARTH_FLATTENING,
@@ -401,7 +492,7 @@ public class MultiObjectiveMctsTest {
                                      initTimeResources, current, ooi);
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, ooi, 
-                                   new ArrayList<ObservedObject>(), null);
+                                   new ArrayList<ObservedObject>(), sensor);
         Node lastLeaf = mctsTracking.select(root);
         //System.out.println(rootUpdated.getUtility());
     }
