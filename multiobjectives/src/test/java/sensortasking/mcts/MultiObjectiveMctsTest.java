@@ -245,7 +245,7 @@ public class MultiObjectiveMctsTest {
         double slewT = 9.;
         Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
         double slewVel = fov.getHeight()/slewT;
-        Sensor sensor = new Sensor("TDRS Station", fov, pos, exposure, readout, slewVel, cutOff, settling);
+        Sensor sensor = new Sensor("TDRS Station", fov, pos, exposure, readout, slewVel, settling, cutOff);
 
         // Model Earth
         BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
@@ -271,8 +271,6 @@ public class MultiObjectiveMctsTest {
             new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, null, 
                                    new ArrayList<ObservedObject>(), sensor);
         Node lastLeaf = mctsTracking.select(root);
-
-
     }
     @Test
     public void testSelectTdrs() {

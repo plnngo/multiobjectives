@@ -66,7 +66,7 @@ public class SearchObjective implements Objective{
                 // In same declination field 
                 decField.setDate(nextPointing);
                 schedule.add(decField);
-                nextPointing = nextPointing.shiftedBy(exposure/2. + sensor.getReadoutT());
+                nextPointing = nextPointing.shiftedBy(exposure + sensor.getReadoutT());
             }
            
             // last measurement does not require extra time for read out (already covered by repos)
