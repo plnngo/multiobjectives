@@ -224,11 +224,188 @@ public class MultiObjectiveMctsTest {
     } */
 
     @Test
+    public void testMctsSearchAndTrack() {
+        // Epoch
+        AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
+        AbsoluteDate endCampaign = current.shiftedBy(60.*60.*3);
+
+        // Frame
+        Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+        Frame j2000 = FramesFactory.getEME2000();
+
+        // Ground station
+        GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(6.),   // Geodetic latitude
+                                              FastMath.toRadians(-37.),   // Longitude
+                                              0.);              // in [m]
+        double readout = 7.;
+        double exposure = 8.;
+        double allocation = 60.;
+        double settling = 30.;
+        double preparation = 6.;
+        double cutOff = FastMath.toRadians(5.);
+        double slewT = 9.;
+        Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
+        double slewVel = fov.getHeight()/slewT;
+        Sensor sensor = new Sensor("TDRS Station", fov, pos, exposure, readout, slewVel, settling, cutOff);
+
+        // Model Earth
+        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                               Constants.WGS84_EARTH_FLATTENING,
+                                               ecef);
+        TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "TDRS Station");
+        Transform horizonToEci = topohorizon.getTransformTo(j2000, current);  // date has to be the measurement epoch
+        Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
+        Transform eciToTopo = new Transform(current, coordinatesStationEci.negate());
+        Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
+
+        // Retrieve object of interest that shall be tracked
+        List<ObservedObject> ooi = setListOOI(current);
+
+        // Initialise root node
+        List<String> objectives = new ArrayList<String>(Arrays.asList("SEARCH", "TRACK"));
+        double initUtility = 1.;
+        int numVisits = 1;
+        AngularDirection initPointing = 
+            new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
+        double[] initWeights = new double[]{0.5, 0.5};
+        double[] initTimeResources = 
+            new double[]{initWeights[0] * endCampaign.durationFrom(current), 
+                         initWeights[1] * endCampaign.durationFrom(current)};
+        Node root = new DecisionNode(initUtility, numVisits, initPointing, initWeights, 
+                                     initTimeResources, current, ooi);
+        MultiObjectiveMcts mctsTracking = 
+            new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, ooi, 
+                                   new ArrayList<ObservedObject>(), sensor);
+        Node lastLeaf = mctsTracking.select(root);
+        Node parent = lastLeaf.getParent();
+
+        // Extract observable objects
+        List<TLE> observables = getGEOSat(current);
+
+        // Perform tasks
+        List<AngularDirection> actualMeas = new ArrayList<AngularDirection>();
+
+        while (!parent.equals(mctsTracking.getInitial())) {
+            if(parent.getClass().getSimpleName().equals("ChanceNode")) {
+
+                System.out.println("Next node");
+                ChanceNode parentChance = (ChanceNode)parent;
+                if (parentChance.getMacro().getClass().getSimpleName().equals("SearchObjective")) {
+
+                    List<AngularDirection> tasks = ((SearchObjective)parentChance.getMacro()).getSchedule();
+                    for(AngularDirection task: tasks) {
+                        AbsoluteDate epoch = task.getDate();
+                        double[] raRange = new double[]{task.getAngle1() - fov.getWidth()/2, 
+                                                        task.getAngle1() + fov.getWidth()/2};
+                        double[] decRange = new double[]{task.getAngle2() - fov.getHeight()/2,
+                                                        task.getAngle2() + fov.getHeight()/2};
+            
+                        for(TLE candidate : observables) {
+                            TLEPropagator prop = TLEPropagator.selectExtrapolator(candidate);
+                            Vector3D propPos = prop.propagate(epoch).getPVCoordinates(j2000).getPosition();
+                            AngularDirection anglePos = 
+                                new AngularDirection(j2000, 
+                                                    new double[]{propPos.getAlpha(), propPos.getDelta()}, 
+                                                    AngleType.RADEC);
+                            boolean inDecField = checkInAngularRange(anglePos, raRange, decRange);
+            
+                            // Extract measurement if object is in FOV
+                            if(inDecField) {
+                                anglePos.setDate(epoch);
+                                actualMeas.add(anglePos);
+                                System.out.println("Detect: " + candidate.getSatelliteNumber() + " at " + epoch + " frame: " + anglePos.getFrame().getName());
+                            }
+                        }
+                    }
+                } else {
+                    TrackingObjective objective = (TrackingObjective)parentChance.getMacro();
+                    long lastUpdated = objective.getLastUpdated();
+                    AbsoluteDate epoch = parentChance.getEpoch();
+                    System.out.println("Track: " + lastUpdated + " at " + epoch + " frame: " + parentChance.getMicro().getFrame().getName());
+                }
+            }
+            parent = parent.getParent();
+        }
+    }
+
+    public List<ObservedObject> setListOOI(AbsoluteDate current) {
+        // Frame
+        Frame j2000 = FramesFactory.getEME2000();
+
+        // Create list of objects of interest
+        TLE tleTdrs05 = new TLE("1 21639U 91054B   24190.31993666 -.00000307  00000-0  00000-0 0  9990", 
+                                "2 21639  14.1597 358.9539 0002937 207.3422 133.3222  1.00277803120606");      
+        TLE tleTdrs06 = new TLE("1 22314U 93003B   24190.32793498 -.00000302  00000-0  00000-0 0  9994",
+                                "2 22314  14.1631   2.2562 0011972 156.4976 200.1996  1.00268889115292");
+        TLE tleTdrs12 = new TLE("1 39504U 14004A   24190.25733250 -.00000273  00000-0  00000-0 0  9996", 
+                                "2 39504   3.5544   3.9152 0003777 189.8619 144.5768  1.00276604 37168");
+
+        // Compute state
+        TLEPropagator propTdrs05 = TLEPropagator.selectExtrapolator(tleTdrs05);
+        TLEPropagator propTdrs06 = TLEPropagator.selectExtrapolator(tleTdrs06);
+        TLEPropagator propTdrs12 = TLEPropagator.selectExtrapolator(tleTdrs12);
+
+        SpacecraftState spacecraftTdrs05 = propTdrs05.propagate(current);
+        SpacecraftState spacecraftTdrs06 = propTdrs06.propagate(current);
+        SpacecraftState spacecraftTdrs12 = propTdrs12.propagate(current);
+
+        StateVector stateTdrs05 = ObservedObject.spacecraftStateToStateVector(spacecraftTdrs05, j2000);
+        StateVector stateTdrs06 = ObservedObject.spacecraftStateToStateVector(spacecraftTdrs06, j2000);
+        StateVector stateTdrs12 = ObservedObject.spacecraftStateToStateVector(spacecraftTdrs12, j2000);
+
+        double[][] covTdrs05 = new double[][]{{0.009855904759351372, 4.078127311069879E-7, 9.875741320556275E-8, 4.328235954545346E-6, 2.9071094424474166E-8, 7.50553956976887E-9},
+                                              {4.078127311069879E-7, 0.009857835750718295, 2.03608156883521E-7, 2.98649724447625E-8, 4.306014824614407E-6, 6.301496942467037E-9},
+                                              {9.875741320556275E-8, 2.03608156883521E-7, 0.009857086380024797, 7.70583422336434E-9, 6.298597666057694E-9, 4.283086978472644E-6},
+                                              {4.328235954545346E-6, 2.98649724447625E-8, 7.70583422336434E-9, 1.7207377721346993E-8, -8.212503178246334E-10, -2.109541457159083E-10},
+                                              {2.9071094424474166E-8, 4.306014824614407E-6, 6.298597666057694E-9, -8.212503178246334E-10, 1.7482251900748092E-8, -1.9276823004892938E-10},
+                                              {7.50553956976887E-9, 6.301496942467037E-9, 4.283086978472644E-6, -2.109541457159083E-10, -1.9276823004892938E-10, 1.818503320357093E-8}};
+        RealMatrix covMatrixTdrs05 = (new Array2DRowRealMatrix(covTdrs05)).scalarMultiply(1e3);
+        StateCovariance covEciTdrs05 = new StateCovariance(covMatrixTdrs05, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
+
+        double[][] covTdrs06 = new double[][]{{0.009855827555408531, 1.0287018380692445E-7, 3.910267644855593E-8, 4.318775659506618E-6, 3.082546456689512E-8, 7.3708924118463976E-9},
+                                              {1.0287018380692445E-7, 0.009857910682561545, 2.2022442149622472E-7, 3.161755497050027E-8, 4.31510301473182E-6, 8.135870183215624E-9},
+                                              {3.910267644855593E-8, 2.2022442149622472E-7, 0.009857088533581772, 7.570742600210252E-9, 8.144511266654299E-9, 4.2834614349166915E-6},
+                                              {4.318775659506618E-6, 3.161755497050027E-8, 7.570742600210252E-9, 1.746275349153637E-8, -8.194811351938942E-10, -1.983493667495804E-10},
+                                              {3.082546456689512E-8, 4.31510301473182E-6, 8.144511266654299E-9, -8.194811351938942E-10, 1.7236789470442757E-8, -2.4269048963433104E-10},
+                                              {7.3708924118463976E-9, 8.135870183215624E-9, 4.2834614349166915E-6, -1.983493667495804E-10, -2.4269048963433104E-10, 1.8175062188421707E-8}};
+        RealMatrix covMatrixTdrs06 = (new Array2DRowRealMatrix(covTdrs06)).scalarMultiply(1e3);
+        StateCovariance covEciTdrs06 = new StateCovariance(covMatrixTdrs06, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
+
+        double[][] covTdrs12 = new double[][]{{0.009855823497499241, -8.671670864459313E-8, 2.5731929906032663E-9, 4.312988285731713E-6, 3.1286742156174934E-8, 1.7377594871342673E-9},
+                                              {-8.671670864459313E-8, 0.009857965268260518, 5.843499034914995E-8, 3.210358716654692E-8, 4.322741590079748E-6, 2.3545012547055407E-9},
+                                              {2.5731929906032663E-9, 5.843499034914995E-8, 0.009857038107963734, 1.7885410467659128E-9, 2.3598727028774496E-9, 4.281608195160761E-6},
+                                              {4.312988285731713E-6, 3.210358716654692E-8, 1.7885410467659128E-9, 1.7612360625313363E-8, -8.025283878518984E-10, -4.580050494765601E-11},
+                                              {3.1286742156174934E-8, 4.322741590079748E-6, 2.3598727028774496E-9, -8.025283878518984E-10, 1.7031938068152258E-8, -6.947660259826142E-11},
+                                              {1.7377594871342673E-9, 2.3545012547055407E-9, 4.281608195160761E-6, -4.580050494765601E-11, -6.947660259826142E-11, 1.8230352837789837E-8}};
+        RealMatrix covMatrixTdrs12 = (new Array2DRowRealMatrix(covTdrs12)).scalarMultiply(1e3);
+        StateCovariance covEciTdrs12 = new StateCovariance(covMatrixTdrs12, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
+
+        CartesianCovariance stateCovTdrs05 =
+            ObservedObject.stateCovToCartesianCov(spacecraftTdrs05.getOrbit(), covEciTdrs05, j2000); 
+        CartesianCovariance stateCovTdrs06 =
+            ObservedObject.stateCovToCartesianCov(spacecraftTdrs06.getOrbit(), covEciTdrs06, j2000);
+        CartesianCovariance stateCovTdrs12 = 
+            ObservedObject.stateCovToCartesianCov(spacecraftTdrs12.getOrbit(), covEciTdrs12, j2000);
+
+        // Create list of objects of interest
+        ObservedObject tdrs05 = new ObservedObject(tleTdrs05.getSatelliteNumber(), stateTdrs05, stateCovTdrs05, current, j2000);
+        ObservedObject tdrs06 = new ObservedObject(tleTdrs06.getSatelliteNumber(), stateTdrs06, stateCovTdrs06, current, j2000);
+        ObservedObject tdrs12 = new ObservedObject(tleTdrs12.getSatelliteNumber(), stateTdrs12, stateCovTdrs12, current, j2000);
+
+        List<ObservedObject> ooi = new ArrayList<ObservedObject>();
+        ooi.add(tdrs05);
+        ooi.add(tdrs06);
+        ooi.add(tdrs12);
+
+        return ooi;
+    }
+
+    @Test
     public void testOnlySearch() {
 
         // Epoch
         AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60.*60.*3);
+        AbsoluteDate endCampaign = current.shiftedBy(60.*60.);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -312,11 +489,9 @@ public class MultiObjectiveMctsTest {
                         }
                     }
                 }
-            
             }
             parent = parent.getParent();
         }
-
     }
 
     private static boolean checkInAngularRange(AngularDirection obj, double[] raRange, double[] decRange) {
@@ -363,7 +538,7 @@ public class MultiObjectiveMctsTest {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-        System.out.println("Number of observable satellites: " + filtered.size());
+        //System.out.println("Number of observable satellites: " + filtered.size());
         return filtered;
     }
 

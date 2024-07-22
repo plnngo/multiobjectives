@@ -10,4 +10,5 @@ TODO:
 	- BUG: MCTS selects same nodes sequentially even though object's uncertainty should have shrinked down --> Adjust KF parameters
 	- BUG: solar phase condition not met after 2024-07-12T12:25:43.000Z so that there is no target that can be selected --> fixed (don't expand node if target is not observable)
 	- BUG: algorithm stuck on object 22314 --> stuck because it is the only object that is observable --> no bug!
-	- BUG: running 10 min of search tasks reveals detection of object 26495 but when extending to 20min, that object does not get detected anymore
+	- BUG: running 10 min of search tasks reveals detection of object 26495 but when extending to 20min, that object does not get detected anymore --> fixed
+	- BUG: Weight update not correct when combining tracking and searching objective --> fixed (needed to multiply initial time resources by initial weights)
