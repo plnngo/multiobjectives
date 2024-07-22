@@ -228,7 +228,7 @@ public class MultiObjectiveMctsTest {
 
         // Epoch
         AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60.*10.);
+        AbsoluteDate endCampaign = current.shiftedBy(60.*60.*3);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -273,8 +273,8 @@ public class MultiObjectiveMctsTest {
             new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, null, 
                                    new ArrayList<ObservedObject>(), sensor);
         Node lastLeaf = mctsTracking.select(root);
-        ChanceNode child = (ChanceNode)lastLeaf.getChildren().get(0);
-        List<AngularDirection> tasks = ((SearchObjective)child.getMacro()).getSchedule();
+        Node parent = lastLeaf.getParent();
+        
 
         // Extract observable objects
         List<TLE> observables = getGEOSat(current);
@@ -282,29 +282,39 @@ public class MultiObjectiveMctsTest {
         // Perform tasks
         List<AngularDirection> actualMeas = new ArrayList<AngularDirection>();
 
-        for(AngularDirection task: tasks) {
-            AbsoluteDate epoch = task.getDate();
-            double[] raRange = new double[]{task.getAngle1() - fov.getWidth()/2, 
-                                            task.getAngle1() + fov.getWidth()/2};
-            double[] decRange = new double[]{task.getAngle2() - fov.getHeight()/2,
-                                             task.getAngle2() + fov.getHeight()/2};
+        while (!parent.equals(mctsTracking.getInitial())) {
+            if(parent.getClass().getSimpleName().equals("ChanceNode")) {
+                System.out.println("Next node");
+                ChanceNode parentChance = (ChanceNode)parent;
+                List<AngularDirection> tasks = ((SearchObjective)parentChance.getMacro()).getSchedule();
 
-            for(TLE candidate : observables) {
-                TLEPropagator prop = TLEPropagator.selectExtrapolator(candidate);
-                Vector3D propPos = prop.propagate(epoch).getPVCoordinates(j2000).getPosition();
-                AngularDirection anglePos = 
-                    new AngularDirection(j2000, 
-                                        new double[]{propPos.getAlpha(), propPos.getDelta()}, 
-                                        AngleType.RADEC);
-                boolean inDecField = checkInAngularRange(anglePos, raRange, decRange);
-
-                // Extract measurement if object is in FOV
-                if(inDecField) {
-                    anglePos.setDate(epoch);
-                    actualMeas.add(anglePos);
-                    System.out.println(candidate.getSatelliteNumber() + " at " + epoch);
+                for(AngularDirection task: tasks) {
+                    AbsoluteDate epoch = task.getDate();
+                    double[] raRange = new double[]{task.getAngle1() - fov.getWidth()/2, 
+                                                    task.getAngle1() + fov.getWidth()/2};
+                    double[] decRange = new double[]{task.getAngle2() - fov.getHeight()/2,
+                                                    task.getAngle2() + fov.getHeight()/2};
+        
+                    for(TLE candidate : observables) {
+                        TLEPropagator prop = TLEPropagator.selectExtrapolator(candidate);
+                        Vector3D propPos = prop.propagate(epoch).getPVCoordinates(j2000).getPosition();
+                        AngularDirection anglePos = 
+                            new AngularDirection(j2000, 
+                                                new double[]{propPos.getAlpha(), propPos.getDelta()}, 
+                                                AngleType.RADEC);
+                        boolean inDecField = checkInAngularRange(anglePos, raRange, decRange);
+        
+                        // Extract measurement if object is in FOV
+                        if(inDecField) {
+                            anglePos.setDate(epoch);
+                            actualMeas.add(anglePos);
+                            System.out.println(candidate.getSatelliteNumber() + " at " + epoch);
+                        }
+                    }
                 }
+            
             }
+            parent = parent.getParent();
         }
 
     }
@@ -344,9 +354,9 @@ public class MultiObjectiveMctsTest {
                     double lat = FastMath.toDegrees(pvEcef.getPosition().getDelta());
 
                     // Longitude and latitude filter
-                    if((-10. <= lat && lat <= 15.) && (-50. <= lon && lon <= -25.)) {
+                    //if((-10. <= lat && lat <= 15.) && (-50. <= lon && lon <= -25.)) {
                         filtered.add(candidate);
-                    }
+                    //}
                 }
             }
         } catch (IOException e) {

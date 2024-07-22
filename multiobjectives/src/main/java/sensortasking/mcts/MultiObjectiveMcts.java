@@ -152,6 +152,11 @@ public class MultiObjectiveMcts {
 
         if (current.getEpoch().compareTo(endCampaign) <= 0) {
             Node nextChild = selectChild(current);
+
+            if (Objects.isNull(nextChild)) {
+                // no time for further tasks
+                return current;
+            }
             
             if(nextChild.getClass().getSimpleName().equals("ChanceNode")) {
                 System.out.println("---");
@@ -175,17 +180,6 @@ public class MultiObjectiveMcts {
         } else {
             return current;
         }
-       
-       /*  Node current = current;
-        episode.add(current);
-        while(!children.isEmpty() && !Objects.isNull(children)) {
-
-            // travers the tree until a leaf node is reached
-            current = selectChild(current);
-            children = current.getChildren();
-            episode.add(current);
-        }
-        return episode; */
     }
 
     /**
@@ -227,48 +221,48 @@ public class MultiObjectiveMcts {
                         return null; // Search is already performed by another sibling
                     }
                 }
+                // Time until end of observation campaign
+                double leftT = this.endCampaign.durationFrom(leaf.getEpoch());
+                if(leftT < scanStripe.getStripeT(numExpo)){
+                    return null; // Not enough time to complete search
+                }
                 objective = new SearchObjective(stationFrame, scanStripe, numExpo, sensor);
                 break;
 
             case 1:
                 // Macro action = track
-                // for (String macro : MultiObjectiveMcts.objectives) {
-                //     if (macro.equals("TRACK")) {
-                        AbsoluteDate measEpoch = 
-                            leaf.getEpoch().shiftedBy(TrackingObjective.allocation 
-                                                        + TrackingObjective.settling 
-                                                        + TrackingObjective.preparation 
-                                                        + TrackingObjective.exposure/2);
+                AbsoluteDate measEpoch = 
+                    leaf.getEpoch().shiftedBy(TrackingObjective.allocation 
+                                                + TrackingObjective.settling 
+                                                + TrackingObjective.preparation 
+                                                + TrackingObjective.exposure/2);
 
-                        // Extract new station position
-                        Transform horizonToEci = stationFrame.getTransformTo(j2000, measEpoch); 
-                        Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
-                        Transform eciToTopo = new Transform(measEpoch, coordinatesStationEci.negate());
-                        Frame topoInertial = new Frame(j2000, eciToTopo, "Topocentric", true);
+                // Extract new station position
+                Transform horizonToEci = stationFrame.getTransformTo(j2000, measEpoch); 
+                Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
+                Transform eciToTopo = new Transform(measEpoch, coordinatesStationEci.negate());
+                Frame topoInertial = new Frame(j2000, eciToTopo, "Topocentric", true);
 
-                        // make sure that tree does not get expanded by the same node that already exist among siblings
-                        List<ObservedObject> ooi = new ArrayList<>(leaf.getPropEnvironment());
-                        for(Node sibling : leaf.getChildren()) {
-                            ChanceNode chance = (ChanceNode)sibling;
-                            if (chance.getMacro().getClass().getSimpleName().equals("TrackingObjective")) {
-                                TrackingObjective track = (TrackingObjective)chance.getMacro();
-                                long idAlreadyTracked = track.getLastUpdated();
-                                int index = -1;
-                                for(int i=0; i<ooi.size(); i++) {
-                                    if (ooi.get(i).getId() == idAlreadyTracked) {
-                                        index = i;
-                                        break;
-                                    }
-                                }
-                                ooi.remove(index);
+                // make sure that tree does not get expanded by the same node that already exist among siblings
+                List<ObservedObject> ooi = new ArrayList<>(leaf.getPropEnvironment());
+                for(Node sibling : leaf.getChildren()) {
+                    ChanceNode chance = (ChanceNode)sibling;
+                    if (chance.getMacro().getClass().getSimpleName().equals("TrackingObjective")) {
+                        TrackingObjective track = (TrackingObjective)chance.getMacro();
+                        long idAlreadyTracked = track.getLastUpdated();
+                        int index = -1;
+                        for(int i=0; i<ooi.size(); i++) {
+                            if (ooi.get(i).getId() == idAlreadyTracked) {
+                                index = i;
+                                break;
                             }
                         }
+                        ooi.remove(index);
+                    }
+                }
 
-                        objective = new TrackingObjective(ooi, stationFrame, topoInertial);
-                        break;
-                //    }
-                //}
-                //objective = null;
+                objective = new TrackingObjective(ooi, stationFrame, topoInertial);
+                break;
 
             default:
                 throw new IllegalAccessError("Unknown objective.");
