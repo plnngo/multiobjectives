@@ -138,14 +138,6 @@ public class MultiObjectiveMcts {
                 } else {
                     backpropagate(leaf, null);
                 }
-                /* if(leaf.getId() == 2) {
-                    for (ObservedObject candidate : leaf.getPropEnvironment()) {
-                        if(candidate.getId()==22314) {
-                            //System.out.println("Updated covariance of 22314 at " + candidate.getEpoch());
-                            //App.printCovariance(candidate.getCovariance().getCovarianceMatrix());
-                        }
-                    }
-                } */
                 children = current.getChildren();
             } 
         }
@@ -246,7 +238,11 @@ public class MultiObjectiveMcts {
                 Frame topoInertial = new Frame(j2000, eciToTopo, "Topocentric", true);
 
                 // make sure that tree does not get expanded by the same node that already exist among siblings
-                List<ObservedObject> ooi = new ArrayList<>(leaf.getPropEnvironment());
+                DecisionNode current = leaf;
+                while(current.getPropEnvironment().size()==0) {
+                    current = ((DecisionNode)current.getParent().getParent());
+                }
+                List<ObservedObject> ooi = new ArrayList<>(current.getPropEnvironment());
                 for(Node sibling : leaf.getChildren()) {
                     ChanceNode chance = (ChanceNode)sibling;
                     if (chance.getMacro().getClass().getSimpleName().equals("TrackingObjective")) {
@@ -355,6 +351,10 @@ public class MultiObjectiveMcts {
         if (objectiveType.equals("SearchObjective")) {
             // Update time resources
             postTimeResources[0] = priorTimeResources[0] - executionDuration;
+            if(postTimeResources[0]<0.) {
+                postTimeResources[0] = 0.1;
+            }
+            postTimeResources[1] = priorTimeResources[1];
             
             // Correct weight update for given objective
             postWeights[0] = postTimeResources[0]/postTobs;
@@ -362,6 +362,10 @@ public class MultiObjectiveMcts {
         } else if(objectiveType.equals("TrackingObjective")) {
             // Update time resources
             postTimeResources[1] = priorTimeResources[1] - executionDuration;
+            if(postTimeResources[1]<0.) {
+                postTimeResources[1] = 0.1;
+            }
+            postTimeResources[0] = priorTimeResources[0];
 
             // Correct weight update for given objective
             postWeights[1] = postTimeResources[1]/postTobs;
@@ -410,7 +414,10 @@ public class MultiObjectiveMcts {
         AbsoluteDate currentEndMeasEpoch = current.getEpoch().shiftedBy(measDuration);
 
         while(currentEndMeasEpoch.compareTo(campaignEndDate) <= 0) {
-            current = expand(current, true);              
+            current = expand(current, true);  
+            if (Objects.isNull(current)) {
+                return episode;
+            }            
             episode.add(current.getParent());
             episode.add(current);
             currentEndMeasEpoch = current.getEpoch().shiftedBy(measDuration);
