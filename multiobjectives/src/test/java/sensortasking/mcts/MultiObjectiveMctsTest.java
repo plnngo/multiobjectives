@@ -227,7 +227,7 @@ public class MultiObjectiveMctsTest {
     public void testMctsSearchAndTrack() {
         // Epoch
         AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60.*60.*3);
+        AbsoluteDate endCampaign = current.shiftedBy(60.*20.);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);

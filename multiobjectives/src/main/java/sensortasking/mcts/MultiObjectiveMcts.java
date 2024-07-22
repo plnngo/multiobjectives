@@ -174,6 +174,7 @@ public class MultiObjectiveMcts {
                     System.out.println("Scanning stripe, first pointing direction:");
                     System.out.println("RA in EME2000: " + FastMath.toDegrees(chanceSelected.getMicro().getAngle1()));
                     System.out.println("DEC in EME2000: " + FastMath.toDegrees(chanceSelected.getMicro().getAngle2()));
+                    System.out.println(chanceSelected.getEpoch());
                 }
             }
             return select(nextChild);
@@ -212,6 +213,7 @@ public class MultiObjectiveMcts {
         int indexSelectedObjective = 
             WeightedRandomNumberPicker.pickNumber(indexObjective, weights);
         Objective objective;
+        //List<ObservedObject> propEnviroment = new ArrayList<ObservedObject>();
         switch (indexSelectedObjective) {
             case 0:
                 // make sure that tree does not get expanded by the same node that already exist among siblings
@@ -257,11 +259,35 @@ public class MultiObjectiveMcts {
                                 break;
                             }
                         }
-                        ooi.remove(index);
+                        if(index!=-1) {
+                            ooi.remove(index);
+                        }
+                        
                     }
                 }
 
                 objective = new TrackingObjective(ooi, stationFrame, topoInertial);
+                /* // Need to propagate the environment under the selected macro/micro action pair
+                propEnviroment = objective.propagateOutcome();  
+
+                // Add object that was not considered for tracking back to propEnvironment
+                for(int parent=0; parent<leaf.getPropEnvironment().size(); parent++) {
+                    long idParent = leaf.getPropEnvironment().get(parent).getId();
+                    boolean found = false;
+                    for(int child=0; child<propEnviroment.size(); child++) {
+                        if (idParent == propEnviroment.get(child).getId()) {
+                            found = true;
+                        }
+                    }
+                    if(!found) {
+                        ObservedObject notTargeted = 
+                            new ObservedObject(idParent, leaf.getPropEnvironment().get(parent).getState(),
+                                            leaf.getPropEnvironment().get(parent).getCovariance(), 
+                                            leaf.getPropEnvironment().get(parent).getEpoch(), 
+                                            leaf.getPropEnvironment().get(parent).getFrame());
+                        propEnviroment.add(notTargeted);
+                    }
+                } */
                 break;
 
             default:
@@ -283,23 +309,25 @@ public class MultiObjectiveMcts {
         // Expand by Decision node too
         // Need to propagate the environment under the selected macro/micro action pair
         List<ObservedObject> propEnviroment = objective.propagateOutcome();  
-
-        // Add object that was not considered for tracking back to propEnvironment
-        for(int parent=0; parent<leaf.getPropEnvironment().size(); parent++) {
-            long idParent = leaf.getPropEnvironment().get(parent).getId();
-            boolean found = false;
-            for(int child=0; child<propEnviroment.size(); child++) {
-                if (idParent == propEnviroment.get(child).getId()) {
-                    found = true;
+        if (!Objects.isNull(propEnviroment)) {
+            // tracking objective has been selected
+            // Add object that was not considered for tracking back to propEnvironment
+            for(int parent=0; parent<leaf.getPropEnvironment().size(); parent++) {
+                long idParent = leaf.getPropEnvironment().get(parent).getId();
+                boolean found = false;
+                for(int child=0; child<propEnviroment.size(); child++) {
+                    if (idParent == propEnviroment.get(child).getId()) {
+                        found = true;
+                    }
                 }
-            }
-            if(!found) {
-                ObservedObject notTargeted = 
-                    new ObservedObject(idParent, leaf.getPropEnvironment().get(parent).getState(),
-                                       leaf.getPropEnvironment().get(parent).getCovariance(), 
-                                       leaf.getPropEnvironment().get(parent).getEpoch(), 
-                                       leaf.getPropEnvironment().get(parent).getFrame());
-                propEnviroment.add(notTargeted);
+                if(!found) {
+                    ObservedObject notTargeted = 
+                        new ObservedObject(idParent, leaf.getPropEnvironment().get(parent).getState(),
+                                        leaf.getPropEnvironment().get(parent).getCovariance(), 
+                                        leaf.getPropEnvironment().get(parent).getEpoch(), 
+                                        leaf.getPropEnvironment().get(parent).getFrame());
+                    propEnviroment.add(notTargeted);
+                }
             }
         }
 
