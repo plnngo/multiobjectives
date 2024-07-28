@@ -10,7 +10,7 @@ import org.orekit.time.AbsoluteDate;
 public class DecisionNode extends Node{
 
     /** Sensor pointing location. */
-    AngularDirection sensorPointing;
+    private AngularDirection sensorPointing;
 
     /** Prioritisation weight vector. 1st entry refers to search, 2nd to tracking objective. */
     double[] weights;
@@ -32,6 +32,10 @@ public class DecisionNode extends Node{
         super.numVisits = numVisits;
         this.propEnvironment = propEnvironment;
         super.setEpoch(epoch);
+    }
+
+    public AngularDirection getSensorPointing() {
+        return this.sensorPointing;
     }
 
     public void setPropEnvironment(List<ObservedObject> environment) {

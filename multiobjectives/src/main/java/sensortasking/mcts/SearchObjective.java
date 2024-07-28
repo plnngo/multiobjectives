@@ -38,7 +38,7 @@ public class SearchObjective implements Objective{
 
 
     @Override
-    public AngularDirection setMicroAction(AbsoluteDate current) {
+    public AngularDirection setMicroAction(AbsoluteDate current, AngularDirection sensorPointing) {
 
         List<AngularDirection> stripe = callStripeScan(current);
         return stripe.get(0);

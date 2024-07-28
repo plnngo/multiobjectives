@@ -9,7 +9,7 @@ public interface Objective {
 
     public AngularDirection pointingDirection = null;
 
-    public AngularDirection setMicroAction(AbsoluteDate current);
+    public AngularDirection setMicroAction(AbsoluteDate current, AngularDirection sensorPointing);
 
     public AbsoluteDate[] getExecusionDuration(AbsoluteDate current);
 
