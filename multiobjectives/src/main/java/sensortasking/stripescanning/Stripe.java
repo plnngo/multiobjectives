@@ -108,7 +108,8 @@ public class Stripe {
         // Compute repositioning time within stripe from one field to the next one
         reposInStripeT =  0.;        // if only one field in stripe
         if (this.getNumDecFields() > 1){
-            reposInStripeT = sensor.computeRepositionT(this.getPosField(0), this.getPosField(1));
+            reposInStripeT = sensor.computeRepositionT(this.getPosField(0), this.getPosField(1), 
+                                                       sensor.isSlewVelInclSensorSettle());
         }
 
         double t1 = 0.;

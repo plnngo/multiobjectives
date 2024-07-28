@@ -217,7 +217,7 @@ public class Tasking {
             
             double reposLast2FirstField = 
                 this.sensor.computeRepositionT(fixedRa[i].getPosField(fixedRa[i].getNumDecFields()-1), 
-                                            fixedRa[i].getFirstPosField());
+                                            fixedRa[i].getFirstPosField(), sensor.isSlewVelInclSensorSettle());
             // derived with pythagoras (factor 1.5 shall compensate for longer paths)
             double bufferForRepos = 1.5 * reposLast2FirstField * FastMath.sqrt(2);      
             double shiftT = fixedRa[i].getStripeT(this.numExpos) 
@@ -313,7 +313,7 @@ public class Tasking {
         // Compute next time ready for an observation of new stripe
         double reposLast2FirstField = 
             this.sensor.computeRepositionT(fixedRa[0].getPosField(fixedRa[0].getNumDecFields()-1), 
-                                           fixedRa[1].getFirstPosField());      
+                                           fixedRa[1].getFirstPosField(), sensor.isSlewVelInclSensorSettle());      
 
         double shiftT = fixedRa[0].getStripeT(this.numExpos)
                                 + reposLast2FirstField + this.sensor.getSettlingT();
@@ -588,7 +588,8 @@ public class Tasking {
         AngularDirection origin = new AngularDirection(eci, new double[]{0., 0.}, AngleType.RADEC);
         AngularDirection dest = 
             new AngularDirection(eci, new double[]{0., heightFov}, AngleType.RADEC);
-        double reposT = sensor.computeRepositionT(origin, dest);
+        double reposT = 
+            sensor.computeRepositionT(origin, dest, sensor.isSlewVelInclSensorSettle());
 
         // Assigne time durations as defined in Carolin Fruehs paper
         double t1 = 0.;
@@ -606,7 +607,8 @@ public class Tasking {
         // Check if t2 is assigned to read out or repositioning time (depending which is longer)
         AngularDirection destEndStripe = 
             new AngularDirection(eci, new double[]{0., heightFov * numDecFields}, AngleType.RADEC);
-        double reposTBeginEndStripe = sensor.computeRepositionT(origin, destEndStripe);
+        double reposTBeginEndStripe = 
+            sensor.computeRepositionT(origin, destEndStripe, sensor.isSlewVelInclSensorSettle());
         if(t2<reposTBeginEndStripe) {
             t2 = reposTBeginEndStripe;
             numDecFields = 
@@ -945,7 +947,8 @@ public class Tasking {
                 } else {
                     Stripe next = stripes[j];
                     AngularDirection firstFieldNext = next.getFirstPosField();
-                    double reposT = sensor.computeRepositionT(lastFieldCurrent, firstFieldNext);
+                    double reposT = sensor.computeRepositionT(lastFieldCurrent, firstFieldNext, 
+                                                              sensor.isSlewVelInclSensorSettle());
                     if(maxReposNextStripeT<reposT) {
                         maxReposNextStripeT = reposT;
                     }

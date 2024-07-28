@@ -129,7 +129,8 @@ public class SensorTest {
         AngularDirection origin = new AngularDirection(gcrf, radecOrigin, AngleType.RADEC);
         AngularDirection dest = new AngularDirection(gcrf, radecDest, AngleType.RADEC);
 
-        double actual = sensor.computeRepositionT(origin, dest);
+        double actual = 
+            sensor.computeRepositionT(origin, dest, sensor.isSlewVelInclSensorSettle());
 
         // Orekit computation
         Vector3D originVec = new Vector3D(radecOrigin[0], radecOrigin[1]);
@@ -162,7 +163,8 @@ public class SensorTest {
         double[] azelDest = new double[]{FastMath.toRadians(-160.), FastMath.toRadians(10.)};
         AngularDirection origin = new AngularDirection(topoHorizon, azelOrigin, AngleType.AZEL);
         AngularDirection dest = new AngularDirection(topoHorizon, azelDest, AngleType.AZEL);
-        double actual = sensor.computeRepositionT(origin, dest);
+        double actual = 
+            sensor.computeRepositionT(origin, dest, sensor.isSlewVelInclSensorSettle());
 
         // Orekit computation
         Vector3D originVec = new Vector3D(azelOrigin[0], azelOrigin[1]);
@@ -191,7 +193,7 @@ public class SensorTest {
         AngularDirection origin = new AngularDirection(ecef, latlonOrigin, AngleType.LONLAT);
         AngularDirection dest = new AngularDirection(eci, radecDest, AngleType.RADEC);
 
-        sensor.computeRepositionT(origin, dest);
+        sensor.computeRepositionT(origin, dest, sensor.isSlewVelInclSensorSettle());
     }
 
     /**
