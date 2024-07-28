@@ -129,10 +129,8 @@ public class Sensor {
      * 
      * @return                      Reposition duration in [s].
      */
-    public double computeRepositionT(AngularDirection origin, AngularDirection dest/*, 
-                                     AbsoluteDate date*/) {
-        // TODO: maybe overthink the need of date as input(only necessary to transform origin and dest into common frame)
-
+    public double computeRepositionT(AngularDirection origin, AngularDirection dest, 
+                                     boolean slewVelInclSensorSettle) {
         //Frame topoFrame = getTopoInertialFrame(date);        
         //Frame gcrf = FramesFactory.getGCRF();
 
@@ -142,8 +140,13 @@ public class Sensor {
         } */
 
         if(origin.getFrame() != dest.getFrame()) {
-            throw new InputMismatchException("Pointing directions were not defined in the same " 
-                                                + "frame. Transformation necessary.");
+            if(origin.getFrame().getName().equals(dest.getFrame().getName())) {
+                origin = origin.transformReference(dest.getFrame(), dest.getDate(), dest.getAngleType());
+            } else{
+                throw new InputMismatchException("Pointing directions were not defined in the " 
+                                                    + "same frame. Transformation necessary.");
+            }
+
         }
 
         // Transform angular direction into unit vector

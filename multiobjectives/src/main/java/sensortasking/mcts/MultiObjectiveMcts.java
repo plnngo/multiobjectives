@@ -227,9 +227,9 @@ public class MultiObjectiveMcts {
                 // Macro action = track
                 AbsoluteDate measEpoch = 
                     leaf.getEpoch().shiftedBy(TrackingObjective.allocation 
-                                                + TrackingObjective.settling 
+                                                + this.sensor.getSettlingT() 
                                                 + TrackingObjective.preparation 
-                                                + TrackingObjective.exposure/2);
+                                                + this.sensor.getExposureT()/2);
 
                 // Extract new station position
                 Transform horizonToEci = stationFrame.getTransformTo(j2000, measEpoch); 
@@ -262,7 +262,7 @@ public class MultiObjectiveMcts {
                     }
                 }
 
-                objective = new TrackingObjective(ooi, stationFrame, topoInertial);
+                objective = new TrackingObjective(ooi, stationFrame, topoInertial, sensor);
                 /* // Need to propagate the environment under the selected macro/micro action pair
                 propEnviroment = objective.propagateOutcome();  
 
@@ -291,7 +291,8 @@ public class MultiObjectiveMcts {
         }
 
         List<ObservedObject> restore = leaf.getPropEnvironment();
-        AngularDirection pointing = objective.setMicroAction(leaf.getEpoch());
+        AngularDirection pointing = 
+            objective.setMicroAction(leaf.getEpoch(), leaf.getSensorPointing());
         leaf.setPropEnvironment(restore);
         if (Objects.isNull(pointing)) {
             // none of the considered targets was observable --> no expansion possible
@@ -407,10 +408,10 @@ public class MultiObjectiveMcts {
 
         DecisionNode current = leaf;
         double measDuration = TrackingObjective.allocation 
-                                + TrackingObjective.settling 
+                                + TrackingObjective.sensor.getSettlingT() 
                                 + TrackingObjective.preparation 
-                                + TrackingObjective.exposure
-                                + TrackingObjective.readout;
+                                + TrackingObjective.sensor.getExposureT()
+                                + TrackingObjective.sensor.getReadoutT();
         AbsoluteDate currentEndMeasEpoch = current.getEpoch().shiftedBy(measDuration);
 
         while(currentEndMeasEpoch.compareTo(campaignEndDate) <= 0) {

@@ -103,12 +103,15 @@ public class TrackingObjective implements Objective{
 
     long lastUpdated = Long.MIN_VALUE;
 
+    static double preparation = 6.;
+    static double allocation = 30.;
+
     // TODO implement as sensor object
-    static double readout = 7.;
+/*     static double readout = 7.;
     static double exposure = 8.;
     static double allocation = 60.;
     static double settling = 30.;
-    static double preparation = 6.;
+    static double preparation = 6.; */
 
     /** Sun. */
     final static CelestialBody sun = CelestialBodyFactory.getSun();
@@ -134,8 +137,10 @@ public class TrackingObjective implements Objective{
 
     Frame topoInertial;
 
+    static Sensor sensor;
 
-    public TrackingObjective(List<ObservedObject> targets, TopocentricFrame horizon, Frame topocentric) {
+
+    public TrackingObjective(List<ObservedObject> targets, TopocentricFrame horizon, Frame topocentric, Sensor sensor) {
 
         // Initialise list of targets
         for (ObservedObject target : targets) {
@@ -145,6 +150,8 @@ public class TrackingObjective implements Objective{
 
         this.stationHorizon = horizon;
         this.topoInertial = topocentric;
+        TrackingObjective.sensor = sensor;
+        this.sensorApartureRadius = sensor.getFov().getWidth()/2;       // TODO: currently assumed that aparture is circular
 
     }
 
@@ -286,8 +293,8 @@ public class TrackingObjective implements Objective{
                         new ObservedObject(candidate.getId(), stateVecBeginTask, cartCovBeginTask, 
                                            stationHorizon, modTleBeginTask);
                     simulatedMeasurements = 
-                        generateMeasurements(candidateBeginTask, azElBeginTask, readout, 
-                                             exposure, taskEpoch);
+                        generateMeasurements(candidateBeginTask, azElBeginTask, this.sensor.getReadoutT(), 
+                                             this.sensor.getExposureT(), taskEpoch);
 
                     // Transform measurements into orekit measurements
                     List<ObservedMeasurement<?>> orekitAzElMeas = new ArrayList<>();
@@ -763,7 +770,8 @@ public class TrackingObjective implements Objective{
     @Override
     public AbsoluteDate[] getExecusionDuration(AbsoluteDate current) {
         //return 60.*5.;
-        double taskDuration = allocation + settling + preparation + exposure + readout;
+        double taskDuration = allocation + this.sensor.getSettlingT() + preparation 
+                                + this.sensor.getExposureT() + this.sensor.getReadoutT();
         AbsoluteDate[] interval = new AbsoluteDate[]{current, current.shiftedBy(taskDuration)};
 /*         if (this.loggedFORpasses.size() == 2) {
             // object is going to enter and exit FOR within upcoming 15min
@@ -828,15 +836,17 @@ public class TrackingObjective implements Objective{
         return out;
     }
     @Override
-    public AngularDirection setMicroAction(AbsoluteDate current) {
+    public AngularDirection setMicroAction(AbsoluteDate current, AngularDirection sensorPointing) {
 
         // Output
         double maxIG = Double.NEGATIVE_INFINITY;
         AngularDirection pointing = new AngularDirection(topoInertial, new double[]{0., 0.},
                                                             AngleType.RADEC);
-        ObservedObject target = null;
+        ObservedObject target = null;    
+
         AbsoluteDate targetDate = 
-            current.shiftedBy(allocation + settling + preparation + exposure/2);    // shift by 100s
+                current.shiftedBy(allocation + TrackingObjective.sensor.getSettlingT() + preparation 
+                                + TrackingObjective.sensor.getExposureT()/2);
 
         // Iterate through list of objects of interest
         for (ObservedObject candidate : updatedTargets) {
@@ -906,6 +916,12 @@ public class TrackingObjective implements Objective{
                 AngularDirection.computeAngularDistMoon(targetDate, topoInertial, raDecPointing);
             if (distMoon < minMoonDist) {
                 // Observation cannot be performed because of lack of visibility
+                continue;
+            }
+            double actualSlewT = 
+                TrackingObjective.sensor.computeRepositionT(sensorPointing, raDecPointing, false);
+            if(actualSlewT > TrackingObjective.allocation) {
+                // not enough time to slew to target pointing direction
                 continue;
             }
             

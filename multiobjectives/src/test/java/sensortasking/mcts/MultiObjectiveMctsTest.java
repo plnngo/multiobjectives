@@ -239,9 +239,7 @@ public class MultiObjectiveMctsTest {
                                               0.);              // in [m]
         double readout = 7.;
         double exposure = 8.;
-        double allocation = 60.;
         double settling = 30.;
-        double preparation = 6.;
         double cutOff = FastMath.toRadians(5.);
         double slewT = 9.;
         Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
@@ -405,7 +403,7 @@ public class MultiObjectiveMctsTest {
 
         // Epoch
         AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60.*60.);
+        AbsoluteDate endCampaign = current.shiftedBy(60.*60. * 2);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -559,9 +557,7 @@ public class MultiObjectiveMctsTest {
                                               0.);              // in [m]
         double readout = 7.;
         double exposure = 8.;
-        double allocation = 60.;
         double settling = 30.;
-        double preparation = 6.;
         double cutOff = FastMath.toRadians(5.);
         double slewT = 9.;
         Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
@@ -575,19 +571,15 @@ public class MultiObjectiveMctsTest {
                                 "2 22314  14.1631   2.2562 0011972 156.4976 200.1996  1.00268889115292");
         TLE tleTdrs12 = new TLE("1 39504U 14004A   24190.25733250 -.00000273  00000-0  00000-0 0  9996", 
                                 "2 39504   3.5544   3.9152 0003777 189.8619 144.5768  1.00276604 37168");
-        TLE tleTdrs13 = new TLE("1 42915U 17047A   24190.33472274 -.00000099  00000-0  00000-0 0  9997", 
-                                "2 42915   3.6233 345.0954 0017520 118.0871 292.6285  1.00272287 25247");
-
+        
         // Compute state
         TLEPropagator propTdrs05 = TLEPropagator.selectExtrapolator(tleTdrs05);
         TLEPropagator propTdrs06 = TLEPropagator.selectExtrapolator(tleTdrs06);
         TLEPropagator propTdrs12 = TLEPropagator.selectExtrapolator(tleTdrs12);
-        TLEPropagator propTdrs13 = TLEPropagator.selectExtrapolator(tleTdrs13);
 
         SpacecraftState spacecraftTdrs05 = propTdrs05.propagate(current);
         SpacecraftState spacecraftTdrs06 = propTdrs06.propagate(current);
         SpacecraftState spacecraftTdrs12 = propTdrs12.propagate(current);
-        SpacecraftState spacecraftTdrs13 = propTdrs13.propagate(current);
 
         StateVector stateTdrs05 = ObservedObject.spacecraftStateToStateVector(spacecraftTdrs05, j2000);
         StateVector stateTdrs06 = ObservedObject.spacecraftStateToStateVector(spacecraftTdrs06, j2000);
@@ -639,8 +631,6 @@ public class MultiObjectiveMctsTest {
             ObservedObject.stateCovToCartesianCov(spacecraftTdrs06.getOrbit(), covEciTdrs06, j2000);
         CartesianCovariance stateCovTdrs12 = 
             ObservedObject.stateCovToCartesianCov(spacecraftTdrs12.getOrbit(), covEciTdrs12, j2000);
-        // CartesianCovariance stateCovTdrs13 = 
-        //     ObservedObject.stateCovToCartesianCov(spacecraftTdrs13.getOrbit(), covEci, j2000);
 
         // Create list of objects of interest
         ObservedObject tdrs05 = new ObservedObject(tleTdrs05.getSatelliteNumber(), stateTdrs05, stateCovTdrs05, current, j2000);
@@ -651,7 +641,6 @@ public class MultiObjectiveMctsTest {
         ooi.add(tdrs05);
         ooi.add(tdrs06);
         ooi.add(tdrs12);
-        //ooi.add(tdrs13);
 
         // Model Earth
         BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
@@ -662,7 +651,6 @@ public class MultiObjectiveMctsTest {
         Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
         Transform eciToTopo = new Transform(current, coordinatesStationEci.negate());
         Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
-
 
         List<String> objectives = new ArrayList<String>(Arrays.asList("SEARCH", "TRACK"));
 

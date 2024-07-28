@@ -54,6 +54,9 @@ public class TrackingObjectiveTest {
     /** Test object. */
     ObservedObject singleTestCase = null;
 
+    /** Test sensor. */
+    Sensor sensor;
+
     @Before
     public void init() {
 
@@ -75,6 +78,17 @@ public class TrackingObjectiveTest {
                                                Constants.WGS84_EARTH_FLATTENING,
                                                earthFrame);
         this.topoHorizon = new TopocentricFrame(earth, pos, "United States Air Force Academy");
+
+        // Set up sensor
+        double readout = 7.;
+        double exposure = 8.;
+        double settling = 30.;
+        double cutOff = FastMath.toRadians(5.);
+        double slewT = 9.;
+        Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
+        double slewVel = fov.getHeight()/slewT;
+        this.sensor = new Sensor("TDRS Station", fov, pos, exposure, readout, slewVel, settling, cutOff);
+
     }
 
     private void generateTestObject() {
@@ -173,19 +187,42 @@ public class TrackingObjectiveTest {
     @Test
     public void testSetMicroAction() throws IOException {
 
-        AbsoluteDate date = 
+       /*  AbsoluteDate date = 
             new AbsoluteDate(2000, 12, 15, 16, 58, 50.208, TimeScalesFactory.getUTC());
         generateTestObject();
         
         List<ObservedObject> ooi = new ArrayList<ObservedObject>();
         ooi.add(this.singleTestCase);
 
+        // Ground station
+        GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(6.),   // Geodetic latitude
+                                              FastMath.toRadians(-37.),   // Longitude
+                                              0.);              // in [m]
+        double readout = 7.;
+        double exposure = 8.;
+        double settling = 30.;
+        double cutOff = FastMath.toRadians(5.);
+        double slewT = 9.;
+        Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
+        double slewVel = fov.getHeight()/slewT;
+        Sensor sensor = new Sensor("TDRS Station", fov, pos, exposure, readout, slewVel, settling, cutOff);
+
         // Call test function 
         //TODO: work on topocentric inertial frame
-        TrackingObjective trackTask = new TrackingObjective(ooi, this.topoHorizon, null);
-        AngularDirection pointing = trackTask.setMicroAction(date);
+        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                               Constants.WGS84_EARTH_FLATTENING,
+                                               ecef);
+        TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "TDRS Station");
+        Transform horizonToEci = topohorizon.getTransformTo(j2000, current);  // date has to be the measurement epoch
+        Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
+        Transform eciToTopo = new Transform(current, coordinatesStationEci.negate());
+        Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
+        TrackingObjective trackTask = new TrackingObjective(ooi, this.topoHorizon, null, sensor);
+        AngularDirection initPointing = 
+            new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
+        AngularDirection pointing = trackTask.setMicroAction(date, initPointing);
         System.out.println("Azimuth: " + FastMath.toDegrees(pointing.getAngle1()));
-        System.out.println("Elevation: " + FastMath.toDegrees(pointing.getAngle2()));
+        System.out.println("Elevation: " + FastMath.toDegrees(pointing.getAngle2())); */
 
 
         // Load TLEs from file
@@ -298,10 +335,10 @@ public class TrackingObjectiveTest {
         Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
         Transform eciToTopo = new Transform(target, coordinatesStationEci.negate());
         Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
-        TrackingObjective tracking = new TrackingObjective(ooi, topohorizon, topocentric);
+        TrackingObjective tracking = new TrackingObjective(ooi, topohorizon, topocentric, null);
 
         for (int simulation=0; simulation<10; simulation++) {
-            AngularDirection pointing = tracking.setMicroAction(current);
+            AngularDirection pointing = tracking.setMicroAction(current, null);
             System.out.println("Epoch: " + target);
             System.out.println("RA: " + FastMath.toDegrees(pointing.getAngle1()));
             System.out.println("DEC: " + FastMath.toDegrees(pointing.getAngle2()));
@@ -374,12 +411,23 @@ public class TrackingObjectiveTest {
         Transform eciToTopo = new Transform(target, coordinatesStationEci.negate());
         Frame topoCentric = new Frame(eci, eciToTopo, "Topocentric", true);
 
+        double readout = 7.;
+        double exposure = 8.;
+        double settling = 30.;
+        double cutOff = FastMath.toRadians(5.);
+        double slewT = 9.;
+        Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
+        double slewVel = fov.getHeight()/slewT;
+        Sensor sensor = new Sensor("Random Station", fov, station, exposure, readout, slewVel, settling, cutOff);
+
         ObservedObject singleKeplerianTestCase = 
             new ObservedObject(987, stateEci, stateCovEci, current, eci);
         List<ObservedObject> ooi = new ArrayList<ObservedObject>();
         ooi.add(singleKeplerianTestCase);
-        TrackingObjective track = new TrackingObjective(ooi, topoHorizon, topoCentric);
-        AngularDirection micro = track.setMicroAction(current);
+        TrackingObjective track = new TrackingObjective(ooi, topoHorizon, topoCentric, sensor);
+        AngularDirection initPointing = 
+            new AngularDirection(topoCentric, new double[]{0.,0.}, AngleType.RADEC);
+        AngularDirection micro = track.setMicroAction(current, initPointing);
         Assert.assertEquals(AngleType.RADEC, micro.getAngleType());
         Assert.assertEquals(14.535587965895044, FastMath.toDegrees(micro.getAngle1()), 1e-12);
         Assert.assertEquals(30.295623596303162, FastMath.toDegrees(micro.getAngle2()), 1e-12);
@@ -464,7 +512,7 @@ public class TrackingObjectiveTest {
         ooi.add(this.singleTestCase);
 
         // Call test function 
-        TrackingObjective trackTask = new TrackingObjective(ooi, this.topoHorizon, null);
+        TrackingObjective trackTask = new TrackingObjective(ooi, this.topoHorizon, null, this.sensor);
 
         // Compute sensor pointing
         Entry<SpacecraftState, StateCovariance> stateAndCov = 
@@ -498,7 +546,7 @@ public class TrackingObjectiveTest {
         ooi.add(this.singleTestCase);
 
         // Call test function 
-        TrackingObjective trackTask = new TrackingObjective(ooi, this.topoHorizon, null);
+        TrackingObjective trackTask = new TrackingObjective(ooi, this.topoHorizon, null, this.sensor);
         
         // Compute sensor pointing
         Entry<SpacecraftState, StateCovariance> stateAndCov = 
