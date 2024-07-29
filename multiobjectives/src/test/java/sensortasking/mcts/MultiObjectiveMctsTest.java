@@ -239,11 +239,12 @@ public class MultiObjectiveMctsTest {
                                               0.);              // in [m]
         double readout = 7.;
         double exposure = 8.;
-        double settling = 30.;
+        double settling = 10.;
         double cutOff = FastMath.toRadians(5.);
-        double slewT = 9.;
+        //double slewT = 9.;
         Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
-        double slewVel = fov.getHeight()/slewT;
+        //double slewVel = fov.getHeight()/slewT;
+        double slewVel = FastMath.toRadians(1.)/1.;     // 1 deg per second
         Sensor sensor = new Sensor("TDRS Station", fov, pos, exposure, readout, slewVel, settling, cutOff);
 
         // Model Earth

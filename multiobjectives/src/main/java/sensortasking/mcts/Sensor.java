@@ -143,6 +143,7 @@ public class Sensor {
             if(origin.getFrame().getName().equals(dest.getFrame().getName())) {
                 origin = origin.transformReference(dest.getFrame(), dest.getDate(), dest.getAngleType());
             } else{
+                System.out.println(origin.getFrame().getName() + " vs " + dest.getFrame().getName());
                 throw new InputMismatchException("Pointing directions were not defined in the " 
                                                     + "same frame. Transformation necessary.");
             }
@@ -150,7 +151,9 @@ public class Sensor {
         }
 
         // Transform angular direction into unit vector
-        double xOrigin = FastMath.cos(origin.getAngle1()) 
+        Vector3D posOrigin = new Vector3D(origin.getAngle1(), origin.getAngle2());
+        Vector3D posDest = new Vector3D(dest.getAngle1(), dest.getAngle2());
+        /* double xOrigin = FastMath.cos(origin.getAngle1()) 
                             * FastMath.sin(FastMath.PI/2 - origin.getAngle2());
         double yOrigin = FastMath.sin(origin.getAngle1())
                             * FastMath.sin(FastMath.PI/2 - origin.getAngle2());
@@ -162,7 +165,7 @@ public class Sensor {
         double yDest = FastMath.sin(dest.getAngle1())
                             * FastMath.sin(FastMath.PI/2 - dest.getAngle2());
         double zDest = FastMath.cos(FastMath.PI/2 - dest.getAngle2());
-        Vector3D posDest = new Vector3D(xDest, yDest, zDest);
+        Vector3D posDest = new Vector3D(xDest, yDest, zDest); */
 
         // Angle in [rad] between origin and destination vectors
         double theta = FastMath.acos(Vector3D.dotProduct(posOrigin, posDest));

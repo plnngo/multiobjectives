@@ -104,7 +104,7 @@ public class TrackingObjective implements Objective{
     long lastUpdated = Long.MIN_VALUE;
 
     static double preparation = 6.;
-    static double allocation = 30.;
+    static double allocation = 90.;
 
     // TODO implement as sensor object
 /*     static double readout = 7.;
@@ -919,7 +919,7 @@ public class TrackingObjective implements Objective{
                 continue;
             }
             double actualSlewT = 
-                TrackingObjective.sensor.computeRepositionT(sensorPointing, raDecPointing, false);
+                TrackingObjective.sensor.computeRepositionT(sensorPointing, raDecPointing, true);
             if(actualSlewT > TrackingObjective.allocation) {
                 // not enough time to slew to target pointing direction
                 continue;
