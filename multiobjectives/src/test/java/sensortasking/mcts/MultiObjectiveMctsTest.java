@@ -291,7 +291,7 @@ public class MultiObjectiveMctsTest {
                 ChanceNode parentChance = (ChanceNode)parent;
                 if (parentChance.getMacro().getClass().getSimpleName().equals("SearchObjective")) {
 
-                    List<AngularDirection> tasks = ((SearchObjective)parentChance.getMacro()).getSchedule();
+                    List<AngularDirection> tasks = ((SearchObjective)parentChance.getMacro()).getScheduleGeocentric();
                     for(AngularDirection task: tasks) {
                         AbsoluteDate epoch = task.getDate();
                         double[] raRange = new double[]{task.getAngle1() - fov.getWidth()/2, 
@@ -312,7 +312,7 @@ public class MultiObjectiveMctsTest {
                             if(inDecField) {
                                 anglePos.setDate(epoch);
                                 actualMeas.add(anglePos);
-                                System.out.println("Detect: " + candidate.getSatelliteNumber() + " at " + epoch + " frame: " + anglePos.getFrame().getName());
+                                System.out.println("Detect: " + candidate.getSatelliteNumber() + " at " + epoch);
                             }
                         }
                     }
@@ -416,9 +416,7 @@ public class MultiObjectiveMctsTest {
                                               0.);              // in [m]
         double readout = 7.;
         double exposure = 8.;
-        double allocation = 60.;
         double settling = 30.;
-        double preparation = 6.;
         double cutOff = FastMath.toRadians(5.);
         double slewT = 9.;
         Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
@@ -462,7 +460,7 @@ public class MultiObjectiveMctsTest {
             if(parent.getClass().getSimpleName().equals("ChanceNode")) {
                 System.out.println("Next node");
                 ChanceNode parentChance = (ChanceNode)parent;
-                List<AngularDirection> tasks = ((SearchObjective)parentChance.getMacro()).getSchedule();
+                List<AngularDirection> tasks = ((SearchObjective)parentChance.getMacro()).getScheduleGeocentric();
 
                 for(AngularDirection task: tasks) {
                     AbsoluteDate epoch = task.getDate();

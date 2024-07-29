@@ -3,7 +3,11 @@ package sensortasking.mcts;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hipparchus.geometry.euclidean.threed.Vector3D;
+import org.orekit.frames.Frame;
+import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
+import org.orekit.frames.Transform;
 import org.orekit.time.AbsoluteDate;
 
 import lombok.Getter;
@@ -20,7 +24,9 @@ public class SearchObjective implements Objective{
 
     Sensor sensor;
 
-    List<AngularDirection> schedule;
+    List<AngularDirection> scheduleGeocentric;
+
+    List<AngularDirection> scheduleTopocentric;
 
     // TODO implement as sensor object
     static double readout = 7.;
@@ -40,15 +46,20 @@ public class SearchObjective implements Objective{
     @Override
     public AngularDirection setMicroAction(AbsoluteDate current, AngularDirection sensorPointing) {
 
-        List<AngularDirection> stripe = callStripeScan(current);
+        List<AngularDirection> stripe = callStripeScanTopoFrame(current);
         return stripe.get(0);
     }
 
 
-    private List<AngularDirection> callStripeScan(AbsoluteDate start) {
+    private List<AngularDirection> callStripeScanTopoFrame(AbsoluteDate start) {
+
+        // Inertial frame
+        Frame j2000 = FramesFactory.getEME2000();
 
         // Declare output
-        List<AngularDirection> schedule = new ArrayList<AngularDirection>();
+        List<AngularDirection> scheduleTopo = new ArrayList<AngularDirection>();
+        List<AngularDirection> scheduleGeo = new ArrayList<AngularDirection>();
+
 
         // reposition to scan stripe
         AbsoluteDate arriveAtStripe = start.shiftedBy(allocation + settling + preparation);
@@ -62,10 +73,20 @@ public class SearchObjective implements Objective{
             
             for (int j=0; j<this.numExpo; j++) {
                 AngularDirection decField = scan.getPosField(i);
+                decField.setDate(nextPointing);
+
+                // Transform direction into topocentric inertial frame
+                Transform horizonToEci = this.stationHorizon.getTransformTo(j2000, nextPointing);  
+                Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
+                Transform eciToTopo = new Transform(nextPointing, coordinatesStationEci.negate());
+                Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
+                AngularDirection decFieldTopo = 
+                    decField.transformReference(topocentric, nextPointing, AngleType.RADEC);
+                decFieldTopo.setDate(nextPointing);
                 
                 // In same declination field 
-                decField.setDate(nextPointing);
-                schedule.add(decField);
+                scheduleTopo.add(decFieldTopo);
+                scheduleGeo.add(decField);
                 nextPointing = nextPointing.shiftedBy(exposure + sensor.getReadoutT());
             }
            
@@ -77,14 +98,15 @@ public class SearchObjective implements Objective{
         double decFieldDuration = 
             this.numExpo * sensor.getExposureT() + (this.numExpo - 1) * sensor.getReadoutT(); */
         
-        this.schedule = schedule;
-        return schedule;
+        this.scheduleTopocentric = scheduleTopo;
+        this.scheduleGeocentric = scheduleGeo;
+        return scheduleTopo;
     }
 
     @Override
     public AbsoluteDate[] getExecusionDuration(AbsoluteDate current) {
-        AbsoluteDate lastMeas = this.schedule.get(this.schedule.size()-1).getDate();
-        AbsoluteDate firstMeas = this.schedule.get(0).getDate();
+        AbsoluteDate lastMeas = this.scheduleTopocentric.get(this.scheduleTopocentric.size()-1).getDate();
+        AbsoluteDate firstMeas = this.scheduleTopocentric.get(0).getDate();
         double stripeT = lastMeas.durationFrom(firstMeas);
         double taskDuration = allocation + settling + preparation + sensor.getExposureT() 
                                 + stripeT + sensor.getReadoutT();
