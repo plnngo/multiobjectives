@@ -208,20 +208,26 @@ public class MultiObjectiveMcts {
         //List<ObservedObject> propEnviroment = new ArrayList<ObservedObject>();
         switch (indexSelectedObjective) {
             case 0:
+                boolean searchPossible = true;
                 // make sure that tree does not get expanded by the same node that already exist among siblings
                 for(Node sibling : leaf.getChildren()) {
                     ChanceNode chance = (ChanceNode)sibling;
+                    
                     if (chance.getMacro().getClass().getSimpleName().equals("SearchObjective")) {
-                        return null; // Search is already performed by another sibling
+                        searchPossible = false; // Search is already performed by another sibling
                     }
                 }
                 // Time until end of observation campaign
                 double leftT = this.endCampaign.durationFrom(leaf.getEpoch());
                 if(leftT < scanStripe.getStripeT(numExpo)){
-                    return null; // Not enough time to complete search
+                    searchPossible = false; // Not enough time to complete search
                 }
-                objective = new SearchObjective(stationFrame, scanStripe, numExpo, sensor);
-                break;
+                if(searchPossible) {
+                    objective = new SearchObjective(stationFrame, scanStripe, numExpo, sensor);
+                    break;
+                } else {
+                    indexSelectedObjective = 1;
+                }
 
             case 1:
                 // Macro action = track
@@ -415,10 +421,11 @@ public class MultiObjectiveMcts {
         AbsoluteDate currentEndMeasEpoch = current.getEpoch().shiftedBy(measDuration);
 
         while(currentEndMeasEpoch.compareTo(campaignEndDate) <= 0) {
-            current = expand(current, true);  
+            current = expand(current, true); 
             if (Objects.isNull(current)) {
                 return episode;
-            }            
+            }         
+            System.out.println(((ChanceNode)current.getParent()).getMacro() + " at " + current.getEpoch()); 
             episode.add(current.getParent());
             episode.add(current);
             currentEndMeasEpoch = current.getEpoch().shiftedBy(measDuration);
