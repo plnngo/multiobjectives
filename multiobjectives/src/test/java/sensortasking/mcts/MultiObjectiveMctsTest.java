@@ -227,7 +227,7 @@ public class MultiObjectiveMctsTest {
     public void testMctsSearchAndTrackAsMC() {
         // Epoch
         AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60.* 60. * 8);
+        AbsoluteDate endCampaign = current.shiftedBy(60.* 15.);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -275,14 +275,14 @@ public class MultiObjectiveMctsTest {
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, ooi, 
                                    new ArrayList<ObservedObject>(), sensor);
-        mctsTracking.run(root, 40);
+        List<Node> strategy = mctsTracking.run(root, 40);
     }
 
     @Test
     public void testMctsSearchAndTrack() {
         // Epoch
         AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60.* 10.);
+        AbsoluteDate endCampaign = current.shiftedBy(60.* 60.);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);

@@ -46,7 +46,7 @@ public class MultiObjectiveMcts {
     final Frame j2000 = FramesFactory.getEME2000();
 
     /** Tuning parameter (0;1) for progressive widening */
-    final static double alpha = 0.7;
+    final static double alpha = 0.5;
 
     /** List of objects of interest to be tracked. */
     final List<ObservedObject> trackedObjects;
@@ -221,9 +221,14 @@ public class MultiObjectiveMcts {
 
     public Node selectNew(Node current) {
 
+        boolean widening = progressiveWidening(current);
+        if (!widening) {
+            // already reached end of campaign
+            return current;
+        }
 
         // TODO: outsource l.229 - 259 to new function progressiveWidening()
-        List<Node> children = current.getChildren();
+/*         List<Node> children = current.getChildren();
         // check progressive widening condition
         if(current.getClass().getSimpleName().equals("DecisionNode")) {
             boolean expandable = true;
@@ -250,10 +255,8 @@ public class MultiObjectiveMcts {
                 } else {
                     backpropagate(leaf, null);
                 }
-                //children = current.getChildren();
             } 
-            //return current;
-        }
+        } */
 
         current.incrementNumVisits();
         Node nextChild = current;
@@ -266,7 +269,12 @@ public class MultiObjectiveMcts {
             nextChild.incrementNumVisits();
         }
         // Reached leaf node but not end of campaign yet --> progressiveWidening()
-        children = nextChild.getChildren();
+        widening = progressiveWidening(nextChild);
+        if (!widening) {
+            // already reached end of campaign
+            return current;
+        }
+        /* children = nextChild.getChildren();
         // check progressive widening condition
         if(nextChild.getClass().getSimpleName().equals("DecisionNode")) {
             boolean expandable = true;
@@ -293,10 +301,47 @@ public class MultiObjectiveMcts {
                 }
                 //children = current.getChildren();
             } 
-            return current;
-        }
+            //return current;
+        } */
         return current;
     }
+
+    private boolean progressiveWidening(Node current) {
+        if(current.getEpoch().compareTo(endCampaign) >= 0) {
+            return false;
+        }
+        List<Node> children = current.getChildren();
+        // check progressive widening condition
+        if(current.getClass().getSimpleName().equals("DecisionNode")) {
+            boolean expandable = true;
+            while(children.size() <= FastMath.pow(current.getNumVisits(), alpha) && expandable) {
+
+                // allow expansion of new node
+                DecisionNode leaf = expand((DecisionNode) current, false);
+                if (Objects.isNull(leaf)){
+                    // objects not observable 
+                    children = current.getChildren();
+                    expandable = false;
+                    continue;
+
+                } else if (leaf.getEpoch().compareTo(endCampaign) >= 0) {
+                    // already reached end of campaign
+                    leaf.getParent().incrementNumVisits();
+                    leaf.incrementNumVisits();
+                    continue;
+                }
+                expandable = true;
+                List<Node> simulated = simulate(leaf, endCampaign);
+                if (simulated.size() != 0) {
+                    backpropagate(leaf, simulated.get(simulated.size()-1));
+                } else {
+                    backpropagate(leaf, null);
+                }
+            } 
+        }
+        return true;
+    }
+
 
     /**
      * Expand decision tree at the given leaf node by two further nodes, i.e. a new chance and a 
@@ -391,6 +436,10 @@ public class MultiObjectiveMcts {
                     }
                 }
 
+                if (ooi.size()==0) {
+                    // No candidate to track
+                    return null;
+                }
                 objective = new TrackingObjective(ooi, stationFrame, topoInertial, sensor);
                 /* // Need to propagate the environment under the selected macro/micro action pair
                 propEnviroment = objective.propagateOutcome();  
