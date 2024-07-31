@@ -108,7 +108,7 @@ public class MultiObjectiveMctsTest {
 
             parent.setChild(child);
         }
-        Node actuallySelected = MultiObjectiveMcts.selectChild(parent);
+        Node actuallySelected = MultiObjectiveMcts.selectChildUCB(parent);
 
         // Last child is expected to reveal largest UCB because of its large utility value
         Node expectedlySelected = parent.getChildren().get(numVisits.length - 1);
@@ -224,10 +224,65 @@ public class MultiObjectiveMctsTest {
     } */
 
     @Test
+    public void testMctsSearchAndTrackAsMC() {
+        // Epoch
+        AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
+        AbsoluteDate endCampaign = current.shiftedBy(60.* 60. * 8);
+
+        // Frame
+        Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+        Frame j2000 = FramesFactory.getEME2000();
+
+        // Ground station
+        GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(6.),   // Geodetic latitude
+                                              FastMath.toRadians(-37.),   // Longitude
+                                              0.);              // in [m]
+        double readout = 7.;
+        double exposure = 8.;
+        double settling = 10.;
+        double cutOff = FastMath.toRadians(5.);
+        //double slewT = 9.;
+        Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
+        //double slewVel = fov.getHeight()/slewT;
+        double slewVel = FastMath.toRadians(1.)/1.;     // 1 deg per second
+        Sensor sensor = new Sensor("TDRS Station", fov, pos, exposure, readout, slewVel, settling, cutOff);
+
+        // Model Earth
+        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                               Constants.WGS84_EARTH_FLATTENING,
+                                               ecef);
+        TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "TDRS Station");
+        Transform horizonToEci = topohorizon.getTransformTo(j2000, current);  // date has to be the measurement epoch
+        Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
+        Transform eciToTopo = new Transform(current, coordinatesStationEci.negate());
+        Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
+
+        // Retrieve object of interest that shall be tracked
+        List<ObservedObject> ooi = setListOOI(current);
+
+        // Initialise root node
+        List<String> objectives = new ArrayList<String>(Arrays.asList("SEARCH", "TRACK"));
+        double initUtility = 1.;
+        int numVisits = 1;
+        AngularDirection initPointing = 
+            new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
+        double[] initWeights = new double[]{0.5, 0.5};
+        double[] initTimeResources = 
+            new double[]{initWeights[0] * endCampaign.durationFrom(current), 
+                         initWeights[1] * endCampaign.durationFrom(current)};
+        Node root = new DecisionNode(initUtility, numVisits, initPointing, initWeights, 
+                                     initTimeResources, current, ooi);
+        MultiObjectiveMcts mctsTracking = 
+            new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, ooi, 
+                                   new ArrayList<ObservedObject>(), sensor);
+        mctsTracking.run(root, 40);
+    }
+
+    @Test
     public void testMctsSearchAndTrack() {
         // Epoch
         AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60.*20.);
+        AbsoluteDate endCampaign = current.shiftedBy(60.* 10.);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -287,7 +342,7 @@ public class MultiObjectiveMctsTest {
         while (!parent.equals(mctsTracking.getInitial())) {
             if(parent.getClass().getSimpleName().equals("ChanceNode")) {
 
-                System.out.println("Next node");
+                //System.out.println("Next node");
                 ChanceNode parentChance = (ChanceNode)parent;
                 if (parentChance.getMacro().getClass().getSimpleName().equals("SearchObjective")) {
 
@@ -312,7 +367,7 @@ public class MultiObjectiveMctsTest {
                             if(inDecField) {
                                 anglePos.setDate(epoch);
                                 actualMeas.add(anglePos);
-                                System.out.println("Detect: " + candidate.getSatelliteNumber() + " at " + epoch);
+                                //System.out.println("Detect: " + candidate.getSatelliteNumber() + " at " + epoch);
                             }
                         }
                     }
@@ -320,7 +375,7 @@ public class MultiObjectiveMctsTest {
                     TrackingObjective objective = (TrackingObjective)parentChance.getMacro();
                     long lastUpdated = objective.getLastUpdated();
                     AbsoluteDate epoch = parentChance.getEpoch();
-                    System.out.println("Track: " + lastUpdated + " at " + epoch + " frame: " + parentChance.getMicro().getFrame().getName());
+                    //System.out.println("Track: " + lastUpdated + " at " + epoch + " frame: " + parentChance.getMicro().getFrame().getName());
                 }
             }
             parent = parent.getParent();
@@ -458,7 +513,7 @@ public class MultiObjectiveMctsTest {
 
         while (!parent.equals(mctsTracking.getInitial())) {
             if(parent.getClass().getSimpleName().equals("ChanceNode")) {
-                System.out.println("Next node");
+                //System.out.println("Next node");
                 ChanceNode parentChance = (ChanceNode)parent;
                 List<AngularDirection> tasks = ((SearchObjective)parentChance.getMacro()).getScheduleGeocentric();
 

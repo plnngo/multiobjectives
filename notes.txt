@@ -12,9 +12,17 @@ TODO:
 	- BUG: algorithm stuck on object 22314 --> stuck because it is the only object that is observable --> no bug!
 	- BUG: running 10 min of search tasks reveals detection of object 26495 but when extending to 20min, that object does not get detected anymore --> fixed
 	- BUG: Weight update not correct when combining tracking and searching objective --> fixed (needed to multiply initial time resources by initial weights)
+	- BUG: Node show too many children
+	- BUG: MCTS does not explore
+	- BUG: Leaf node does not get a utility value assigned
 
 TODO: 
 	- add references to paper --> finished
 	- implement sensor in tracking objective --> finished
+	- transform frame in search objective also to topocentric inertial frame --> finished
 	- call mcts multiple times and decide on which which branch to execute
-	- roll out after search task was expanded
+	- compare node sequence after each iteration
+	- roll out after search task was expanded --> finished
+
+Observations:
+	- robustMax and UCB result in same node sequence after 10 iterations
