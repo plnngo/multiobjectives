@@ -46,7 +46,7 @@ public class MultiObjectiveMcts {
     final Frame j2000 = FramesFactory.getEME2000();
 
     /** Tuning parameter (0;1) for progressive widening */
-    final static double alpha = 0.5;
+    final static double alpha = 0.3;
 
     /** List of objects of interest to be tracked. */
     final List<ObservedObject> trackedObjects;
@@ -64,7 +64,7 @@ public class MultiObjectiveMcts {
     final Sensor sensor;
 
     /** Maximal number of MCTS iterations. */
-    final int iteration = 10;
+    //final int iteration = 10;
 
     /** Basic constructor.
      * 
@@ -109,7 +109,7 @@ public class MultiObjectiveMcts {
         for(int i=0; i<iterations; i++) {
             selectNew(initial);
             // retrieve updated root node
-            System.out.println("Num of visits " + initial.getNumVisits());
+            //System.out.println("Num of visits " + initial.getNumVisits());
 
             // Retrieve pointing strategy UCB
             Node current = initial;
@@ -226,37 +226,6 @@ public class MultiObjectiveMcts {
             // already reached end of campaign
             return current;
         }
-
-        // TODO: outsource l.229 - 259 to new function progressiveWidening()
-/*         List<Node> children = current.getChildren();
-        // check progressive widening condition
-        if(current.getClass().getSimpleName().equals("DecisionNode")) {
-            boolean expandable = true;
-            while(children.size() <= FastMath.pow(current.getNumVisits(), alpha) && expandable) {
-
-                // allow expansion of new node
-                DecisionNode leaf = expand((DecisionNode) current, false);
-                if (Objects.isNull(leaf)){
-                    // objects not observable 
-                    children = current.getChildren();
-                    expandable = false;
-                    continue;
-
-                } else if (leaf.getEpoch().compareTo(endCampaign) >= 0) {
-                    // already reached end of campaign
-                    leaf.getParent().incrementNumVisits();
-                    leaf.incrementNumVisits();
-                    return current;
-                }
-                expandable = true;
-                List<Node> simulated = simulate(leaf, endCampaign);
-                if (simulated.size() != 0) {
-                    backpropagate(leaf, simulated.get(simulated.size()-1));
-                } else {
-                    backpropagate(leaf, null);
-                }
-            } 
-        } */
 
         current.incrementNumVisits();
         Node nextChild = current;

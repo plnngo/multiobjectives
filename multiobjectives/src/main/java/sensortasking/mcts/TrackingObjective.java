@@ -83,9 +83,6 @@ public class TrackingObjective implements Objective{
     /** Convergence threshold in the event time search. */
     final double threshold =  0.001;
 
-    /** Cut off eleveation angle in [rad]. */
-    final double elevation = FastMath.toRadians(5.0);
-
     /** Coordinated Universal Time.  */
     final TimeScale utc = TimeScalesFactory.getUTC();
 
@@ -101,17 +98,14 @@ public class TrackingObjective implements Objective{
     /** Tasking duration for an observation in [sec]. */
     final double taskDuration = 2 * 60.;
 
+    /** Last object whose state has been updated. */
     long lastUpdated = Long.MIN_VALUE;
 
+    /** Preparation time duraution in [sec]. */
     static double preparation = 6.;
-    static double allocation = 90.;
 
-    // TODO implement as sensor object
-/*     static double readout = 7.;
-    static double exposure = 8.;
-    static double allocation = 60.;
-    static double settling = 30.;
-    static double preparation = 6.; */
+    /** Allocation time duration in [sec].  */
+    static double allocation = 90.;
 
     /** Sun. */
     final static CelestialBody sun = CelestialBodyFactory.getSun();
@@ -129,14 +123,15 @@ public class TrackingObjective implements Objective{
     /** Minimal angular distance between Moon and sensor pointing direction. */
     double minMoonDist = FastMath.toRadians(20.);
 
-    private double sensorApartureRadius = FastMath.toRadians(1.);
+    private double sensorApartureRadius;
 
-    final public double MU = Constants.WGS84_EARTH_MU;
+    //final public double MU = Constants.WGS84_EARTH_MU;
 
     TopocentricFrame stationHorizon;
 
     Frame topoInertial;
 
+    /** Sensor. */
     static Sensor sensor;
 
 
@@ -163,162 +158,162 @@ public class TrackingObjective implements Objective{
         this.topoInertial = frame;
     }
     
-    public AngularDirection setMicroActionMultiMeasurements(AbsoluteDate current) { 
+//     public AngularDirection setMicroActionMultiMeasurements(AbsoluteDate current) { 
 
-        // Output
-        double maxIG = Double.NEGATIVE_INFINITY;
-        // TODO: change to radec
-        AngularDirection pointing = new AngularDirection(stationHorizon, new double[]{0., 0.},
-                                                            AngleType.AZEL);
-        ObservedObject target = null;
+//         // Output
+//         double maxIG = Double.NEGATIVE_INFINITY;
+//         // TODO: change to radec
+//         AngularDirection pointing = new AngularDirection(stationHorizon, new double[]{0., 0.},
+//                                                             AngleType.AZEL);
+//         ObservedObject target = null;
 
-        // Iterate through list of objects of interest
-        for (ObservedObject candidate : updatedTargets) {
+//         // Iterate through list of objects of interest
+//         for (ObservedObject candidate : updatedTargets) {
 
-            final EventDetector visibility =
-                    new ElevationDetector(maxcheck, threshold, stationHorizon).
-                    withConstantElevation(elevation).
-                    withHandler((s, d, increasing) -> {
-                        System.out.println(" Visibility on object " +
-                                           candidate.getId() +
-                                           (increasing ? " begins at " : " ends at ") +
-                                           s.getDate().toStringWithoutUtcOffset(utc, 3));
-                        return increasing ? Action.CONTINUE : Action.STOP;  // stop propagation when object leaves FOR
-                    }/* new ContinueOnEvent() */);
+//             final EventDetector visibility =
+//                     new ElevationDetector(maxcheck, threshold, stationHorizon).
+//                     withConstantElevation(elevation).
+//                     withHandler((s, d, increasing) -> {
+//                         System.out.println(" Visibility on object " +
+//                                            candidate.getId() +
+//                                            (increasing ? " begins at " : " ends at ") +
+//                                            s.getDate().toStringWithoutUtcOffset(utc, 3));
+//                         return increasing ? Action.CONTINUE : Action.STOP;  // stop propagation when object leaves FOR
+//                     }/* new ContinueOnEvent() */);
 
-            // Set up SGP4 propagator
-            TLE tle = candidate.getPseudoTle();
-            TLEPropagator tleProp = TLEPropagator.selectExtrapolator(tle);
+//             // Set up SGP4 propagator
+//             TLE tle = candidate.getPseudoTle();
+//             TLEPropagator tleProp = TLEPropagator.selectExtrapolator(tle);
 
             
-            // Add event to be detected
-            final EventsLogger logger = new EventsLogger();
-            tleProp.addEventDetector(logger.monitorDetector(visibility));
+//             // Add event to be detected
+//             final EventsLogger logger = new EventsLogger();
+//             tleProp.addEventDetector(logger.monitorDetector(visibility));
 
-            // Propagate over maximal propoagation duration
-            // TODO: set targetDate to measurement epoch that we aim for
-            AbsoluteDate targetDate = current.shiftedBy(maxPropDuration);
-            //SpacecraftState s = tleProp.propagate(targetDate);
-            SpacecraftState s = tleProp.propagate(current);
-            //System.out.println("Events: " + logger.getLoggedEvents().size());
-            //StateVector stateVec = ObservedObject.spacecraftStateToStateVector(s, stationFrame);
-            // System.out.println("Elevation: " + FastMath.toDegrees(stateVec.getPositionVector().getDelta()));
-            // System.out.println("Azimuth: " + FastMath.toDegrees(stateVec.getPositionVector().getAlpha()));
-            boolean objectAlreadyInFOR = visibility.g(tleProp.getInitialState()) > 0. ? true : false;
-            AbsoluteDate[] passInterval = 
-                getFORPassDuration(current, logger.getLoggedEvents(), objectAlreadyInFOR);
-            // System.out.println("G value end " + visibility.g(s));
-            // System.out.println("G value beginning " + visibility.g(tleProp.getInitialState()));
+//             // Propagate over maximal propoagation duration
+//             // TODO: set targetDate to measurement epoch that we aim for
+//             AbsoluteDate targetDate = current.shiftedBy(maxPropDuration);
+//             //SpacecraftState s = tleProp.propagate(targetDate);
+//             SpacecraftState s = tleProp.propagate(current);
+//             //System.out.println("Events: " + logger.getLoggedEvents().size());
+//             //StateVector stateVec = ObservedObject.spacecraftStateToStateVector(s, stationFrame);
+//             // System.out.println("Elevation: " + FastMath.toDegrees(stateVec.getPositionVector().getDelta()));
+//             // System.out.println("Azimuth: " + FastMath.toDegrees(stateVec.getPositionVector().getAlpha()));
+//             boolean objectAlreadyInFOR = visibility.g(tleProp.getInitialState()) > 0. ? true : false;
+//             AbsoluteDate[] passInterval = 
+//                 getFORPassDuration(current, logger.getLoggedEvents(), objectAlreadyInFOR);
+//             // System.out.println("G value end " + visibility.g(s));
+//             // System.out.println("G value beginning " + visibility.g(tleProp.getInitialState()));
             
-             if (passInterval[0].equals(passInterval[1])){
-                // object doess not pass through FOR within the request time duration
-                continue;
-            } else {
-                // schedule observations for FOR pass 
-                double totalObsDuration = numObs * taskDuration;
-                double actualObsDuration = passInterval[1].durationFrom(passInterval[0]);
+//              if (passInterval[0].equals(passInterval[1])){
+//                 // object doess not pass through FOR within the request time duration
+//                 continue;
+//             } else {
+//                 // schedule observations for FOR pass 
+//                 double totalObsDuration = numObs * taskDuration;
+//                 double actualObsDuration = passInterval[1].durationFrom(passInterval[0]);
 
-                // Correct number of observation request so that they fit into observation window
-                while(actualObsDuration<totalObsDuration) {
-                    numObs--;
-                    totalObsDuration = numObs * taskDuration;
-                }
+//                 // Correct number of observation request so that they fit into observation window
+//                 while(actualObsDuration<totalObsDuration) {
+//                     numObs--;
+//                     totalObsDuration = numObs * taskDuration;
+//                 }
 
-                TLEPropagator tlePropFOR = TLEPropagator.selectExtrapolator(tle);
-                // TODO: check that timeDurationBetweenTasks > taskDuration
-                double timeDurationBetweenTasks = 
-                    (passInterval[1].durationFrom(passInterval[0])-totalObsDuration) / (numObs+1);
-                //AbsoluteDate taskEpoch = passInterval[0].shiftedBy(timeDurationBetweenTasks);
-                AbsoluteDate taskEpoch = current;
+//                 TLEPropagator tlePropFOR = TLEPropagator.selectExtrapolator(tle);
+//                 // TODO: check that timeDurationBetweenTasks > taskDuration
+//                 double timeDurationBetweenTasks = 
+//                     (passInterval[1].durationFrom(passInterval[0])-totalObsDuration) / (numObs+1);
+//                 //AbsoluteDate taskEpoch = passInterval[0].shiftedBy(timeDurationBetweenTasks);
+//                 AbsoluteDate taskEpoch = current;
 
-                // organise observation tasks
-                numObs = 1;
+//                 // organise observation tasks
+//                 numObs = 1;
                 
-                for (int i=0; i<numObs; i++) {
+//                 for (int i=0; i<numObs; i++) {
 
-                    Entry<SpacecraftState, StateCovariance> stateBeginTask = 
-                        TrackingObjective.propagateStateAndCovariance(candidate, taskEpoch);
+//                     Entry<SpacecraftState, StateCovariance> stateBeginTask = 
+//                         TrackingObjective.propagateStateAndCovariance(candidate, taskEpoch);
 
-                    //RealMatrix covPropMatrix = stateBeginTask.getValue().getMatrix();
-/*                     for (int row=0; row<covPropMatrix.getRowDimension(); row++) {
-                        double[] rowVec = covPropMatrix.getRow(row);
-                        for(int col=0; col<covPropMatrix.getColumnDimension(); col++) {
-                            System.out.print(rowVec[col] + " ");
-                        }
-                        System.out.println();
-                    } */
+//                     //RealMatrix covPropMatrix = stateBeginTask.getValue().getMatrix();
+// /*                     for (int row=0; row<covPropMatrix.getRowDimension(); row++) {
+//                         double[] rowVec = covPropMatrix.getRow(row);
+//                         for(int col=0; col<covPropMatrix.getColumnDimension(); col++) {
+//                             System.out.print(rowVec[col] + " ");
+//                         }
+//                         System.out.println();
+//                     } */
 
-                    if (Objects.isNull(stateBeginTask)) {
-                        // Observation cannot be performed because of lack of visibility
-                        continue;
-                    }
+//                     if (Objects.isNull(stateBeginTask)) {
+//                         // Observation cannot be performed because of lack of visibility
+//                         continue;
+//                     }
 
-                    // Transform spacecraft state into sensor pointing direction
-                    AngularDirection azElBeginTask = 
-                        transformStateToPointing(stateBeginTask.getKey(), stationHorizon);
-                    System.out.println("Azimuth sensor: " + FastMath.toDegrees(azElBeginTask.getAngle1()));
-                    System.out.println("Elevation sensor: " + FastMath.toDegrees(azElBeginTask.getAngle2()));
+//                     // Transform spacecraft state into sensor pointing direction
+//                     AngularDirection azElBeginTask = 
+//                         transformStateToPointing(stateBeginTask.getKey(), stationHorizon);
+//                     System.out.println("Azimuth sensor: " + FastMath.toDegrees(azElBeginTask.getAngle1()));
+//                     System.out.println("Elevation sensor: " + FastMath.toDegrees(azElBeginTask.getAngle2()));
 
                     
-                    boolean goodSolarPhase = 
-                        Tasking.checkSolarPhaseCondition(taskEpoch, azElBeginTask);
+//                     boolean goodSolarPhase = 
+//                         Tasking.checkSolarPhaseCondition(taskEpoch, azElBeginTask);
 
-                    if (!goodSolarPhase) {
-                        // Observation cannot be performed because of lack of visibility
-                        continue;
-                    }
-                    double distMoon = 
-                        AngularDirection.computeAngularDistMoon(taskEpoch, stationHorizon, azElBeginTask);
-                    if (distMoon < minMoonDist) {
-                        // Observation cannot be performed because of lack of visibility
-                        continue;
-                    }
+//                     if (!goodSolarPhase) {
+//                         // Observation cannot be performed because of lack of visibility
+//                         continue;
+//                     }
+//                     double distMoon = 
+//                         AngularDirection.computeAngularDistMoon(taskEpoch, stationHorizon, azElBeginTask);
+//                     if (distMoon < minMoonDist) {
+//                         // Observation cannot be performed because of lack of visibility
+//                         continue;
+//                     }
 
-                    // If code reaches here, object is observable and visible
+//                     // If code reaches here, object is observable and visible
                     
-                    List<AngularDirection> simulatedMeasurements = new ArrayList<AngularDirection>();
+//                     List<AngularDirection> simulatedMeasurements = new ArrayList<AngularDirection>();
 
-                    // Set up modified TLE using the state at the beginning of the tasking window
-                    TLE modTleBeginTask = 
-                        new FixedPointTleGenerationAlgorithm().generate(stateBeginTask.getKey(), 
-                                                                        candidate.getPseudoTle());
-                    StateVector stateVecBeginTask = 
-                        ObservedObject.spacecraftStateToStateVector(stateBeginTask.getKey(), 
-                                                                    candidate.getFrame());
-                    CartesianCovariance cartCovBeginTask = 
-                        ObservedObject.stateCovToCartesianCov(stateBeginTask.getKey().getOrbit(), 
-                                                              stateBeginTask.getValue(), 
-                                                              candidate.getFrame());
-                    ObservedObject candidateBeginTask = 
-                        new ObservedObject(candidate.getId(), stateVecBeginTask, cartCovBeginTask, 
-                                           stationHorizon, modTleBeginTask);
-                    simulatedMeasurements = 
-                        generateMeasurements(candidateBeginTask, azElBeginTask, this.sensor.getReadoutT(), 
-                                             this.sensor.getExposureT(), taskEpoch);
+//                     // Set up modified TLE using the state at the beginning of the tasking window
+//                     TLE modTleBeginTask = 
+//                         new FixedPointTleGenerationAlgorithm().generate(stateBeginTask.getKey(), 
+//                                                                         candidate.getPseudoTle());
+//                     StateVector stateVecBeginTask = 
+//                         ObservedObject.spacecraftStateToStateVector(stateBeginTask.getKey(), 
+//                                                                     candidate.getFrame());
+//                     CartesianCovariance cartCovBeginTask = 
+//                         ObservedObject.stateCovToCartesianCov(stateBeginTask.getKey().getOrbit(), 
+//                                                               stateBeginTask.getValue(), 
+//                                                               candidate.getFrame());
+//                     ObservedObject candidateBeginTask = 
+//                         new ObservedObject(candidate.getId(), stateVecBeginTask, cartCovBeginTask, 
+//                                            stationHorizon, modTleBeginTask);
+//                     simulatedMeasurements = 
+//                         generateMeasurements(candidateBeginTask, azElBeginTask, this.sensor.getReadoutT(), 
+//                                              this.sensor.getExposureT(), taskEpoch);
 
-                    // Transform measurements into orekit measurements
-                    List<ObservedMeasurement<?>> orekitAzElMeas = new ArrayList<>();
-                    for (AngularDirection meas : simulatedMeasurements) {
-                        orekitAzElMeas
-                            .add(transformAngularAzEl2OrekitMeasurements(meas, this.stationHorizon));
-                    }
-                    // Perform updated state estimation with measurements
-                    ObservedObject[] result = estimateStateWithKalman(orekitAzElMeas, candidateBeginTask);
+//                     // Transform measurements into orekit measurements
+//                     List<ObservedMeasurement<?>> orekitAzElMeas = new ArrayList<>();
+//                     for (AngularDirection meas : simulatedMeasurements) {
+//                         orekitAzElMeas
+//                             .add(transformAngularAzEl2OrekitMeasurements(meas, this.stationHorizon));
+//                     }
+//                     // Perform updated state estimation with measurements
+//                     ObservedObject[] result = estimateStateWithKalman(orekitAzElMeas, candidateBeginTask);
 
-                    // Evaluate information gain
-                    double iG = computeInformationGain(result[1], result[2]); 
-                    if (iG>maxIG) {
-                        maxIG = iG;
-                        pointing = azElBeginTask;
-                        target = candidate;
+//                     // Evaluate information gain
+//                     double iG = computeInformationGain(result[1], result[2]); 
+//                     if (iG>maxIG) {
+//                         maxIG = iG;
+//                         pointing = azElBeginTask;
+//                         target = candidate;
                         
-                    }
-                }
-            }
-        }
-        System.out.println("Information gain: " + maxIG);
-        return pointing;
-    }
+//                     }
+//                 }
+//             }
+//         }
+//         System.out.println("Information gain: " + maxIG);
+//         return pointing;
+//     }
 
     protected List<AngularDirection> generateMeasurements(ObservedObject candidate,
                                                           AngularDirection pointing, 
@@ -518,10 +513,15 @@ public class TrackingObjective implements Objective{
 
    
 
-    protected ObservedObject[] estimateStateWithOwnKalman(AngularDirection meas, RealMatrix R,
+    protected static ObservedObject[] estimateStateWithOwnKalman(AngularDirection meas, RealMatrix R,
                                                           SpacecraftState predicted, 
                                                           MatricesHarvester harvester, 
-                                                          ObservedObject candidate) {
+                                                          ObservedObject candidate,
+                                                          Frame topoInertial) {
+        // Frames
+        FactoryManagedFrame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+
+        Frame j2000 = FramesFactory.getEME2000();
       
         // Initialise Kalman setting
         RealMatrix xbar0 = 
@@ -553,12 +553,12 @@ public class TrackingObjective implements Objective{
 
         // Measurement
         Transform toTopo = 
-            predicted.getFrame().getTransformTo(this.topoInertial, predicted.getDate());
+            predicted.getFrame().getTransformTo(topoInertial, predicted.getDate());
         PVCoordinates pvTopo = toTopo.transformPVCoordinates(predicted.getPVCoordinates());
         Vector3D posTopo = pvTopo.getPosition();
 
         RealMatrix H = App.getObservationPartialDerivative(posTopo, false);
-        AngularDirection radec = App.predictMeasurement(posTopo, this.topoInertial); 
+        AngularDirection radec = App.predictMeasurement(posTopo, topoInertial); 
 
         // Compute Kalman Gain
         RealMatrix covInMeasSpace = H.multiply(predictedCov).multiplyTransposed(H);
@@ -600,7 +600,7 @@ public class TrackingObjective implements Objective{
         Vector3D posUpdated = new Vector3D(updatedArray[0], updatedArray[1], updatedArray[2]);
         Vector3D velUpdated = new Vector3D(updatedArray[3], updatedArray[4], updatedArray[5]);
         PVCoordinates pvUpdated = new PVCoordinates(posUpdated, velUpdated);
-        CartesianOrbit updatedOrbit = new CartesianOrbit(pvUpdated, j2000, predicted.getDate(), MU);
+        CartesianOrbit updatedOrbit = new CartesianOrbit(pvUpdated, j2000, predicted.getDate(), Constants.WGS84_EARTH_MU);
         SpacecraftState updated = new SpacecraftState(updatedOrbit);
         StateVector corrState = ObservedObject.spacecraftStateToStateVector(updated, j2000);
         StateCovariance updatedStateCov = 
@@ -741,11 +741,11 @@ public class TrackingObjective implements Objective{
     }
 
     /**
-     * Transform spacecraft state into angular direction in topocentric horizon frame.
+     * Transform spacecraft state into angular direction in topocentric frame.
      * TODO: move function to AngularDirection class
      * 
      * @param state         Spacecraft state.
-     * @return              Angular pointing direction with respect to topocentric horizon frame.
+     * @return              Angular pointing direction with respect to topocentric frame.
      */
     protected static AngularDirection transformStateToPointing(SpacecraftState state, Frame topo) {
 
@@ -852,9 +852,9 @@ public class TrackingObjective implements Objective{
         for (ObservedObject candidate : updatedTargets) {
 
             final EventDetector visibility =
-                    new ElevationDetector(maxcheck, threshold, stationHorizon).
-                    withConstantElevation(elevation).
-                    withHandler((s, d, increasing) -> {
+                    new ElevationDetector(maxcheck, threshold, stationHorizon)
+                    .withConstantElevation(this.sensor.getElevCutOff())
+                    .withHandler((s, d, increasing) -> {
                         System.out.println(" Visibility on object " +
                                            candidate.getId() +
                                            (increasing ? " begins at " : " ends at ") +
@@ -873,7 +873,7 @@ public class TrackingObjective implements Objective{
             Vector3D vel = candidate.getState().getVelocityVector();
             PVCoordinates pv = new PVCoordinates(pos, vel);
             Orbit initialOrbit = new CartesianOrbit(pv, candidate.getFrame(), 
-                                     candidate.getEpoch(), MU);
+                                     candidate.getEpoch(), Constants.WGS84_EARTH_MU);
             KeplerianPropagator kepPropo = new KeplerianPropagator(initialOrbit);
             
             // Add event to be detected
@@ -931,13 +931,9 @@ public class TrackingObjective implements Objective{
                 MatrixUtils.createRealDiagonalMatrix(new double[]{FastMath.pow(1./206265, 2), 
                                                                   FastMath.pow(1./206265, 2)});
             ObservedObject[] predAndCorr = 
-                estimateStateWithOwnKalman(realRaDec, R, predState, harvester, candidate);
+                estimateStateWithOwnKalman(realRaDec, R, predState, harvester, candidate, this.topoInertial);
             double iG = computeInformationGain(predAndCorr[0], predAndCorr[1]);
-            if (predAndCorr[0].getId() == 22314) {
-                //System.out.println("Predicted covariance of 22314 at " + predAndCorr[0].getEpoch());
-                //App.printCovariance(predAndCorr[0].getCovariance().getCovarianceMatrix());
-            }
-            //System.out.println("Information gain: " + iG);
+            
             if (iG>maxIG) {
                 maxIG = iG;
                 pointing = raDecPointing;

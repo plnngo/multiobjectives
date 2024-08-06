@@ -82,7 +82,7 @@ public class App {
 
         //App.testPropo2();
         //App.propagateKeplerianDynamics();
-        //App.propagateCovarianceOrekitExample();
+        App.propagateCovarianceOrekitExample();
         //App.compareNormalPropWithKalmanPrediction();
         //App.setUpOwnKalmanFilter();
         //App.compareCovTdrs();
