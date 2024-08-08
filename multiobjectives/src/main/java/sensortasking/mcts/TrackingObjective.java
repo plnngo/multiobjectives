@@ -517,7 +517,8 @@ public class TrackingObjective implements Objective{
                                                           SpacecraftState predicted, 
                                                           MatricesHarvester harvester, 
                                                           ObservedObject candidate,
-                                                          Frame topoInertial) {
+                                                          Frame topoInertial,
+                                                          double[] angleResiduals) {
         // Frames
         FactoryManagedFrame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
 
@@ -531,7 +532,7 @@ public class TrackingObjective implements Objective{
 
         // Process noise
         RealMatrix Q = 
-            MatrixUtils.createRealDiagonalMatrix(new double[]{1e-8, 1e-8, 1e-8});
+            MatrixUtils.createRealDiagonalMatrix(new double[]{1e-12, 1e-12, 1e-12});
         RealMatrix gamma = App.getGammaMatrix(candidate.getEpoch(), predicted.getDate());
         RealMatrix mappedAcc = gamma.multiply(Q).multiplyTransposed(gamma);
 
@@ -559,6 +560,9 @@ public class TrackingObjective implements Objective{
 
         RealMatrix H = App.getObservationPartialDerivative(posTopo, false);
         AngularDirection radec = App.predictMeasurement(posTopo, topoInertial); 
+        AngularDirection raDecEme2000 = new AngularDirection(j2000, new double[]{predictedPos.getAlpha(), predictedPos.getDelta()}, AngleType.RADEC);
+        AngularDirection radecCopy = raDecEme2000.transformReference(topoInertial, predicted.getDate(), AngleType.RADEC);
+        AngularDirection radecCopy2 = new AngularDirection(topoInertial, new double[]{posTopo.getAlpha(), posTopo.getDelta()}, AngleType.RADEC);
 
         // Compute Kalman Gain
         RealMatrix covInMeasSpace = H.multiply(predictedCov).multiplyTransposed(H);
@@ -567,8 +571,16 @@ public class TrackingObjective implements Objective{
 
         // Measurement error
         AngularDirection residuals = meas.substract(radec);
+        if(residuals.getAngles()[0]<0.) {
+
+            System.out.println("Found bug");
+
+        }
+        angleResiduals[0] = residuals.getAngles()[0];
+
+        angleResiduals[1] = residuals.getAngle2();
         double[][] residualsArray = new double[2][1];
-        residualsArray[0] = new double[]{residuals.getAngle1()};
+        residualsArray[0] = new double[]{residuals.getAngles()[0]};
         residualsArray[1] = new double[]{residuals.getAngle2()};
         RealMatrix residualMatrix = MatrixUtils.createRealMatrix(residualsArray);
 
@@ -930,8 +942,12 @@ public class TrackingObjective implements Objective{
             RealMatrix R = 
                 MatrixUtils.createRealDiagonalMatrix(new double[]{FastMath.pow(1./206265, 2), 
                                                                   FastMath.pow(1./206265, 2)});
+                //MatrixUtils.createRealDiagonalMatrix(new double[]{0., 0.});
+            
+            double[] residuals = new double[2];
             ObservedObject[] predAndCorr = 
-                estimateStateWithOwnKalman(realRaDec, R, predState, harvester, candidate, this.topoInertial);
+                estimateStateWithOwnKalman(realRaDec, R, predState, harvester, candidate, 
+                                           this.topoInertial, residuals);
             double iG = computeInformationGain(predAndCorr[0], predAndCorr[1]);
             
             if (iG>maxIG) {

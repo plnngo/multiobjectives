@@ -84,9 +84,9 @@ public class App {
         //App.propagateKeplerianDynamics();
         App.propagateCovarianceOrekitExample();
         //App.compareNormalPropWithKalmanPrediction();
-        //App.setUpOwnKalmanFilter();
+        App.setUpOwnKalmanFilter();
         //App.compareCovTdrs();
-        App.computeKLTest();
+        //App.computeKLTest();
     }
 
     public static void computeKLTest(){
@@ -219,11 +219,6 @@ public class App {
         RealMatrix propCovTdrs06 = providerCov06.getStateCovariance(predState06).getMatrix().add(mappedAcc);
         System.out.println("Cov of 22314 at 12:01:40Z propagated");
         printCovariance(propCovTdrs06);
-        
-
-
-
-
     }
 
     public static void setUpOwnKalmanFilter(){
@@ -276,7 +271,9 @@ public class App {
         extrapolator.addAdditionalStateProvider(providerCov); */
 
         // State transition matrix
-        final AbsoluteDate target = initialState.getDate().shiftedBy(100.);
+        //final AbsoluteDate target = initialState.getDate().shiftedBy(100.);
+        final AbsoluteDate target = new AbsoluteDate("2000-01-01T15:50:04.36035985407872Z", TimeScalesFactory.getUTC());
+
         System.out.println("Target date: \t" + target);
         System.out.println("Propagation duration [s]: \t" + initialState.getKeplerianPeriod());
         System.out.println("----- Propagation -----");

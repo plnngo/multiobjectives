@@ -20,7 +20,7 @@ public class AngularDirection {
     private Frame frame;
 
     /** Values in [rad] of the pair of angles. */
-    private double[] angles;
+    public double[] angles;
 
     /** Angle type. */
     private AngleType angleType;
@@ -44,6 +44,7 @@ public class AngularDirection {
     }
 
     /** 
+     * @deprecated
      * Transform the pointing direction into {@code dest} frame.
      * 
      * @param dest                  Destination reference frame.
@@ -70,10 +71,11 @@ public class AngularDirection {
      * @return                      Angle in [rad].
      */
     public double getAngle1() {
+        double posAngle = angles[0];
         if(angles[0] < 0) {
-            angles[0] = angles[0] + 2*FastMath.PI;
+            posAngle = angles[0] + 2*FastMath.PI;
         }
-        return angles[0];
+        return posAngle;
     }
 
     /**
