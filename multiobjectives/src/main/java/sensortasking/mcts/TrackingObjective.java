@@ -510,10 +510,112 @@ public class TrackingObjective implements Objective{
         return dKL;
     }
 
+    protected static ObservedObject[] estimateStateWithOwnConventionalKalman(AngularDirection meas, RealMatrix R,
+                                                          SpacecraftState predicted, 
+                                                          MatricesHarvester harvester, 
+                                                          ObservedObject candidate,
+                                                          Frame topoInertial,
+                                                          double[] angleResiduals,
+                                                          double[] xhatPreData) {
+        // Frames
+        FactoryManagedFrame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+
+        Frame j2000 = FramesFactory.getEME2000();
+      
+        // Initialise Kalman setting
+/*         RealMatrix xbar0 = 
+            MatrixUtils.createColumnRealMatrix(new double[]{0., 0., 0., 0., 0., 0.});*/ 
+        RealMatrix xhatPre = MatrixUtils.createColumnRealMatrix(xhatPreData); 
+        ObservedObject[] output = new ObservedObject[2];
+
+        // Process noise
+        RealMatrix Q = 
+            MatrixUtils.createRealDiagonalMatrix(new double[]{1e-8, 1e-8, 1e-8});
+        RealMatrix gamma = App.getGammaMatrix(candidate.getEpoch(), predicted.getDate());
+        RealMatrix mappedAcc = gamma.multiply(Q).multiplyTransposed(gamma);
+
+        // Prediction
+        RealMatrix dYdY0 = harvester.getStateTransitionMatrix(predicted);
+        RealMatrix covInit = candidate.getCovariance().getCovarianceMatrix();
+        RealMatrix predictedCov = dYdY0.multiply(covInit).multiplyTransposed(dYdY0);
+        predictedCov = predictedCov.add(mappedAcc);     // Add process noise to predicted cov
+        RealMatrix xbar = dYdY0.multiply(xhatPre);
+        Vector3D predictedPos = predicted.getPVCoordinates().getPosition();
+        Vector3D predictedVel = predicted.getPVCoordinates().getVelocity();
+        double[] dataPredictedState = 
+            new double[]{predictedPos.getX(), predictedPos.getY(), predictedPos.getZ(),
+                         predictedVel.getX(), predictedVel.getY(), predictedVel.getZ()};
+        RealMatrix predictedStateColumnVec = new Array2DRowRealMatrix(dataPredictedState);
+
+        // Measurement
+        Transform toTopo = 
+            predicted.getFrame().getTransformTo(topoInertial, predicted.getDate());
+        PVCoordinates pvTopo = toTopo.transformPVCoordinates(predicted.getPVCoordinates());
+        Vector3D posTopo = pvTopo.getPosition();
+
+        RealMatrix H = App.getObservationPartialDerivative(posTopo, false);
+        AngularDirection radec = App.predictMeasurement(posTopo, topoInertial); 
+       
+        // Compute Kalman Gain
+        RealMatrix covInMeasSpace = H.multiply(predictedCov).multiplyTransposed(H);
+        RealMatrix kalmanGain = predictedCov.multiplyTransposed(H)
+                                            .multiply(MatrixUtils.inverse(covInMeasSpace.add(R)));
+
+        // Measurement error
+        AngularDirection residuals = meas.substract(radec);
+        angleResiduals[0] = residuals.getAngles()[0];
+
+        angleResiduals[1] = residuals.getAngle2();
+        double[][] residualsArray = new double[2][1];
+        residualsArray[0] = new double[]{residuals.getAngles()[0]};
+        residualsArray[1] = new double[]{residuals.getAngle2()};
+        RealMatrix residualMatrix = MatrixUtils.createRealMatrix(residualsArray);
+
+        // Correction
+        RealMatrix xhat = xbar.add(kalmanGain.multiply(residualMatrix.subtract(H.multiply(xbar))));
+        RealMatrix updatedState = predictedStateColumnVec.add(xhat);
+        double[] xhatPrePlaceholder = xhat.getColumn(0);
+        for(int i=0; i<xhatPrePlaceholder.length; i++){
+            xhatPreData[i] = xhatPrePlaceholder[i];
+        }
+
+        RealMatrix kRkT = kalmanGain.multiply(R).multiplyTransposed(kalmanGain);
+        RealMatrix identity = MatrixUtils.createRealIdentityMatrix(6);
+        RealMatrix iMinusKgH = identity.subtract(kalmanGain.multiply(H));
+        RealMatrix updatedCov = 
+            iMinusKgH.multiply(predictedCov).multiplyTransposed(iMinusKgH).add(kRkT);
+        
+        // Set up output prediction
+        StateVector predState = ObservedObject.spacecraftStateToStateVector(predicted, predicted.getFrame());
+        StateCovariance stateCov = 
+            new StateCovariance(predictedCov, predicted.getDate(), j2000, OrbitType.CARTESIAN, 
+                                PositionAngleType.MEAN);
+        CartesianCovariance predCartCov = 
+            ObservedObject.stateCovToCartesianCov(predicted.getOrbit(), stateCov, j2000);
+        output[0] = new ObservedObject(candidate.getId(), predState, predCartCov, 
+                                       predicted.getDate(), j2000);
+            
+        // Set up output updated
+        double[] updatedArray = updatedState.getColumn(0);
+        Vector3D posUpdated = new Vector3D(updatedArray[0], updatedArray[1], updatedArray[2]);
+        Vector3D velUpdated = new Vector3D(updatedArray[3], updatedArray[4], updatedArray[5]);
+        PVCoordinates pvUpdated = new PVCoordinates(posUpdated, velUpdated);
+        CartesianOrbit updatedOrbit = new CartesianOrbit(pvUpdated, j2000, predicted.getDate(), Constants.WGS84_EARTH_MU);
+        SpacecraftState updated = new SpacecraftState(updatedOrbit);
+        StateVector corrState = ObservedObject.spacecraftStateToStateVector(updated, j2000);
+        StateCovariance updatedStateCov = 
+            new StateCovariance(updatedCov, predicted.getDate(), j2000, OrbitType.CARTESIAN, 
+                                PositionAngleType.MEAN);
+        CartesianCovariance corrCartCov = 
+            ObservedObject.stateCovToCartesianCov(updatedOrbit, updatedStateCov, j2000);
+        output[1] = new ObservedObject(candidate.getId(), corrState, corrCartCov, 
+                                       predicted.getDate(), j2000);
+        return output;
+    }
 
    
 
-    protected static ObservedObject[] estimateStateWithOwnKalman(AngularDirection meas, RealMatrix R,
+    protected static ObservedObject[] estimateStateWithOwnExtendedKalman(AngularDirection meas, RealMatrix R,
                                                           SpacecraftState predicted, 
                                                           MatricesHarvester harvester, 
                                                           ObservedObject candidate,
@@ -532,7 +634,7 @@ public class TrackingObjective implements Objective{
 
         // Process noise
         RealMatrix Q = 
-            MatrixUtils.createRealDiagonalMatrix(new double[]{1e-12, 1e-12, 1e-12});
+            MatrixUtils.createRealDiagonalMatrix(new double[]{1e-15, 1e-15, 1e-15});
         RealMatrix gamma = App.getGammaMatrix(candidate.getEpoch(), predicted.getDate());
         RealMatrix mappedAcc = gamma.multiply(Q).multiplyTransposed(gamma);
 
@@ -560,10 +662,7 @@ public class TrackingObjective implements Objective{
 
         RealMatrix H = App.getObservationPartialDerivative(posTopo, false);
         AngularDirection radec = App.predictMeasurement(posTopo, topoInertial); 
-        AngularDirection raDecEme2000 = new AngularDirection(j2000, new double[]{predictedPos.getAlpha(), predictedPos.getDelta()}, AngleType.RADEC);
-        AngularDirection radecCopy = raDecEme2000.transformReference(topoInertial, predicted.getDate(), AngleType.RADEC);
-        AngularDirection radecCopy2 = new AngularDirection(topoInertial, new double[]{posTopo.getAlpha(), posTopo.getDelta()}, AngleType.RADEC);
-
+       
         // Compute Kalman Gain
         RealMatrix covInMeasSpace = H.multiply(predictedCov).multiplyTransposed(H);
         RealMatrix kalmanGain = predictedCov.multiplyTransposed(H)
@@ -571,11 +670,6 @@ public class TrackingObjective implements Objective{
 
         // Measurement error
         AngularDirection residuals = meas.substract(radec);
-        if(residuals.getAngles()[0]<0.) {
-
-            System.out.println("Found bug");
-
-        }
         angleResiduals[0] = residuals.getAngles()[0];
 
         angleResiduals[1] = residuals.getAngle2();
@@ -605,7 +699,7 @@ public class TrackingObjective implements Objective{
         CartesianCovariance predCartCov = 
             ObservedObject.stateCovToCartesianCov(predicted.getOrbit(), stateCov, j2000);
         output[0] = new ObservedObject(candidate.getId(), predState, predCartCov, 
-                                       predicted.getDate(), ecef);
+                                       predicted.getDate(), j2000);
             
         // Set up output updated
         double[] updatedArray = updatedState.getColumn(0);
@@ -946,7 +1040,7 @@ public class TrackingObjective implements Objective{
             
             double[] residuals = new double[2];
             ObservedObject[] predAndCorr = 
-                estimateStateWithOwnKalman(realRaDec, R, predState, harvester, candidate, 
+                estimateStateWithOwnExtendedKalman(realRaDec, R, predState, harvester, candidate, 
                                            this.topoInertial, residuals);
             double iG = computeInformationGain(predAndCorr[0], predAndCorr[1]);
             

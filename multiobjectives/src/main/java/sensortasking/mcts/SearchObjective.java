@@ -29,11 +29,11 @@ public class SearchObjective implements Objective{
     List<AngularDirection> scheduleTopocentric;
 
     // TODO implement as sensor object
-    static double readout = 7.;
-    static double exposure = 8.;
-    static double allocation = 60.;
-    static double settling = 30.;
-    static double preparation = 6.;
+    //static double readout = 7.;
+    //static double exposure = 8.;
+    double allocation = 60.;
+    //static double settling = 30.;
+    double preparation = 6.;
 
     public SearchObjective(TopocentricFrame horizon, Stripe scan, int numExpo, Sensor sensor) {
         this.stationHorizon = horizon;
@@ -46,12 +46,12 @@ public class SearchObjective implements Objective{
     @Override
     public AngularDirection setMicroAction(AbsoluteDate current, AngularDirection sensorPointing) {
 
-        List<AngularDirection> stripe = callStripeScanTopoFrame(current);
+        List<AngularDirection> stripe = callStripeScanTopoFrame(current, sensorPointing);
         return stripe.get(0);
     }
 
 
-    private List<AngularDirection> callStripeScanTopoFrame(AbsoluteDate start) {
+    private List<AngularDirection> callStripeScanTopoFrame(AbsoluteDate start, AngularDirection sensorPointing) {
 
         // Inertial frame
         Frame j2000 = FramesFactory.getEME2000();
@@ -60,10 +60,16 @@ public class SearchObjective implements Objective{
         List<AngularDirection> scheduleTopo = new ArrayList<AngularDirection>();
         List<AngularDirection> scheduleGeo = new ArrayList<AngularDirection>();
 
+        // TODO: re-compute allocation period to slew from current sensor position towards stripe position
+        AngularDirection newSensorPointing = 
+            scan.getPosField(0).transformReference(sensorPointing.getFrame(), start, sensorPointing.getAngleType());
+        double actualSlewT = 
+                this.sensor.computeRepositionT(sensorPointing, newSensorPointing, true);
+        this.allocation = actualSlewT;
 
         // reposition to scan stripe
-        AbsoluteDate arriveAtStripe = start.shiftedBy(allocation + settling + preparation);
-        AbsoluteDate nextPointing = arriveAtStripe.shiftedBy(exposure/2.);
+        AbsoluteDate arriveAtStripe = start.shiftedBy(this.allocation + this.sensor.getSettlingT() + preparation);
+        AbsoluteDate nextPointing = arriveAtStripe.shiftedBy(this.sensor.getExposureT()/2.);
 
         // reposition inside scan stripe
         double reposDuration = this.scan.getReposInStripeT();
@@ -87,7 +93,7 @@ public class SearchObjective implements Objective{
                 // In same declination field 
                 scheduleTopo.add(decFieldTopo);
                 scheduleGeo.add(decField);
-                nextPointing = nextPointing.shiftedBy(exposure + sensor.getReadoutT());
+                nextPointing = nextPointing.shiftedBy(this.sensor.getExposureT() + sensor.getReadoutT());
             }
            
             // last measurement does not require extra time for read out (already covered by repos)
@@ -108,7 +114,7 @@ public class SearchObjective implements Objective{
         AbsoluteDate lastMeas = this.scheduleTopocentric.get(this.scheduleTopocentric.size()-1).getDate();
         AbsoluteDate firstMeas = this.scheduleTopocentric.get(0).getDate();
         double stripeT = lastMeas.durationFrom(firstMeas);
-        double taskDuration = allocation + settling + preparation + sensor.getExposureT() 
+        double taskDuration = this.allocation + this.sensor.getSettlingT() + preparation + sensor.getExposureT() 
                                 + stripeT + sensor.getReadoutT();
         AbsoluteDate[] interval = new AbsoluteDate[]{current, current.shiftedBy(taskDuration)};
         return interval;
