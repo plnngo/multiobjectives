@@ -63,9 +63,6 @@ public class MultiObjectiveMcts {
     /** Observation station (TODO: implement sensor for tracking objective). */
     final Sensor sensor;
 
-    /** Maximal number of MCTS iterations. */
-    //final int iteration = 10;
-
     /** Basic constructor.
      * 
      * @param descisionTree
@@ -499,9 +496,9 @@ public class MultiObjectiveMcts {
         if (objectiveType.equals("SearchObjective")) {
             // Update time resources
             postTimeResources[0] = priorTimeResources[0] - executionDuration;
-            if(postTimeResources[0]<0.) {
+            /* if(postTimeResources[0]<0.) {
                 postTimeResources[0] = 0.1;
-            }
+            } */
             postTimeResources[1] = priorTimeResources[1];
             
             // Correct weight update for given objective
@@ -510,9 +507,9 @@ public class MultiObjectiveMcts {
         } else if(objectiveType.equals("TrackingObjective")) {
             // Update time resources
             postTimeResources[1] = priorTimeResources[1] - executionDuration;
-            if(postTimeResources[1]<0.) {
+            /* if(postTimeResources[1]<0.) {
                 postTimeResources[1] = 0.1;
-            }
+            } */
             postTimeResources[0] = priorTimeResources[0];
 
             // Correct weight update for given objective
@@ -593,24 +590,37 @@ public class MultiObjectiveMcts {
 
                 // In case leaf is initial node
                 leaf.incrementNumVisits();
-                double[] leftResources = ((DecisionNode)leaf).getTimeResources();
+                double[] spentResources = new double[((DecisionNode)leaf).getTimeResources().length];
                 double[] initWeights = ((DecisionNode)this.initial).getWeights();
                 double obsCampaignDuration = endCampaign.durationFrom(startCampaign);
+                double timeSpentObserving = obsCampaignDuration;
+                for(int i=0; i<((DecisionNode)leaf).getTimeResources().length; i++) {
+                    timeSpentObserving -= ((DecisionNode)leaf).getTimeResources()[i];
+                }
                 double[] lastUtility = new double[2];
                 double totalUtility = 0.;
-                for(int i=0; i<lastUtility.length; i++) {
+               /*  for(int i=0; i<lastUtility.length; i++) {
                     if(initWeights[i] == 0) {
                         // objective not selected
                         lastUtility[i] = 0.;
                     } else {
                         // TODO: handle case when left resources is exactly zero
-                        lastUtility[i] = initWeights[i] * obsCampaignDuration / leftResources[i];
+                        lastUtility[i] = initWeights[i] * obsCampaignDuration / spentResources[i];
                         totalUtility += lastUtility[i];
                     }
                 }
                 totalUtility = totalUtility / 1000;
+                leaf.setUtility(totalUtility); */
+
+                for(int i=0; i<lastUtility.length; i++) {
+                    spentResources[i] = ((DecisionNode)this.initial).getTimeResources()[i] - ((DecisionNode)leaf).getTimeResources()[i];
+                    lastUtility[i] = (spentResources[i]/timeSpentObserving) - initWeights[i];
+                    totalUtility += lastUtility[i];
+                }
+                totalUtility = 1 - totalUtility;
                 leaf.setUtility(totalUtility);
             }
+            
 
             DecisionNode leafDecision = (DecisionNode) leaf;
             last = new DecisionNode(leaf.getUtility(), leaf.getNumVisits(), 
@@ -621,12 +631,16 @@ public class MultiObjectiveMcts {
         }
         // Compute utility value of last node
         DecisionNode lastDecision = (DecisionNode) last;
-        double[] leftResources = lastDecision.getTimeResources();
+        double[] spentResources = new double[lastDecision.getTimeResources().length];
         double[] initWeights = ((DecisionNode)this.initial).getWeights();
         double obsCampaignDuration = endCampaign.durationFrom(startCampaign);
+        double timeSpentObserving = obsCampaignDuration;
+        for(int i=0; i<lastDecision.getTimeResources().length; i++) {
+            timeSpentObserving -= lastDecision.getTimeResources()[i];
+        }
         double[] lastUtility = new double[2];
         double totalUtility = 0.;
-        for(int i=0; i<lastUtility.length; i++) {
+        /* for(int i=0; i<lastUtility.length; i++) {
             if(initWeights[i] == 0) {
                 // objective not selected
                 lastUtility[i] = 0.;
@@ -637,8 +651,16 @@ public class MultiObjectiveMcts {
             }
         }
         totalUtility = totalUtility / 1000;
+        last.setUtility(totalUtility); */
+
+        for(int i=0; i<lastUtility.length; i++) {
+            spentResources[i] = ((DecisionNode)this.initial).getTimeResources()[i] - lastDecision.getTimeResources()[i];
+            lastUtility[i] = (spentResources[i]/timeSpentObserving) - initWeights[i];
+            totalUtility += lastUtility[i];
+        }
+        totalUtility = 1 - totalUtility;
         last.setUtility(totalUtility);
-        
+
         if (!leaf.equals(this.initial)) {
             leaf.incrementNumVisits();
             double updatedUtility = leaf.getUtility() + last.getUtility();

@@ -55,10 +55,10 @@ public class Tasking {
 
     /** Minimal modified solar phase angle (MSPA) in [rad] to ensure good visibility. The MSPA is 
      * formed by the space object and the sun from the perspective of the observer*/
-    final static double minSolarPhase = FastMath.toRadians(40.);    // TODO: change back to value according to siminski
+    final static double minSolarPhase = FastMath.toRadians(60.);    
 
     /** Minimal angular distance between Moon and observation stripe. */
-    double minMoonDist = FastMath.toRadians(20.);   // TODO: change back to 90 deg
+    double minMoonDist = FastMath.toRadians(20.);   
 
     /** Sun's maximal elevation angle according to nautical twilight condition. */
     double nauticalTwilight = FastMath.toRadians(-12);

@@ -294,7 +294,7 @@ public class MultiObjectiveMctsTest {
         int numVisits = 1;
         AngularDirection initPointing = 
             new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
-        double[] initWeights = new double[]{1.0, 0.0};
+        double[] initWeights = new double[]{0.5, 0.5};
         double[] initTimeResources = 
             new double[]{initWeights[0] * endCampaign.durationFrom(current), 
                          initWeights[1] * endCampaign.durationFrom(current)};
@@ -465,12 +465,12 @@ public class MultiObjectiveMctsTest {
 
                                         posError = posOD.subtract(posTruth);
                                         velError = velOD.subtract(velTruth);
-                                        Transform toTopo = 
+/*                                         Transform toTopo = 
                                             truthState.getFrame().getTransformTo(measWithNoise.getFrame(), measWithNoise.getDate());
                                         PVCoordinates pvTopo = toTopo.transformPVCoordinates(truthState.getPVCoordinates());
                                         Vector3D posTopo = pvTopo.getPosition();
                                         AngularDirection radecCopy2 = new AngularDirection(measWithNoise.getFrame(), new double[]{posTopo.getAlpha(), posTopo.getDelta()}, AngleType.RADEC);
-                                        AngularDirection diff = radecCopy2.substract(measWithNoise);
+                                        AngularDirection diff = radecCopy2.substract(measWithNoise); */
                                         
                                         break;
                                     }
@@ -483,7 +483,6 @@ public class MultiObjectiveMctsTest {
                                 for(int j=0; j<sigma.length; j++) {
                                     sigma[j] = FastMath.sqrt(covMatrix.getEntry(j, j));
                                 }
-                                // TODO: standard deviation aka sigma
                                 // Print file
                                 String[] data = { Long.toString(candidate.getId()), Double.toString(predAndCorr[1].getEpoch().durationFrom(ooiInitial.get(0).getEpoch())),
                                                   Double.toString(posError.getX()), Double.toString(posError.getY()), Double.toString(posError.getZ()),
@@ -534,9 +533,9 @@ public class MultiObjectiveMctsTest {
             // TODO Auto-generated catch block 
             e.printStackTrace(); 
         } 
-/*         double timeLeftSearch = ((DecisionNode)strategy.get(strategy.size()-3)).getTimeResources()[0];
+        double timeLeftSearch = ((DecisionNode)strategy.get(strategy.size()-3)).getTimeResources()[0];
         double timeLeftTrack = ((DecisionNode)strategy.get(strategy.size()-3)).getTimeResources()[1];
-        System.out.println("Time left search: " + timeLeftSearch + " and time left track: " + timeLeftTrack); */
+        System.out.println("Time left search: " + timeLeftSearch + " and time left track: " + timeLeftTrack);
 
         System.out.println("Number of objects detected " + measMap.size());
         //IodGauss iod = new IodGauss(TLEConstants.MU);
