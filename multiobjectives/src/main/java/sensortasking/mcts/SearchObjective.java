@@ -100,9 +100,11 @@ public class SearchObjective implements Objective{
             nextPointing = nextPointing.shiftedBy(reposDuration - sensor.getReadoutT());
         }
 
-/*         double scanDuration = this.scan.getStripeT(this.numExpo);
-        double decFieldDuration = 
-            this.numExpo * sensor.getExposureT() + (this.numExpo - 1) * sensor.getReadoutT(); */
+        AbsoluteDate lastMeas = scheduleTopo.get(scheduleTopo.size()-1).getDate();
+        AbsoluteDate firstMeas = scheduleTopo.get(0).getDate();
+        if (Double.isNaN(lastMeas.durationFrom(firstMeas))) {
+            System.out.println("Weird time stamps");
+        }
         
         this.scheduleTopocentric = scheduleTopo;
         this.scheduleGeocentric = scheduleGeo;
@@ -114,6 +116,7 @@ public class SearchObjective implements Objective{
         AbsoluteDate lastMeas = this.scheduleTopocentric.get(this.scheduleTopocentric.size()-1).getDate();
         AbsoluteDate firstMeas = this.scheduleTopocentric.get(0).getDate();
         double stripeT = lastMeas.durationFrom(firstMeas);
+        //System.out.println("Stripe duration: " + stripeT);
         double taskDuration = this.allocation + this.sensor.getSettlingT() + preparation + sensor.getExposureT() 
                                 + stripeT + sensor.getReadoutT();
         AbsoluteDate[] interval = new AbsoluteDate[]{current, current.shiftedBy(taskDuration)};

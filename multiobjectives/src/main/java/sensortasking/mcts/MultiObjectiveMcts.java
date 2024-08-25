@@ -126,21 +126,21 @@ public class MultiObjectiveMcts {
 
         // Retrieve pointing strategy UCB
         Node current = initial;
-        outputUCB.add(initial);
+/*         outputUCB.add(initial);
         // Travers decision until leaf node
         while(!Objects.isNull(current) && current.getChildren().size() !=0){
             current = selectChildUCB(current);
             outputUCB.add(current);
-        }
+        } */
 
-        current = initial;
+        //current = initial;
         outputRobustMax.add(initial);
         // Travers decision until leaf node
         while(!Objects.isNull(current) && current.getChildren().size() !=0){
             current = selectChildRobustMax(current);
             outputRobustMax.add(current);
         }
-        return outputUCB;
+        return outputRobustMax;
     }
 
 
@@ -492,33 +492,35 @@ public class MultiObjectiveMcts {
             postWeights[i] = priorTimeResources[i]/postTobs;
         }
 
+        AngularDirection sensorPointing;
         String objectiveType = objective.getClass().getSimpleName();
         if (objectiveType.equals("SearchObjective")) {
             // Update time resources
             postTimeResources[0] = priorTimeResources[0] - executionDuration;
-            /* if(postTimeResources[0]<0.) {
-                postTimeResources[0] = 0.1;
-            } */
             postTimeResources[1] = priorTimeResources[1];
             
             // Correct weight update for given objective
             postWeights[0] = postTimeResources[0]/postTobs;
 
+            // Assign sensor pointing location
+            List<AngularDirection> tasks = ((SearchObjective)expandedChance.getMacro()).getScheduleTopocentric();
+            sensorPointing = tasks.get(tasks.size()-1);
+
         } else if(objectiveType.equals("TrackingObjective")) {
             // Update time resources
             postTimeResources[1] = priorTimeResources[1] - executionDuration;
-            /* if(postTimeResources[1]<0.) {
-                postTimeResources[1] = 0.1;
-            } */
             postTimeResources[0] = priorTimeResources[0];
 
             // Correct weight update for given objective
             postWeights[1] = postTimeResources[1]/postTobs;
+
+            // Assign sensor pointing location
+            sensorPointing = expandedChance.getMicro();
         }else {
             throw new IllegalAccessError("Unknown objective.");
         }
         AbsoluteDate propEpoch = leaf.getEpoch().shiftedBy(executionDuration);
-        expandedDecision = new DecisionNode(0., 0, expandedChance.getMicro(), postWeights, 
+        expandedDecision = new DecisionNode(0., 0, sensorPointing, postWeights, 
                                                     postTimeResources, propEpoch, propEnviroment);  
         expandedChance.setChild(expandedDecision); 
         expandedDecision.setId(expandedChance.getId()+expandedChance.getChildren().size());
@@ -551,21 +553,27 @@ public class MultiObjectiveMcts {
         episode.add(leaf);
 
         DecisionNode current = leaf;
-        double measDuration = TrackingObjective.allocation 
+/*         double measDuration = TrackingObjective.allocation 
                                 + this.sensor.getSettlingT() 
                                 + TrackingObjective.preparation 
                                 + this.sensor.getExposureT()
-                                + this.sensor.getReadoutT();
-        AbsoluteDate currentEndMeasEpoch = current.getEpoch().shiftedBy(measDuration);
+                                + this.sensor.getReadoutT(); */
+        /* ChanceNode parentLeaf = ((ChanceNode)leaf.getParent());
+        double measDuration = parentLeaf.getExecutionDuration()[1]
+                                        .durationFrom(parentLeaf.getExecutionDuration()[0]);
+        AbsoluteDate currentEndMeasEpoch = current.getEpoch().shiftedBy(measDuration); */
+
+        AbsoluteDate currentEndMeasEpoch = current.getEpoch();
 
         while(currentEndMeasEpoch.compareTo(campaignEndDate) <= 0) {
             current = expand(current, true); 
             if (Objects.isNull(current)) {
                 return episode;
             }         
-            //System.out.println(((ChanceNode)current.getParent()).getMacro() + " at " + current.getEpoch()); 
             episode.add(current.getParent());
             episode.add(current);
+            AbsoluteDate[] taskT = ((ChanceNode)current.getParent()).getExecutionDuration();
+            double measDuration = taskT[1].durationFrom(taskT[0]);
             currentEndMeasEpoch = current.getEpoch().shiftedBy(measDuration);
         }
         leaf.clearChildren();  
