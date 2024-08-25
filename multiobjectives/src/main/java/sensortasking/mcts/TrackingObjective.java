@@ -633,7 +633,9 @@ public class TrackingObjective implements Objective{
 
         // Process noise
         RealMatrix Q = 
-            MatrixUtils.createRealDiagonalMatrix(new double[]{1e-15, 1e-15, 1e-15});
+            //MatrixUtils.createRealDiagonalMatrix(new double[]{1e-15, 1e-15, 1e-15});
+            MatrixUtils.createRealDiagonalMatrix(new double[]{0.,0.,0.});
+
         RealMatrix gamma = App.getGammaMatrix(candidate.getEpoch(), predicted.getDate());
         RealMatrix mappedAcc = gamma.multiply(Q).multiplyTransposed(gamma);
 

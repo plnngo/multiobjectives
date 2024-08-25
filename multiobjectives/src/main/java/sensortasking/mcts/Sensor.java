@@ -170,6 +170,12 @@ public class Sensor {
         // Angle in [rad] between origin and destination vectors
         double theta = FastMath.acos(Vector3D.dotProduct(posOrigin, posDest));
 
+/*         if (origin.getAngle2() == dest.getAngle2()) {
+            System.out.println("Same pointing direction");
+            System.out.println(Vector3D.dotProduct(posOrigin, posDest));
+            System.out.println(FastMath.acos(Vector3D.dotProduct(posOrigin, posDest)));
+        } */
+
         if(slewVelInclSensorSettle) {
             return theta/this.slewVel;
         } else {

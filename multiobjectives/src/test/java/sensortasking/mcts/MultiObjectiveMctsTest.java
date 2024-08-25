@@ -247,6 +247,8 @@ public class MultiObjectiveMctsTest {
 
     @Test
     public void testMctsSearchAndTrackAsMC() {
+        long start1 = System.nanoTime();
+      
         // Epoch
         //AbsoluteDate current = (new AbsoluteDate(2024, 8, 2, 3, 24, 0., TimeScalesFactory.getUTC())).shiftedBy(4000.);
         AbsoluteDate current = new AbsoluteDate(2024, 8, 2, 3, 24, 0., TimeScalesFactory.getUTC());
@@ -288,6 +290,10 @@ public class MultiObjectiveMctsTest {
         List<ObservedObject> ooi = setListOOI(current);
         List<ObservedObject> initialOoi = new ArrayList<ObservedObject>(ooi);
 
+        Transform eciToHorizon = j2000.getTransformTo(topohorizon, current);
+        Vector3D tdrs6Horizon = eciToHorizon.transformPosition(ooi.get(1).getState().getPositionVector());
+        System.out.println("Elevation: " + FastMath.toDegrees(tdrs6Horizon.getDelta()));
+
         // Initialise root node
         List<String> objectives = new ArrayList<String>(Arrays.asList("SEARCH", "TRACK"));
         double initUtility = 1.;
@@ -306,6 +312,9 @@ public class MultiObjectiveMctsTest {
         List<Node> strategy = mctsTracking.run(root, 5000);
         
         performIODsearch(strategy, current, fov, topohorizon, initialOoi);
+
+        long end1 = System.nanoTime();      
+        System.out.println("Elapsed Time in nano seconds: "+ (end1-start1));
     }
 
     private void performIODsearch(List<Node> strategy, AbsoluteDate current, Fov fov, 
@@ -329,6 +338,8 @@ public class MultiObjectiveMctsTest {
         //List<AngularDirection> actualMeas = new ArrayList<AngularDirection>();
         Map<Integer, List<AngularDirection>> measMap = new HashMap<Integer, List<AngularDirection>>();
         File file = new File("PlotTrackingData.csv"); 
+        int countStripes = 0;
+
         try { 
             // create FileWriter object with file as parameter 
             FileWriter outputfile = new FileWriter(file); 
@@ -341,7 +352,10 @@ public class MultiObjectiveMctsTest {
                                 "PosX error", "PosY error", "PosZ error", 
                                 "VelX error", "VelY error", "VelZ error", 
                                 "CovX", "CovY", "CovZ", "CovXdot", "CovYdot", "CovZdot",
-                                "Ra Residual", "Dec Residual" }; 
+                                "Ra Residual", "Dec Residual",
+                                "PosX Truth", "PosY Truth", "PosZ Truth",
+                                "VelX Truth", "VelY Truth", "VelZ Truth",
+                                "CovXY", "CovXZ", "CovYZ" }; 
             writer.writeNext(header); 
 
             for (Node selected : strategy) {
@@ -354,6 +368,7 @@ public class MultiObjectiveMctsTest {
                     ChanceNode chance = (ChanceNode)selected;
                     
                     if (chance.getMacro().getClass().getSimpleName().equals("SearchObjective")) {
+                        countStripes++;
 
                         List<AngularDirection> tasks = ((SearchObjective)chance.getMacro()).getScheduleGeocentric();
                         for(AngularDirection task: tasks) {
@@ -396,8 +411,8 @@ public class MultiObjectiveMctsTest {
                         Random r = new java.util.Random();
                         double mean = 0.;
                         double variance = FastMath.pow(1./206265., 2);
-                        double noiseRa = r.nextGaussian() * Math.sqrt(variance) + mean;
-                        double noiseDec = r.nextGaussian() * Math.sqrt(variance) + mean;
+                        double noiseRa = r.nextGaussian() * FastMath.sqrt(variance) + mean;
+                        double noiseDec = r.nextGaussian() * FastMath.sqrt(variance) + mean;
                         double[] noisyAngles = new double[]{rawMeas.getAngle1() + noiseRa, 
                                                             rawMeas.getAngle2() + noiseDec};
 
@@ -448,6 +463,9 @@ public class MultiObjectiveMctsTest {
                                 Vector3D velOD = predAndCorr[1].getState().getVelocityVector();
                                 Vector3D posError = Vector3D.ZERO;
                                 Vector3D velError = Vector3D.ZERO;
+                                Vector3D posTruth = Vector3D.ZERO;
+                                Vector3D velTruth = Vector3D.ZERO;
+
                                 for(ObservedObject target : ooiInitial) {
                                     if(target.getId() == candidate.getId()) {
                                         Vector3D posInitial = target.getState().getPositionVector();
@@ -457,8 +475,8 @@ public class MultiObjectiveMctsTest {
                                                                         target.getEpoch(), Constants.WGS84_EARTH_MU);
                                         KeplerianPropagator prop = new KeplerianPropagator(initial);
                                         SpacecraftState truthState = prop.propagate(predAndCorr[1].getEpoch());
-                                        Vector3D posTruth = truthState.getPVCoordinates().getPosition();
-                                        Vector3D velTruth = truthState.getPVCoordinates().getVelocity();
+                                        posTruth = truthState.getPVCoordinates().getPosition();
+                                        velTruth = truthState.getPVCoordinates().getVelocity();
                                         System.out.println(posTruth.getX() * 1e-3 + " " + posTruth.getY() * 1e-3 + " " + posTruth.getZ() * 1e-3);
                                         System.out.println(velTruth.getX() * 1e-3 + " " + velTruth.getY() * 1e-3 + " " + velTruth.getZ() * 1e-3);
 
@@ -480,16 +498,27 @@ public class MultiObjectiveMctsTest {
                                 double[] sigma = new double[6];
                                 CartesianCovariance cov = predAndCorr[1].getCovariance();
                                 RealMatrix covMatrix = cov.getCovarianceMatrix();
+                                //App.printCovariance(covMatrix);
                                 for(int j=0; j<sigma.length; j++) {
                                     sigma[j] = FastMath.sqrt(covMatrix.getEntry(j, j));
                                 }
+                                double[] sigma2Side = new double[3];
+                                sigma2Side[0] = covMatrix.getEntry(1, 0);
+                                sigma2Side[1] = covMatrix.getEntry(2, 0);
+                                sigma2Side[2] = covMatrix.getEntry(2, 1);
+
                                 // Print file
+                                AngularDirection residuals = rawMeas.substract(measWithNoise);
                                 String[] data = { Long.toString(candidate.getId()), Double.toString(predAndCorr[1].getEpoch().durationFrom(ooiInitial.get(0).getEpoch())),
                                                   Double.toString(posError.getX()), Double.toString(posError.getY()), Double.toString(posError.getZ()),
                                                   Double.toString(velError.getX()), Double.toString(velError.getY()), Double.toString(velError.getZ()),
                                                   Double.toString(sigma[0]), Double.toString(sigma[1]), Double.toString(sigma[2]),
                                                   Double.toString(sigma[3]), Double.toString(sigma[4]), Double.toString(sigma[5]),
-                                                  Double.toString(angleRes[0]), Double.toString(angleRes[1])}; 
+                                                  Double.toString(angleRes[0]), Double.toString(angleRes[1]),
+                                                  //Double.toString(residuals.getAngles()[0]), Double.toString(residuals.getAngle2()),
+                                                  Double.toString(posTruth.getX()), Double.toString(posTruth.getY()), Double.toString(posTruth.getZ()),
+                                                  Double.toString(velTruth.getX()), Double.toString(velTruth.getY()), Double.toString(velTruth.getZ()),
+                                                  Double.toString(sigma2Side[0]), Double.toString(sigma2Side[1]), Double.toString(sigma2Side[2])}; 
                                 writer.writeNext(data); 
 
                                 // Compute vector norm 
@@ -533,8 +562,8 @@ public class MultiObjectiveMctsTest {
             // TODO Auto-generated catch block 
             e.printStackTrace(); 
         } 
-        double timeLeftSearch = ((DecisionNode)strategy.get(strategy.size()-3)).getTimeResources()[0];
-        double timeLeftTrack = ((DecisionNode)strategy.get(strategy.size()-3)).getTimeResources()[1];
+        double timeLeftSearch = ((DecisionNode)strategy.get(strategy.size()-1)).getTimeResources()[0];
+        double timeLeftTrack = ((DecisionNode)strategy.get(strategy.size()-1)).getTimeResources()[1];
         System.out.println("Time left search: " + timeLeftSearch + " and time left track: " + timeLeftTrack);
 
         System.out.println("Number of objects detected " + measMap.size());
@@ -542,10 +571,11 @@ public class MultiObjectiveMctsTest {
         IodGooding iod = new IodGooding(TLEConstants.MU);
         GroundStation stationOrekit = new GroundStation(topohorizon);
         List<Orbit> iodOrbits = new ArrayList<Orbit>();
+        System.out.println("Number of stripe scans: " + countStripes);
         for (Map.Entry<Integer, List<AngularDirection>> entry : measMap.entrySet()) {
             List<AngularDirection> meas = entry.getValue();
             if(meas.size()<3){
-                System.out.println("Not enough data for " + entry.getKey() + " for IOD.");
+                System.out.println(meas.size() + "are enough data for " + entry.getKey() + " for IOD.");
                 continue;
             } 
             List<AngularAzEl> measOrekit = new ArrayList<AngularAzEl>();
@@ -886,6 +916,7 @@ public class MultiObjectiveMctsTest {
                                               {2.9071094424474166E-8, 4.306014824614407E-6, 6.298597666057694E-9, -8.212503178246334E-10, 1.7482251900748092E-8, -1.9276823004892938E-10},
                                               {7.50553956976887E-9, 6.301496942467037E-9, 4.283086978472644E-6, -2.109541457159083E-10, -1.9276823004892938E-10, 1.818503320357093E-8}};
         RealMatrix covMatrixTdrs05 = (new Array2DRowRealMatrix(covTdrs05)).scalarMultiply(1e6);
+        App.printCovariance(covMatrixTdrs05);
         StateCovariance covEciTdrs05 = new StateCovariance(covMatrixTdrs05, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
 
         double[][] covTdrs06 = new double[][]{{0.009855827555408531, 1.0287018380692445E-7, 3.910267644855593E-8, 4.318775659506618E-6, 3.082546456689512E-8, 7.3708924118463976E-9},
