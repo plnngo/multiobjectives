@@ -309,7 +309,7 @@ public class MultiObjectiveMctsTest {
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, ooi, 
                                    new ArrayList<ObservedObject>(), sensor);
-        List<Node> strategy = mctsTracking.run(root, 5000);
+        List<Node> strategy = mctsTracking.run(root, 55000000);
         
         performIODsearch(strategy, current, fov, topohorizon, initialOoi);
 

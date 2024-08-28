@@ -519,6 +519,9 @@ public class MultiObjectiveMcts {
         }else {
             throw new IllegalAccessError("Unknown objective.");
         }
+        // TODO: Try MCTS handling weight 
+        //postWeights = new double[]{0.5, 0.5};
+
         AbsoluteDate propEpoch = leaf.getEpoch().shiftedBy(executionDuration);
         expandedDecision = new DecisionNode(0., 0, sensorPointing, postWeights, 
                                                     postTimeResources, propEpoch, propEnviroment);  
@@ -607,22 +610,10 @@ public class MultiObjectiveMcts {
                 }
                 double[] lastUtility = new double[2];
                 double totalUtility = 0.;
-               /*  for(int i=0; i<lastUtility.length; i++) {
-                    if(initWeights[i] == 0) {
-                        // objective not selected
-                        lastUtility[i] = 0.;
-                    } else {
-                        // TODO: handle case when left resources is exactly zero
-                        lastUtility[i] = initWeights[i] * obsCampaignDuration / spentResources[i];
-                        totalUtility += lastUtility[i];
-                    }
-                }
-                totalUtility = totalUtility / 1000;
-                leaf.setUtility(totalUtility); */
 
                 for(int i=0; i<lastUtility.length; i++) {
                     spentResources[i] = ((DecisionNode)this.initial).getTimeResources()[i] - ((DecisionNode)leaf).getTimeResources()[i];
-                    lastUtility[i] = (spentResources[i]/timeSpentObserving) - initWeights[i];
+                    lastUtility[i] = FastMath.abs((spentResources[i]/timeSpentObserving) - initWeights[i]);
                     totalUtility += lastUtility[i];
                 }
                 totalUtility = 1 - totalUtility;
@@ -648,22 +639,10 @@ public class MultiObjectiveMcts {
         }
         double[] lastUtility = new double[2];
         double totalUtility = 0.;
-        /* for(int i=0; i<lastUtility.length; i++) {
-            if(initWeights[i] == 0) {
-                // objective not selected
-                lastUtility[i] = 0.;
-            } else {
-                // TODO: handle case when left resources is exactly zero
-                lastUtility[i] = initWeights[i] * obsCampaignDuration / leftResources[i];
-                totalUtility += lastUtility[i];
-            }
-        }
-        totalUtility = totalUtility / 1000;
-        last.setUtility(totalUtility); */
-
+       
         for(int i=0; i<lastUtility.length; i++) {
             spentResources[i] = ((DecisionNode)this.initial).getTimeResources()[i] - lastDecision.getTimeResources()[i];
-            lastUtility[i] = (spentResources[i]/timeSpentObserving) - initWeights[i];
+            lastUtility[i] = FastMath.abs((spentResources[i]/timeSpentObserving) - initWeights[i]);
             totalUtility += lastUtility[i];
         }
         totalUtility = 1 - totalUtility;
