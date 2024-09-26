@@ -238,49 +238,21 @@ public class MultiObjectiveMcts {
         }
         // Reached leaf node but not end of campaign yet --> progressiveWidening()
         widening = progressiveWidening(nextChild);
-        if (!widening) {
-            // already reached end of campaign --> TODO: need to backpropagate and only increment numVisits
+        /* if (!widening) {
+            // already reached end of campaign --> TODO: need to backpropagate
             while(!nextChild.equals(this.initial)) {
                 nextChild.incrementNumVisits();
                 nextChild = nextChild.getParent();
             }
             this.initial.incrementNumVisits();
             return current;
-        }
-        /* children = nextChild.getChildren();
-        // check progressive widening condition
-        if(nextChild.getClass().getSimpleName().equals("DecisionNode")) {
-            boolean expandable = true;
-            while(children.size() <= FastMath.pow(nextChild.getNumVisits(), alpha) && expandable) {
-
-                // allow expansion of new node
-                DecisionNode leaf = expand((DecisionNode) nextChild, false);
-                if (Objects.isNull(leaf)){
-                    // objects not observable 
-                    children = nextChild.getChildren();
-                    expandable = false;
-                    continue;
-
-                } else if (leaf.getEpoch().compareTo(endCampaign) >= 0) {
-                    // already reached end of campaign
-                    return current;
-                }
-                expandable = true;
-                List<Node> simulated = simulate(leaf, endCampaign);
-                if (simulated.size() != 0) {
-                    backpropagate(leaf, simulated.get(simulated.size()-1));
-                } else {
-                    backpropagate(leaf, null);
-                }
-                //children = current.getChildren();
-            } 
-            //return current;
         } */
         return current;
     }
 
     private boolean progressiveWidening(Node current) {
         if(current.getEpoch().compareTo(endCampaign) >= 0) {
+            backpropagate(current, null);
             return false;
         }
         List<Node> children = current.getChildren();
