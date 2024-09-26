@@ -89,7 +89,7 @@ public class MultiObjectiveMcts {
     }
 
   
-    private Stripe computeScanStripe() {
+    public Stripe computeScanStripe() {
 
         Tasking survey = new Tasking(sensor, this.startCampaign, this.endCampaign, this.numExpo);
         Stripe[] stripes = survey.computeScanStripes();
@@ -104,6 +104,8 @@ public class MultiObjectiveMcts {
         List<Node> outputRobustMax = new ArrayList<Node>();
 
         for(int i=0; i<iterations; i++) {
+
+                        
             selectNew(initial);
             // retrieve updated root node
             //System.out.println("Num of visits " + initial.getNumVisits());
@@ -224,7 +226,7 @@ public class MultiObjectiveMcts {
             return current;
         }
 
-        current.incrementNumVisits();
+        //current.incrementNumVisits();
         Node nextChild = current;
         while(nextChild.getChildren().size() != 0) {
             nextChild = selectChildUCB(nextChild);
@@ -232,12 +234,17 @@ public class MultiObjectiveMcts {
                 // no time for further tasks
                 return current;
             }
-            nextChild.incrementNumVisits();
+            //nextChild.incrementNumVisits();
         }
         // Reached leaf node but not end of campaign yet --> progressiveWidening()
         widening = progressiveWidening(nextChild);
         if (!widening) {
-            // already reached end of campaign
+            // already reached end of campaign --> TODO: need to backpropagate and only increment numVisits
+            while(!nextChild.equals(this.initial)) {
+                nextChild.incrementNumVisits();
+                nextChild = nextChild.getParent();
+            }
+            this.initial.incrementNumVisits();
             return current;
         }
         /* children = nextChild.getChildren();
@@ -292,9 +299,10 @@ public class MultiObjectiveMcts {
 
                 } else if (leaf.getEpoch().compareTo(endCampaign) >= 0) {
                     // already reached end of campaign
-                    leaf.getParent().incrementNumVisits();
-                    leaf.incrementNumVisits();
-                    continue;
+                    if (((ChanceNode)leaf.getParent()).getMacro().getClass().getSimpleName().equals("TrackingObjective")) {
+                        leaf.getParent().getParent().clearChildren();
+                        return false;
+                    }
                 }
                 expandable = true;
                 List<Node> simulated = simulate(leaf, endCampaign);
@@ -329,7 +337,8 @@ public class MultiObjectiveMcts {
         // Expand by Chance node first
         // Need to sample a new pair of macro and micro action
         //DecisionNode castedLeaf = (DecisionNode) leaf;
-        double[] weights = leaf.getWeights();
+        //double[] weights = leaf.getWeights();
+        double[] weights = new double[]{0.5, 0.5};
 
         // Generate array filled with indexes representing the objective IDs
         int[] indexObjective = new int[weights.length];
@@ -343,12 +352,13 @@ public class MultiObjectiveMcts {
         switch (indexSelectedObjective) {
             case 0:
                 boolean searchPossible = true;
+                boolean searchAlreadyPerformed = false;
                 // make sure that tree does not get expanded by the same node that already exist among siblings
                 for(Node sibling : leaf.getChildren()) {
                     ChanceNode chance = (ChanceNode)sibling;
                     
                     if (chance.getMacro().getClass().getSimpleName().equals("SearchObjective")) {
-                        searchPossible = false; // Search is already performed by another sibling
+                        searchAlreadyPerformed = true; // Search is already performed by another sibling
                     }
                 }
                 // Time until end of observation campaign
@@ -356,7 +366,13 @@ public class MultiObjectiveMcts {
                 if(leftT < scanStripe.getStripeT(numExpo)){
                     searchPossible = false; // Not enough time to complete search
                 }
-                if(searchPossible) {
+                if(searchPossible && !searchAlreadyPerformed) {
+                    objective = new SearchObjective(stationFrame, scanStripe, numExpo, sensor);
+                    break;
+                } else if(!searchAlreadyPerformed && leaf.getTimeResources()[1] < TrackingObjective.allocation 
+                                                                                    + this.sensor.getSettlingT() 
+                                                                                    + TrackingObjective.preparation 
+                                                                                    + this.sensor.getExposureT()) {
                     objective = new SearchObjective(stationFrame, scanStripe, numExpo, sensor);
                     break;
                 } else {
@@ -403,32 +419,33 @@ public class MultiObjectiveMcts {
                 }
 
                 if (ooi.size()==0) {
-                    // No candidate to track
-                    return null;
+                    // No candidate to track but try search
+                    indexSelectedObjective = 2;
+                } else {
+                    objective = new TrackingObjective(ooi, stationFrame, topoInertial, sensor);
+                    break;
                 }
-                objective = new TrackingObjective(ooi, stationFrame, topoInertial, sensor);
-                /* // Need to propagate the environment under the selected macro/micro action pair
-                propEnviroment = objective.propagateOutcome();  
-
-                // Add object that was not considered for tracking back to propEnvironment
-                for(int parent=0; parent<leaf.getPropEnvironment().size(); parent++) {
-                    long idParent = leaf.getPropEnvironment().get(parent).getId();
-                    boolean found = false;
-                    for(int child=0; child<propEnviroment.size(); child++) {
-                        if (idParent == propEnviroment.get(child).getId()) {
-                            found = true;
-                        }
+            case 2:
+                searchPossible = true;
+                // make sure that tree does not get expanded by the same node that already exist among siblings
+                for(Node sibling : leaf.getChildren()) {
+                    ChanceNode chance = (ChanceNode)sibling;
+                    
+                    if (chance.getMacro().getClass().getSimpleName().equals("SearchObjective")) {
+                        searchPossible = false; // Search is already performed by another sibling
                     }
-                    if(!found) {
-                        ObservedObject notTargeted = 
-                            new ObservedObject(idParent, leaf.getPropEnvironment().get(parent).getState(),
-                                            leaf.getPropEnvironment().get(parent).getCovariance(), 
-                                            leaf.getPropEnvironment().get(parent).getEpoch(), 
-                                            leaf.getPropEnvironment().get(parent).getFrame());
-                        propEnviroment.add(notTargeted);
-                    }
+                }
+                // Time until end of observation campaign
+                /* leftT = this.endCampaign.durationFrom(leaf.getEpoch());
+                if(leftT < scanStripe.getStripeT(numExpo)){
+                    searchPossible = false; // Not enough time to complete search
                 } */
-                break;
+                if(searchPossible) {
+                    objective = new SearchObjective(stationFrame, scanStripe, numExpo, sensor);
+                    break;
+                } else {
+                    return null; // Tasking not possible
+                }
 
             default:
                 throw new IllegalAccessError("Unknown objective.");
@@ -520,7 +537,7 @@ public class MultiObjectiveMcts {
             throw new IllegalAccessError("Unknown objective.");
         }
         // TODO: Try MCTS handling weight 
-        //postWeights = new double[]{0.5, 0.5};
+        postWeights = new double[]{0.5, 0.5};
 
         AbsoluteDate propEpoch = leaf.getEpoch().shiftedBy(executionDuration);
         expandedDecision = new DecisionNode(0., 0, sensorPointing, postWeights, 
@@ -545,39 +562,32 @@ public class MultiObjectiveMcts {
      */
     public List<Node> simulate(DecisionNode leaf, AbsoluteDate campaignEndDate) {
 
-/*         if(((ChanceNode)leaf.getParent()).getMacro().getClass().getSimpleName()
-                                         .equals("SearchObjective")) {
-            return new ArrayList<Node>();
-        } */
-        //System.out.println("Simulation phase:");
         List<ObservedObject> restore = leaf.getPropEnvironment();
         // Declare output
         List<Node> episode = new ArrayList<Node>(); // TODO: not necessary to store in an array because node holds all the descendants
-        episode.add(leaf);
+        //episode.add(leaf);
 
         DecisionNode current = leaf;
-/*         double measDuration = TrackingObjective.allocation 
-                                + this.sensor.getSettlingT() 
-                                + TrackingObjective.preparation 
-                                + this.sensor.getExposureT()
-                                + this.sensor.getReadoutT(); */
-        /* ChanceNode parentLeaf = ((ChanceNode)leaf.getParent());
-        double measDuration = parentLeaf.getExecutionDuration()[1]
-                                        .durationFrom(parentLeaf.getExecutionDuration()[0]);
-        AbsoluteDate currentEndMeasEpoch = current.getEpoch().shiftedBy(measDuration); */
-
         AbsoluteDate currentEndMeasEpoch = current.getEpoch();
 
         while(currentEndMeasEpoch.compareTo(campaignEndDate) <= 0) {
+            episode.add(current.getParent());
+            episode.add(current);
             current = expand(current, true); 
             if (Objects.isNull(current)) {
                 return episode;
             }         
+            currentEndMeasEpoch = current.getEpoch();
+        }
+
+/*         // If simulated leaf node is a searching objectiv, then it can be still added to the output
+        if (((ChanceNode)current.getParent()).getMacro().getClass().getSimpleName().equals("SearchObjective")) {
             episode.add(current.getParent());
             episode.add(current);
-            AbsoluteDate[] taskT = ((ChanceNode)current.getParent()).getExecutionDuration();
-            double measDuration = taskT[1].durationFrom(taskT[0]);
-            currentEndMeasEpoch = current.getEpoch().shiftedBy(measDuration);
+        } */
+       
+        if(episode.size()>0) {
+            episode.remove(0);
         }
         leaf.clearChildren();  
         leaf.setPropEnvironment(restore);     
@@ -594,42 +604,32 @@ public class MultiObjectiveMcts {
      */
     public Node backpropagate(Node leaf, Node last) {
 
+        DecisionNode lastDecision;
+        ChanceNode lastChance;
+        Node parent;
         if (Objects.isNull(last)) {
-            // no simulation was performed
-
-            if (!leaf.equals(this.initial)) {
-
-                // In case leaf is initial node
-                leaf.incrementNumVisits();
-                double[] spentResources = new double[((DecisionNode)leaf).getTimeResources().length];
-                double[] initWeights = ((DecisionNode)this.initial).getWeights();
-                double obsCampaignDuration = endCampaign.durationFrom(startCampaign);
-                double timeSpentObserving = obsCampaignDuration;
-                for(int i=0; i<((DecisionNode)leaf).getTimeResources().length; i++) {
-                    timeSpentObserving -= ((DecisionNode)leaf).getTimeResources()[i];
-                }
-                double[] lastUtility = new double[2];
-                double totalUtility = 0.;
-
-                for(int i=0; i<lastUtility.length; i++) {
-                    spentResources[i] = ((DecisionNode)this.initial).getTimeResources()[i] - ((DecisionNode)leaf).getTimeResources()[i];
-                    lastUtility[i] = FastMath.abs((spentResources[i]/timeSpentObserving) - initWeights[i]);
-                    totalUtility += lastUtility[i];
-                }
-                totalUtility = 1 - totalUtility;
-                leaf.setUtility(totalUtility);
-            }
-            
-
-            DecisionNode leafDecision = (DecisionNode) leaf;
-            last = new DecisionNode(leaf.getUtility(), leaf.getNumVisits(), 
-                                    ((ChanceNode)leaf.getParent()).getMicro(), 
-                                    leafDecision.getWeights(), leafDecision.getTimeResources(), 
-                                    leaf.getEpoch(), new ArrayList<ObservedObject>()); // TODO: fill propEnvironment with IOD results of detections
-            leaf = leaf.getParent();
+            //No simulation was performed
+            DecisionNode fakeRoot = 
+                new DecisionNode(0., 0, null, null, 
+                                 ((DecisionNode)leaf.getParent().getParent()).getTimeResources(), 
+                                 leaf.getParent().getParent().getEpoch(), null);
+            lastChance = 
+                new ChanceNode(((ChanceNode)leaf.getParent()).getExecutionDuration(), leaf.getParent().getUtility(), 
+                                leaf.getParent().getNumVisits(), ((ChanceNode)leaf.getParent()).getMacro(), 
+                                ((ChanceNode)leaf.getParent()).getMicro(), fakeRoot);
+            lastDecision = 
+                new DecisionNode(leaf.getUtility(), leaf.getNumVisits(), ((DecisionNode)leaf).getSensorPointing(), 
+                                ((DecisionNode)leaf).getWeights(), ((DecisionNode)leaf).getTimeResources(), 
+                                leaf.getEpoch(), ((DecisionNode)leaf).getPropEnvironment());
+            Node.setParent(lastDecision, lastChance);
+            parent = leaf;
+            //leaf = leaf.getParent();
+        } else {
+            lastDecision = (DecisionNode) last;
+            parent = lastDecision;
         }
         // Compute utility value of last node
-        DecisionNode lastDecision = (DecisionNode) last;
+        
         double[] spentResources = new double[lastDecision.getTimeResources().length];
         double[] initWeights = ((DecisionNode)this.initial).getWeights();
         double obsCampaignDuration = endCampaign.durationFrom(startCampaign);
@@ -639,24 +639,50 @@ public class MultiObjectiveMcts {
         }
         double[] lastUtility = new double[2];
         double totalUtility = 0.;
+
+        if(timeSpentObserving>obsCampaignDuration) {
+            timeSpentObserving = obsCampaignDuration;
+        }
        
+        // How much time has been spent on each objective up until end of observation campaign
+        while(parent.getEpoch().durationFrom(endCampaign) > 0.) {
+            parent = parent.getParent();
+        }
+        DecisionNode grandParent;
+        double untilEnd = 0.;
+        if(parent.getParent().getClass().getSimpleName().equals("ChanceNode")) {
+            System.out.println("Error occurs here");
+            grandParent = (DecisionNode) parent;
+        } else {
+            grandParent = (DecisionNode) parent.getParent();
+            
+            if(((ChanceNode) parent).getMacro().getClass().getSimpleName().equals("SearchObjective")){
+                untilEnd = endCampaign.durationFrom(parent.getEpoch());
+            }
+        }
+        
         for(int i=0; i<lastUtility.length; i++) {
-            spentResources[i] = ((DecisionNode)this.initial).getTimeResources()[i] - lastDecision.getTimeResources()[i];
+                   
+            spentResources[i] = ((DecisionNode)this.initial).getTimeResources()[i] - grandParent.getTimeResources()[i];
+            if(i==0) {
+                spentResources[i] += untilEnd;
+            }
+
             lastUtility[i] = FastMath.abs((spentResources[i]/timeSpentObserving) - initWeights[i]);
             totalUtility += lastUtility[i];
         }
         totalUtility = 1 - totalUtility;
-        last.setUtility(totalUtility);
+        lastDecision.setUtility(totalUtility);
 
         if (!leaf.equals(this.initial)) {
             leaf.incrementNumVisits();
-            double updatedUtility = leaf.getUtility() + last.getUtility();
+            double updatedUtility = leaf.getUtility() + lastDecision.getUtility();
             leaf.setUtility(updatedUtility); 
-            return backpropagate(leaf.getParent(), last);
+            return backpropagate(leaf.getParent(), lastDecision);
         } else {
             // Update root too
             this.initial.incrementNumVisits();
-            double updatedUtility = this.initial.getUtility() + last.getUtility();
+            double updatedUtility = this.initial.getUtility() + lastDecision.getUtility();
             this.initial.setUtility(updatedUtility);
             return this.initial;
         }

@@ -53,14 +53,12 @@ public class Stripe {
      * @param j                     = 0 for fixed stripes, otherwise an integer number of stripe 
      *                              duration that defines the position of re-obs stripes.
      */
-    public Stripe(int numDecFields, Frame frame, Sensor sensor, /*Fov fov,*/ 
+    public Stripe(int numDecFields, Frame frame, Sensor sensor,  
                   AngularDirection firstPosField, StripeType functionality, int j) {
 
-        //this.fixRa = ra;
         this.numDecFields = numDecFields;
         this.frame = frame;
         this.sensor = sensor;
-        //this.fov = fov;
         this.firstPosField = firstPosField;
 
         if (StripeType.FIXED.equals(functionality)) {

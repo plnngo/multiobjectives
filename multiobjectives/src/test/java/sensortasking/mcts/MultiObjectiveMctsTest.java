@@ -246,6 +246,77 @@ public class MultiObjectiveMctsTest {
     } */
 
     @Test
+    public void testUtilityPerformance() {
+      
+        // Epoch
+        AbsoluteDate current = (new AbsoluteDate(2024, 8, 2, 3, 24, 0., TimeScalesFactory.getUTC())).shiftedBy(4000.);
+        AbsoluteDate endCampaign = current.shiftedBy(10.* 60.);
+
+        // Frame
+        Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+        Frame j2000 = FramesFactory.getEME2000();
+
+        // Ground station
+        GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(6.),   // Geodetic latitude
+                                              FastMath.toRadians(-37.),   // Longitude
+                                              0.);              // in [m]
+        double readout = 7.;
+        double exposure = 8.;
+        double settling = 10.;
+        double cutOff = FastMath.toRadians(5.);
+        Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
+        double slewVel = FastMath.toRadians(1.)/1.;     // 1 deg per second
+        Sensor sensor = new Sensor("TDRS Station", fov, pos, exposure, readout, slewVel, settling, cutOff);
+
+        // Model Earth
+        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                               Constants.WGS84_EARTH_FLATTENING,
+                                               ecef);
+        TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "TDRS Station");
+        Transform horizonToEci = topohorizon.getTransformTo(j2000, current);  // date has to be the measurement epoch
+        Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
+        Transform eciToTopo = new Transform(current, coordinatesStationEci.negate());
+        Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
+
+        // Retrieve object of interest that shall be tracked
+        List<ObservedObject> ooiAll = setListOOI(current);
+        List<ObservedObject> ooi = new ArrayList<ObservedObject>();
+        ooi.add(ooiAll.get(0));
+
+        // Initialise root node
+        List<String> objectives = new ArrayList<String>(Arrays.asList("SEARCH", "TRACK"));
+        double initUtility = 1.;
+        int numVisits = 1;
+        AngularDirection initPointing = 
+            new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
+        double[] initWeights = new double[]{1.0, 0.0};
+        double[] initTimeResources = 
+            new double[]{initWeights[0] * endCampaign.durationFrom(current), 
+                         initWeights[1] * endCampaign.durationFrom(current)};
+        Node root = new DecisionNode(initUtility, numVisits, initPointing, initWeights, 
+                                     initTimeResources, current, ooi);
+        MultiObjectiveMcts mctsTracking = 
+            new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, ooi, 
+                                   new ArrayList<ObservedObject>(), sensor);
+        List<Node> strategy = mctsTracking.run(root, 10);
+        for(Node selected : strategy) {
+            if(selected.getClass().getSimpleName().equals("ChanceNode")) {
+
+                //System.out.println("Next node");
+                ChanceNode chance = (ChanceNode)selected;
+                
+                if (chance.getMacro().getClass().getSimpleName().equals("SearchObjective")) {
+                    System.out.println("Search from " + chance.getExecutionDuration()[0] + " to " + chance.getExecutionDuration()[1]);
+                } else {
+                    System.out.println("Track from " + chance.getExecutionDuration()[0] + " to " + chance.getExecutionDuration()[1]);
+                }
+            }
+        }
+        double timeLeftSearch = ((DecisionNode)strategy.get(strategy.size()-1)).getTimeResources()[0];
+        double timeLeftTrack = ((DecisionNode)strategy.get(strategy.size()-1)).getTimeResources()[1];
+        System.out.println("Time left search: " + timeLeftSearch + " and time left track: " + timeLeftTrack);
+    }
+    @Test
     public void testMctsSearchAndTrackAsMC() {
         long start1 = System.nanoTime();
       
@@ -253,7 +324,7 @@ public class MultiObjectiveMctsTest {
         //AbsoluteDate current = (new AbsoluteDate(2024, 8, 2, 3, 24, 0., TimeScalesFactory.getUTC())).shiftedBy(4000.);
         AbsoluteDate current = new AbsoluteDate(2024, 8, 2, 3, 24, 0., TimeScalesFactory.getUTC());
 
-        AbsoluteDate endCampaign = current.shiftedBy(60.* 60. * 7);
+        AbsoluteDate endCampaign = current.shiftedBy(60.* 60. * 2);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -309,7 +380,7 @@ public class MultiObjectiveMctsTest {
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, ooi, 
                                    new ArrayList<ObservedObject>(), sensor);
-        List<Node> strategy = mctsTracking.run(root, 55000000);
+        List<Node> strategy = mctsTracking.run(root, 70000000);
         
         performIODsearch(strategy, current, fov, topohorizon, initialOoi);
 
