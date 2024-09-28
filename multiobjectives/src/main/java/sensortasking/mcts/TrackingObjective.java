@@ -70,9 +70,6 @@ import sensortasking.stripescanning.Tasking;
 @Getter
 public class TrackingObjective implements Objective{
 
-    /** List of targets of interests with their initial condition. */
-    List<ObservedObject> initTargets = new ArrayList<ObservedObject>();
-
     /** List of targets of interest with latest state update. */
     List<ObservedObject> updatedTargets = new ArrayList<ObservedObject>();
 
@@ -84,9 +81,6 @@ public class TrackingObjective implements Objective{
 
     /** Coordinated Universal Time.  */
     final TimeScale utc = TimeScalesFactory.getUTC();
-
-    /** Updated field of regard passes. */
-    //List<LoggedEvent> loggedFORpasses = new ArrayList<LoggedEvent>();
 
     /** Maximal propagation duration in [sec] to check if satellite is entering field of regard. */
     final double maxPropDuration = 100.;
@@ -124,8 +118,6 @@ public class TrackingObjective implements Objective{
 
     private double sensorApartureRadius;
 
-    //final public double MU = Constants.WGS84_EARTH_MU;
-
     TopocentricFrame stationHorizon;
 
     Frame topoInertial;
@@ -138,7 +130,6 @@ public class TrackingObjective implements Objective{
 
         // Initialise list of targets
         for (ObservedObject target : targets) {
-            initTargets.add(target);
             updatedTargets.add(target);
         }
 
@@ -434,7 +425,7 @@ public class TrackingObjective implements Objective{
         return new AbstractMap.SimpleEntry<>(s, covProp);
     }
 
-    private double computeInformationGain(ObservedObject prior, ObservedObject posterior) {
+    protected static double computeInformationGain(ObservedObject prior, ObservedObject posterior) {
         //return computeJensenShannonDivergence(prior, posterior);
         return computeKullbackLeiblerDivergence(prior, posterior);
     }

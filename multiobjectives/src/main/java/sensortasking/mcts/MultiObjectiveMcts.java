@@ -98,19 +98,17 @@ public class MultiObjectiveMcts {
         return stripes[1];
     }
 
-    public List<Node> run(Node initial, int iterations) {
+    public List<Node> run(int iterations) {
 
-        List<Node> outputUCB = new ArrayList<Node>();
+        //List<Node> outputUCB = new ArrayList<Node>();
         List<Node> outputRobustMax = new ArrayList<Node>();
 
         for(int i=0; i<iterations; i++) {
 
                         
-            selectNew(initial);
-            // retrieve updated root node
-            //System.out.println("Num of visits " + initial.getNumVisits());
+            selectNew(this.initial);
 
-            // Retrieve pointing strategy UCB
+            /* // Retrieve pointing strategy UCB
             Node current = initial;
             //initial.incrementNumVisits();
             outputUCB.add(initial);
@@ -120,10 +118,10 @@ public class MultiObjectiveMcts {
                 outputUCB.add(current);
 /*                 if (!Objects.isNull(current)){
                     current.incrementNumVisits();
-                } */
+                } 
             }
 
-            outputUCB = new ArrayList<Node>();
+            outputUCB = new ArrayList<Node>(); */
         }
 
         // Retrieve pointing strategy UCB
@@ -234,19 +232,9 @@ public class MultiObjectiveMcts {
                 // no time for further tasks
                 return current;
             }
-            //nextChild.incrementNumVisits();
         }
         // Reached leaf node but not end of campaign yet --> progressiveWidening()
         widening = progressiveWidening(nextChild);
-        /* if (!widening) {
-            // already reached end of campaign --> TODO: need to backpropagate
-            while(!nextChild.equals(this.initial)) {
-                nextChild.incrementNumVisits();
-                nextChild = nextChild.getParent();
-            }
-            this.initial.incrementNumVisits();
-            return current;
-        } */
         return current;
     }
 
@@ -308,8 +296,6 @@ public class MultiObjectiveMcts {
         
         // Expand by Chance node first
         // Need to sample a new pair of macro and micro action
-        //DecisionNode castedLeaf = (DecisionNode) leaf;
-        //double[] weights = leaf.getWeights();
         double[] weights = new double[]{0.5, 0.5};
 
         // Generate array filled with indexes representing the objective IDs
@@ -595,12 +581,12 @@ public class MultiObjectiveMcts {
                                 leaf.getEpoch(), ((DecisionNode)leaf).getPropEnvironment());
             Node.setParent(lastDecision, lastChance);
             parent = leaf;
-            //leaf = leaf.getParent();
         } else {
             lastDecision = (DecisionNode) last;
             parent = lastDecision;
         }
         // Compute utility value of last node
+        double[] utilityVec = computeUtilityVector(lastDecision);
         
         double[] spentResources = new double[lastDecision.getTimeResources().length];
         double[] initWeights = ((DecisionNode)this.initial).getWeights();
@@ -659,6 +645,24 @@ public class MultiObjectiveMcts {
             return this.initial;
         }
     }
+
+    private double[] computeUtilityVector(DecisionNode last) {
+        List<ObservedObject> targetsBefore = ((DecisionNode)this.initial).getPropEnvironment();
+        double trackingReward = 0;
+
+        for(int i=0; i<targetsBefore.size(); i++){
+            for(ObservedObject obj : last.getPropEnvironment()){
+                if(targetsBefore.get(i).getId() == obj.getId()) {
+                    trackingReward += TrackingObjective
+                                        .computeInformationGain(targetsBefore.get(i), obj);
+                    break;
+                }
+            }
+        }
+        
+        return null;
+    }
+
 
     /**
      * Given the {@code current} node, the next child is selected based on the Upper 
