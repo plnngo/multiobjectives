@@ -2,7 +2,6 @@ package sensortasking.mcts;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 import org.orekit.time.AbsoluteDate;
 
@@ -22,6 +21,15 @@ public class DecisionNode extends Node{
     /** Propoagated environment under the influence of the last tracking action. */
     PropoagatedEnvironment environment;
 
+    /** User-defined weights of searching tasks. First entry stripe scan, second bullseye scan. */
+    protected double[] weightsSearch = new double[]{1., 0.};
+
+    /** Search discrepancy vectors of all existing leaf nodes */
+    List<double[]> searchDiscrepancyVec = new ArrayList<double[]>();
+
+    /** Node ID counter. */
+    protected long idCounter = 1;
+
 
     public DecisionNode(double utility, int numVisits, AngularDirection pointing, double[] weights,
                         double[] timeResources, AbsoluteDate epoch, PropoagatedEnvironment environment) {
@@ -35,6 +43,24 @@ public class DecisionNode extends Node{
         super.setEpoch(epoch);
     }
 
+    public DecisionNode setWeightsSearchingTask(double[] weights) {
+        this.weightsSearch = weights;
+        return this;
+    }
+
+    public long incrementIdCounter() {
+        this.idCounter++;
+        return this.idCounter;
+    }
+
+    public double[] getWeightsSearch() {
+        return this.weightsSearch;
+    }
+
+    public List<double[]> addSearchDiscrepancyVec() {
+        return null;
+    }
+
     public AngularDirection getSensorPointing() {
         return this.sensorPointing;
     }
@@ -42,10 +68,6 @@ public class DecisionNode extends Node{
     public PropoagatedEnvironment getEnvironment() {
         return this.environment;
     }
-
-/*     public void setPropTrackingTargets(List<ObservedObject> environment) {
-        this.environment.setStateTracking(environment);
-    } */
 
     public double[] getWeights() {
         return this.weights;

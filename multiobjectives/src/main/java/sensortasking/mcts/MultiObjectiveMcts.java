@@ -25,7 +25,7 @@ public class MultiObjectiveMcts {
     //TreeStructure descisionTree;
 
     /** Root node. */
-    Node initial;
+    DecisionNode initial;
 
     /** Objectives. */
     static List<String> objectives = new ArrayList<String>(Arrays.asList("SEARCH", "TRACK"));
@@ -75,7 +75,7 @@ public class MultiObjectiveMcts {
                               List<ObservedObject> trackedObjects, List<ObservedObject> detectedObjects,
                               Sensor sensor) {
 
-        this.initial = descisionTree;
+        this.initial = (DecisionNode) descisionTree;
         MultiObjectiveMcts.objectives = objectives;
         this.startCampaign = start;
         this.endCampaign = end;
@@ -423,7 +423,7 @@ public class MultiObjectiveMcts {
         }
         expandedChance = new ChanceNode(objective.getExecusionDuration(leaf.getEpoch()), 
                                         0., 0, objective, pointing, leaf);   
-        expandedChance.setId(leaf.getId()+leaf.getChildren().size());
+        expandedChance.setId(this.initial.incrementIdCounter());
       
 
         // Update 
@@ -551,7 +551,7 @@ public class MultiObjectiveMcts {
         }
 
         expandedChance.setChild(expandedDecision); 
-        expandedDecision.setId(expandedChance.getId()+expandedChance.getChildren().size());
+        expandedDecision.setId(this.initial.incrementIdCounter());
                  
         return expandedDecision;
     }
@@ -584,13 +584,7 @@ public class MultiObjectiveMcts {
             }         
             currentEndMeasEpoch = current.getEpoch();
         }
-
-/*         // If simulated leaf node is a searching objectiv, then it can be still added to the output
-        if (((ChanceNode)current.getParent()).getMacro().getClass().getSimpleName().equals("SearchObjective")) {
-            episode.add(current.getParent());
-            episode.add(current);
-        } */
-       
+      
         if(episode.size()>0) {
             episode.remove(0);
         }
@@ -694,9 +688,11 @@ public class MultiObjectiveMcts {
     }
 
     private double[] computeUtilityVector(DecisionNode last) {
+
+        // Compute tracking reward
         List<ObservedObject> targetsBefore = ((DecisionNode)this.initial).getEnvironment().getStateTracking();
         double trackingReward = 0;
-
+        
         for(int i=0; i<targetsBefore.size(); i++){
             for(ObservedObject obj : last.getEnvironment().getStateTracking()){
                 if(targetsBefore.get(i).getId() == obj.getId()) {
@@ -706,6 +702,24 @@ public class MultiObjectiveMcts {
                 }
             }
         }
+
+        // Compute searching reward
+        double[] weightsSearch = this.initial.getWeightsSearch();
+        List<Integer> completedSearchTasks = last.getEnvironment().getStateSearching();
+        int numTotalSearchTaskCompleted = 0;
+        for(int i=0; i<completedSearchTasks.size(); i++) {
+            numTotalSearchTaskCompleted += completedSearchTasks.get(i);
+        }
+        
+        // Compute discrepance 
+        double[] discrepance = new double[2];
+        for(int i=0; i<completedSearchTasks.size(); i++){
+            discrepance[i] = 
+                FastMath.abs(((double)completedSearchTasks.get(i)/numTotalSearchTaskCompleted) 
+                                - weightsSearch[i]);
+        }
+
+
         
         return null;
     }

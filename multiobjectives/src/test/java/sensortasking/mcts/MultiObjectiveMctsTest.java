@@ -390,7 +390,8 @@ public class MultiObjectiveMctsTest {
             new double[]{initWeights[0] * endCampaign.durationFrom(current), 
                          initWeights[1] * endCampaign.durationFrom(current)};
         Node root = new DecisionNode(initUtility, numVisits, initPointing, initWeights, 
-                                     initTimeResources, current, enviro);
+                                     initTimeResources, current, enviro)
+                        .setWeightsSearchingTask(new double[]{1.0, 0.});
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, ooi, 
                                    new ArrayList<ObservedObject>(), sensor);
