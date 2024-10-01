@@ -49,10 +49,10 @@ public class MultiObjectiveMcts {
     final static double alpha = 0.3;
 
     /** List of objects of interest to be tracked. */
-    final List<ObservedObject> trackedObjects;
+    //final List<ObservedObject> trackedObjects;
 
     /** List of objects that have been detected.*/
-    List<ObservedObject> detectedObjects = new ArrayList<ObservedObject>();
+    //List<ObservedObject> detectedObjects = new ArrayList<ObservedObject>();
 
     /** Stripe for searching objective. */
     final Stripe scanStripe; 
@@ -80,8 +80,8 @@ public class MultiObjectiveMcts {
         this.startCampaign = start;
         this.endCampaign = end;
         this.stationFrame = stationFrame;
-        this.trackedObjects = trackedObjects;
-        this.detectedObjects = detectedObjects;
+/*         this.trackedObjects = trackedObjects;
+        this.detectedObjects = detectedObjects; */
         this.sensor = sensor;
 
         //this.scanStripe = null;
@@ -324,14 +324,19 @@ public class MultiObjectiveMcts {
                 if(leftT < scanStripe.getStripeT(numExpo)){
                     searchPossible = false; // Not enough time to complete search
                 }
+                List<Integer> completedSearchTasks = leaf.getEnvironment().getStateSearching();
+
+                // Increment stripe scan tasks by one
+                completedSearchTasks.set(0, completedSearchTasks.get(0) + 1);   
                 if(searchPossible && !searchAlreadyPerformed) {
-                    objective = new SearchObjective(stationFrame, scanStripe, numExpo, sensor);
+                    objective = new SearchObjective(completedSearchTasks, stationFrame, 
+                                                    scanStripe, numExpo, sensor);
                     break;
                 } else if(!searchAlreadyPerformed && leaf.getTimeResources()[1] < TrackingObjective.allocation 
                                                                                     + this.sensor.getSettlingT() 
                                                                                     + TrackingObjective.preparation 
                                                                                     + this.sensor.getExposureT()) {
-                    objective = new SearchObjective(stationFrame, scanStripe, numExpo, sensor);
+                    objective = new SearchObjective(completedSearchTasks, stationFrame, scanStripe, numExpo, sensor);
                     break;
                 } else {
                     indexSelectedObjective = 1;
@@ -353,10 +358,10 @@ public class MultiObjectiveMcts {
 
                 // make sure that tree does not get expanded by the same node that already exist among siblings
                 DecisionNode current = leaf;
-                while(current.getPropEnvironment().size()==0) {
+                while(current.getEnvironment().getStateTracking().size()==0) {
                     current = ((DecisionNode)current.getParent().getParent());
                 }
-                List<ObservedObject> ooi = new ArrayList<>(current.getPropEnvironment());
+                List<ObservedObject> ooi = new ArrayList<>(current.getEnvironment().getStateTracking());
                 for(Node sibling : leaf.getChildren()) {
                     ChanceNode chance = (ChanceNode)sibling;
                     if (chance.getMacro().getClass().getSimpleName().equals("TrackingObjective")) {
@@ -393,13 +398,12 @@ public class MultiObjectiveMcts {
                         searchPossible = false; // Search is already performed by another sibling
                     }
                 }
-                // Time until end of observation campaign
-                /* leftT = this.endCampaign.durationFrom(leaf.getEpoch());
-                if(leftT < scanStripe.getStripeT(numExpo)){
-                    searchPossible = false; // Not enough time to complete search
-                } */
                 if(searchPossible) {
-                    objective = new SearchObjective(stationFrame, scanStripe, numExpo, sensor);
+                    completedSearchTasks = leaf.getEnvironment().getStateSearching();
+
+                    // Increment stripe scan tasks by one
+                    completedSearchTasks.set(0, completedSearchTasks.get(0) + 1);   
+                    objective = new SearchObjective(completedSearchTasks, stationFrame, scanStripe, numExpo, sensor);
                     break;
                 } else {
                     return null; // Tasking not possible
@@ -409,10 +413,10 @@ public class MultiObjectiveMcts {
                 throw new IllegalAccessError("Unknown objective.");
         }
 
-        List<ObservedObject> restore = leaf.getPropEnvironment();
+        List<ObservedObject> restore = leaf.getEnvironment().getStateTracking();
         AngularDirection pointing = 
             objective.setMicroAction(leaf.getEpoch(), leaf.getSensorPointing());
-        leaf.setPropEnvironment(restore);
+        leaf.getEnvironment().setStateTracking(restore);
         if (Objects.isNull(pointing)) {
             // none of the considered targets was observable --> no expansion possible
             return null;
@@ -420,32 +424,7 @@ public class MultiObjectiveMcts {
         expandedChance = new ChanceNode(objective.getExecusionDuration(leaf.getEpoch()), 
                                         0., 0, objective, pointing, leaf);   
         expandedChance.setId(leaf.getId()+leaf.getChildren().size());
-        //selected.add(toBeAdded);
-
-        // Expand by Decision node too
-        // Need to propagate the environment under the selected macro/micro action pair
-        List<ObservedObject> propEnviroment = objective.propagateOutcome();  
-        if (!Objects.isNull(propEnviroment)) {
-            // tracking objective has been selected
-            // Add object that was not considered for tracking back to propEnvironment
-            for(int parent=0; parent<leaf.getPropEnvironment().size(); parent++) {
-                long idParent = leaf.getPropEnvironment().get(parent).getId();
-                boolean found = false;
-                for(int child=0; child<propEnviroment.size(); child++) {
-                    if (idParent == propEnviroment.get(child).getId()) {
-                        found = true;
-                    }
-                }
-                if(!found) {
-                    ObservedObject notTargeted = 
-                        new ObservedObject(idParent, leaf.getPropEnvironment().get(parent).getState(),
-                                        leaf.getPropEnvironment().get(parent).getCovariance(), 
-                                        leaf.getPropEnvironment().get(parent).getEpoch(), 
-                                        leaf.getPropEnvironment().get(parent).getFrame());
-                    propEnviroment.add(notTargeted);
-                }
-            }
-        }
+      
 
         // Update 
         //DecisionNode grandparent = (DecisionNode) leaf.getParent();
@@ -498,14 +477,82 @@ public class MultiObjectiveMcts {
         postWeights = new double[]{0.5, 0.5};
 
         AbsoluteDate propEpoch = leaf.getEpoch().shiftedBy(executionDuration);
-        expandedDecision = new DecisionNode(0., 0, sensorPointing, postWeights, 
-                                                    postTimeResources, propEpoch, propEnviroment);  
+
+        // Need to propagate the environment under the selected macro/micro action pair
+        /* List<Object> propEnviroment = objective.propagateOutcome();  
+        if (propEnviroment.get(0) instanceof ObservedObject) {
+            // tracking objective has been selected
+            // Add object that was not considered for tracking back to propEnvironment
+            for(int parent=0; parent<leaf.getEnvironment().getStateTracking().size(); parent++) {
+                long idParent = leaf.getEnvironment().getStateTracking().get(parent).getId();
+                boolean found = false;
+                for(int child=0; child<propEnviroment.size(); child++) {
+                    if (idParent == ((ObservedObject)propEnviroment.get(child))
+                                                                   .getId()) {
+                        found = true;
+                    }
+                }
+                if(!found) {
+                    ObservedObject notTargeted = 
+                        new ObservedObject(idParent, leaf.getEnvironment().getStateTracking().get(parent).getState(),
+                                        leaf.getEnvironment().getStateTracking().get(parent).getCovariance(), 
+                                        leaf.getEnvironment().getStateTracking().get(parent).getEpoch(), 
+                                        leaf.getEnvironment().getStateTracking().get(parent).getFrame());
+                    propEnviroment.add(notTargeted);
+                }
+            }
+        } else if(propEnviroment.get(0) instanceof Integer) {
+            // searching objective has been selected
+            // for now, only stripe scan is performed TODO: implement bullseye
+            propEnviroment.set(0, (Integer)propEnviroment.get(0) + 1);
+
+        } else {
+            // other objective was selected
+        } */
+
+        if(objective instanceof TrackingObjective) {
+            List<ObservedObject> propEnviroment = objective.propagateOutcome();
+            for(int parent=0; parent<leaf.getEnvironment().getStateTracking().size(); parent++) {
+                long idParent = leaf.getEnvironment().getStateTracking().get(parent).getId();
+                boolean found = false;
+                for(int child=0; child<propEnviroment.size(); child++) {
+                    if (idParent == ((ObservedObject)propEnviroment.get(child))
+                                                                   .getId()) {
+                        found = true;
+                    }
+                }
+                if(!found) {
+                    ObservedObject notTargeted = 
+                        new ObservedObject(idParent, leaf.getEnvironment().getStateTracking().get(parent).getState(),
+                                        leaf.getEnvironment().getStateTracking().get(parent).getCovariance(), 
+                                        leaf.getEnvironment().getStateTracking().get(parent).getEpoch(), 
+                                        leaf.getEnvironment().getStateTracking().get(parent).getFrame());
+                    propEnviroment.add(notTargeted);
+                }
+            }
+            PropoagatedEnvironment environment = 
+                new PropoagatedEnvironment(propEnviroment, 
+                                           leaf.getEnvironment().stateSearching);
+            expandedDecision = new DecisionNode(0., 0, sensorPointing, postWeights, 
+                                                postTimeResources, propEpoch, environment);  
+        } else if (objective instanceof SearchObjective) {
+            // searching objective has been selected
+            // for now, only stripe scan is performed TODO: implement bullseye
+            List<Integer> propEnviroment = objective.propagateOutcome();
+            propEnviroment.set(0, (Integer)propEnviroment.get(0) + 1);
+            PropoagatedEnvironment environment = 
+                new PropoagatedEnvironment(leaf.getEnvironment().getStateTracking(), 
+                                           propEnviroment);
+            expandedDecision = new DecisionNode(0., 0, sensorPointing, postWeights, 
+                                                postTimeResources, propEpoch, environment);
+
+        } else {
+            // other objective was selected
+        }
+
         expandedChance.setChild(expandedDecision); 
         expandedDecision.setId(expandedChance.getId()+expandedChance.getChildren().size());
-         
-        
-        //selected.add(toBeAdded);
-        
+                 
         return expandedDecision;
     }
 
@@ -520,7 +567,7 @@ public class MultiObjectiveMcts {
      */
     public List<Node> simulate(DecisionNode leaf, AbsoluteDate campaignEndDate) {
 
-        List<ObservedObject> restore = leaf.getPropEnvironment();
+        List<ObservedObject> restore = leaf.getEnvironment().getStateTracking();
         // Declare output
         List<Node> episode = new ArrayList<Node>(); // TODO: not necessary to store in an array because node holds all the descendants
         //episode.add(leaf);
@@ -548,7 +595,7 @@ public class MultiObjectiveMcts {
             episode.remove(0);
         }
         leaf.clearChildren();  
-        leaf.setPropEnvironment(restore);     
+        leaf.getEnvironment().setStateTracking(restore);     
         return episode;
     }
 
@@ -578,7 +625,7 @@ public class MultiObjectiveMcts {
             lastDecision = 
                 new DecisionNode(leaf.getUtility(), leaf.getNumVisits(), ((DecisionNode)leaf).getSensorPointing(), 
                                 ((DecisionNode)leaf).getWeights(), ((DecisionNode)leaf).getTimeResources(), 
-                                leaf.getEpoch(), ((DecisionNode)leaf).getPropEnvironment());
+                                leaf.getEpoch(), ((DecisionNode)leaf).getEnvironment());
             Node.setParent(lastDecision, lastChance);
             parent = leaf;
         } else {
@@ -647,11 +694,11 @@ public class MultiObjectiveMcts {
     }
 
     private double[] computeUtilityVector(DecisionNode last) {
-        List<ObservedObject> targetsBefore = ((DecisionNode)this.initial).getPropEnvironment();
+        List<ObservedObject> targetsBefore = ((DecisionNode)this.initial).getEnvironment().getStateTracking();
         double trackingReward = 0;
 
         for(int i=0; i<targetsBefore.size(); i++){
-            for(ObservedObject obj : last.getPropEnvironment()){
+            for(ObservedObject obj : last.getEnvironment().getStateTracking()){
                 if(targetsBefore.get(i).getId() == obj.getId()) {
                     trackingReward += TrackingObjective
                                         .computeInformationGain(targetsBefore.get(i), obj);

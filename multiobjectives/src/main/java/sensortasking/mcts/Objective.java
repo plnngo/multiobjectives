@@ -4,11 +4,11 @@ import java.util.List;
 
 import org.orekit.time.AbsoluteDate;
 
-public interface Objective {
+public interface Objective<T> {
 
     public AngularDirection setMicroAction(AbsoluteDate current, AngularDirection sensorPointing);
 
     public AbsoluteDate[] getExecusionDuration(AbsoluteDate current);
 
-    public List<ObservedObject> propagateOutcome();    
+    public List<T> propagateOutcome();    
 }

@@ -67,6 +67,7 @@ import org.orekit.utils.TimeStampedPVCoordinates;
 import lombok.Getter;
 import sensortasking.stripescanning.Tasking;
 
+@SuppressWarnings("rawtypes")
 @Getter
 public class TrackingObjective implements Objective{
 
@@ -923,6 +924,8 @@ public class TrackingObjective implements Objective{
 
     @Override
     public List<ObservedObject> propagateOutcome() {
+
+
         // return copy of updated targets
         List<ObservedObject> out = new ArrayList<ObservedObject>();
         for (ObservedObject obj : this.updatedTargets) {
@@ -931,6 +934,7 @@ public class TrackingObjective implements Objective{
                                                      obj.getFrame());
             out.add(copy);
         }
+        
         return out;
     }
     @Override

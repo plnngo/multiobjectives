@@ -13,6 +13,7 @@ import org.orekit.time.AbsoluteDate;
 import lombok.Getter;
 import sensortasking.stripescanning.Stripe;
 
+@SuppressWarnings("rawtypes")
 @Getter
 public class SearchObjective implements Objective{
 
@@ -28,14 +29,14 @@ public class SearchObjective implements Objective{
 
     List<AngularDirection> scheduleTopocentric;
 
-    // TODO implement as sensor object
-    //static double readout = 7.;
-    //static double exposure = 8.;
     double allocation = 60.;
-    //static double settling = 30.;
+
     double preparation = 6.;
 
-    public SearchObjective(TopocentricFrame horizon, Stripe scan, int numExpo, Sensor sensor) {
+    protected List<Integer> completedTasks = new ArrayList<Integer>();
+
+    public SearchObjective(List<Integer> completedSearchTasks, TopocentricFrame horizon, Stripe scan, int numExpo, Sensor sensor) {
+        this.completedTasks = completedSearchTasks;
         this.stationHorizon = horizon;
         this.scan = scan;
         this.numExpo = numExpo;
@@ -124,23 +125,7 @@ public class SearchObjective implements Objective{
     }
 
     @Override
-    public List<ObservedObject> propagateOutcome() {
-
-       /*  // Fake data
-        StateVector state = new StateVector();
-        state.setX(100.);
-        state.setY(200.);
-        state.setZ(300.);
-
-        CartesianCovariance cov = new CartesianCovariance(null);
-        for (int pos=0; pos<3; pos++) {
-            cov.setCovarianceMatrixEntry(pos, pos, 10.);
-            cov.setCovarianceMatrixEntry(pos+3, pos+3, 100.);
-        }
-        
-        ObservedObject obj = new ObservedObject(0123, state, cov, new AbsoluteDate(), FramesFactory.getTEME());
-        List<ObservedObject> out = new ArrayList<ObservedObject>();
-        out.add(obj); */
-        return null;
+    public List<Integer> propagateOutcome() {
+        return new ArrayList<>(this.completedTasks);
     }
 }

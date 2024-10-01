@@ -283,6 +283,13 @@ public class MultiObjectiveMctsTest {
         List<ObservedObject> ooi = new ArrayList<ObservedObject>();
         ooi.add(ooiAll.get(0));
 
+        // Set environment storing the state of the tasking outputs
+        List<Integer> stripeBullseyeCompleted = new ArrayList<Integer>();
+        stripeBullseyeCompleted.add(0); // Stripe scan
+        stripeBullseyeCompleted.add(0); // Bullseye scan
+
+        PropoagatedEnvironment enviro = new PropoagatedEnvironment(ooi, stripeBullseyeCompleted);
+
         // Initialise root node
         List<String> objectives = new ArrayList<String>(Arrays.asList("SEARCH", "TRACK"));
         double initUtility = 1.;
@@ -294,7 +301,7 @@ public class MultiObjectiveMctsTest {
             new double[]{initWeights[0] * endCampaign.durationFrom(current), 
                          initWeights[1] * endCampaign.durationFrom(current)};
         Node root = new DecisionNode(initUtility, numVisits, initPointing, initWeights, 
-                                     initTimeResources, current, ooi);
+                                     initTimeResources, current, enviro);
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, ooi, 
                                    new ArrayList<ObservedObject>(), sensor);
@@ -361,6 +368,13 @@ public class MultiObjectiveMctsTest {
         List<ObservedObject> ooi = setListOOI(current);
         List<ObservedObject> initialOoi = new ArrayList<ObservedObject>(ooi);
 
+        // Set environment storing the state of the tasking outputs
+        List<Integer> stripeBullseyeCompleted = new ArrayList<Integer>();
+        stripeBullseyeCompleted.add(0); // Stripe scan
+        stripeBullseyeCompleted.add(0); // Bullseye scan
+
+        PropoagatedEnvironment enviro = new PropoagatedEnvironment(ooi, stripeBullseyeCompleted);
+
         Transform eciToHorizon = j2000.getTransformTo(topohorizon, current);
         Vector3D tdrs6Horizon = eciToHorizon.transformPosition(ooi.get(1).getState().getPositionVector());
         System.out.println("Elevation: " + FastMath.toDegrees(tdrs6Horizon.getDelta()));
@@ -376,7 +390,7 @@ public class MultiObjectiveMctsTest {
             new double[]{initWeights[0] * endCampaign.durationFrom(current), 
                          initWeights[1] * endCampaign.durationFrom(current)};
         Node root = new DecisionNode(initUtility, numVisits, initPointing, initWeights, 
-                                     initTimeResources, current, ooi);
+                                     initTimeResources, current, enviro);
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, ooi, 
                                    new ArrayList<ObservedObject>(), sensor);
@@ -888,6 +902,13 @@ public class MultiObjectiveMctsTest {
         // Retrieve object of interest that shall be tracked
         List<ObservedObject> ooi = setListOOI(current);
 
+        // Set environment storing the state of the tasking outputs
+        List<Integer> stripeBullseyeCompleted = new ArrayList<Integer>();
+        stripeBullseyeCompleted.add(0); // Stripe scan
+        stripeBullseyeCompleted.add(0); // Bullseye scan
+
+        PropoagatedEnvironment enviro = new PropoagatedEnvironment(ooi, stripeBullseyeCompleted);
+
         // Initialise root node
         List<String> objectives = new ArrayList<String>(Arrays.asList("SEARCH", "TRACK"));
         double initUtility = 1.;
@@ -899,7 +920,7 @@ public class MultiObjectiveMctsTest {
             new double[]{initWeights[0] * endCampaign.durationFrom(current), 
                          initWeights[1] * endCampaign.durationFrom(current)};
         Node root = new DecisionNode(initUtility, numVisits, initPointing, initWeights, 
-                                     initTimeResources, current, ooi);
+                                     initTimeResources, current, enviro);
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, ooi, 
                                    new ArrayList<ObservedObject>(), sensor);
@@ -1071,8 +1092,17 @@ public class MultiObjectiveMctsTest {
             new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
         double[] initWeights = new double[]{1., 0.};
         double[] initTimeResources = new double[]{endCampaign.durationFrom(current), 0.};
+
+        // Set environment storing the state of the tasking outputs
+        List<Integer> stripeBullseyeCompleted = new ArrayList<Integer>();
+        stripeBullseyeCompleted.add(0); // Stripe scan
+        stripeBullseyeCompleted.add(0); // Bullseye scan
+
+        List<ObservedObject> ooi = new ArrayList<ObservedObject>();
+
+        PropoagatedEnvironment enviro = new PropoagatedEnvironment(ooi, stripeBullseyeCompleted);
         Node root = new DecisionNode(initUtility, numVisits, initPointing, initWeights, 
-                                     initTimeResources, current, new ArrayList<ObservedObject>());
+                                     initTimeResources, current, enviro);
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, null, 
                                    new ArrayList<ObservedObject>(), sensor);
@@ -1271,6 +1301,13 @@ public class MultiObjectiveMctsTest {
         ooi.add(tdrs06);
         ooi.add(tdrs12);
 
+        // Set environment storing the state of the tasking outputs
+        List<Integer> stripeBullseyeCompleted = new ArrayList<Integer>();
+        stripeBullseyeCompleted.add(0); // Stripe scan
+        stripeBullseyeCompleted.add(0); // Bullseye scan
+
+        PropoagatedEnvironment enviro = new PropoagatedEnvironment(ooi, stripeBullseyeCompleted);
+
         // Model Earth
         BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
                                                Constants.WGS84_EARTH_FLATTENING,
@@ -1291,7 +1328,7 @@ public class MultiObjectiveMctsTest {
         double[] initWeights = new double[]{0., 1.};
         double[] initTimeResources = new double[]{0., endCampaign.durationFrom(current)};
         Node root = new DecisionNode(initUtility, numVisits, initPointing, initWeights, 
-                                     initTimeResources, current, ooi);
+                                     initTimeResources, current, enviro);
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, ooi, 
                                    new ArrayList<ObservedObject>(), sensor);
