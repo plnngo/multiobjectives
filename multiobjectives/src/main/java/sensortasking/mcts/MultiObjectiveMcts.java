@@ -719,7 +719,8 @@ public class MultiObjectiveMcts {
                                 - weightsSearch[i]);
         }
 
-
+        List<double[]> otherSearch = this.initial.getSearchDiscrepancyVecs();
+        
         
         return null;
     }

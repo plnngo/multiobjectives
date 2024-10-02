@@ -57,8 +57,13 @@ public class DecisionNode extends Node{
         return this.weightsSearch;
     }
 
-    public List<double[]> addSearchDiscrepancyVec() {
-        return null;
+    public List<double[]> addSearchDiscrepancyVec(double[] toAdd) {
+        searchDiscrepancyVec.add(toAdd);
+        return searchDiscrepancyVec;
+    }
+
+    public List<double[]> getSearchDiscrepancyVecs() {
+        return this.searchDiscrepancyVec;
     }
 
     public AngularDirection getSensorPointing() {
