@@ -1,7 +1,7 @@
 package sensortasking.mcts;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 import org.orekit.time.AbsoluteDate;
 
@@ -25,7 +25,7 @@ public class DecisionNode extends Node{
     protected double[] weightsSearch = new double[]{1., 0.};
 
     /** Search discrepancy vectors of all existing leaf nodes */
-    List<double[]> searchDiscrepancyVec = new ArrayList<double[]>();
+    Map<Long, double[]> searchDiscrepancyVec = new HashMap<Long, double[]>();
 
     /** Node ID counter. */
     protected long idCounter = 1;
@@ -57,12 +57,11 @@ public class DecisionNode extends Node{
         return this.weightsSearch;
     }
 
-    public List<double[]> addSearchDiscrepancyVec(double[] toAdd) {
-        searchDiscrepancyVec.add(toAdd);
-        return searchDiscrepancyVec;
+    public void addSearchDiscrepancyVec(long id, double[] toAdd) {
+        searchDiscrepancyVec.put(Long.valueOf(id), toAdd);
     }
 
-    public List<double[]> getSearchDiscrepancyVecs() {
+    public Map<Long, double[]> getSearchDiscrepancyVecs() {
         return this.searchDiscrepancyVec;
     }
 
@@ -81,21 +80,4 @@ public class DecisionNode extends Node{
     public double[] getTimeResources() {
         return this.timeResources;
     }
-
-    /* public List<ObservedObject> getPropTrackingTargets() {
-        List<ObservedObject> out = new ArrayList<ObservedObject>();
-
-        // TODO: remove new ArrayList<ObservedObject>() as soon Search objective has implemented IOD
-        if (Objects.isNull(this.environment.getStateTracking())) {
-            return new ArrayList<ObservedObject>();
-        } else {
-            for(ObservedObject obj : this.environment.getStateTracking()) {
-                ObservedObject copy = new ObservedObject(obj.getId(), obj.getState(), 
-                                                         obj.getCovariance(), obj.getEpoch(), 
-                                                         obj.getFrame());
-                out.add(copy);
-            }
-            return out;
-        }
-    } */
 }

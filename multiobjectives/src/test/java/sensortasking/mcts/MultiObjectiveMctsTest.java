@@ -1336,4 +1336,53 @@ public class MultiObjectiveMctsTest {
         Node lastLeaf = mctsTracking.select(root);
         //System.out.println(rootUpdated.getUtility());
     }
+
+    @Test
+    public void testComputeSearchReward() {
+        // Build up test decision tree
+        DecisionNode root = new DecisionNode(1, 1, null, null, null, new AbsoluteDate(), null);
+
+        // Stripe scan 70% and Bullseye scan 30%
+        root.setWeightsSearchingTask(new double[]{0.7, 0.3});
+
+        // Set up decision tree
+        List<Integer> task1 = new ArrayList<>();
+        task1.add(1);
+        task1.add(0);
+        SearchObjective search1 = new SearchObjective(task1, null, null, 0, null);
+        ChanceNode c1 = new ChanceNode(null, 1, 1, search1, null, root);
+        DecisionNode d1 = new DecisionNode(0, 1, null, null, null, null, 
+                                           new PropoagatedEnvironment(null, task1));
+        c1.setChild(d1);
+
+        List<Integer> task2 = new ArrayList<>();
+        task2.add(2);
+        task2.add(0);
+        SearchObjective search2 = new SearchObjective(task2, null, null, 0, null);
+        ChanceNode c2 = new ChanceNode(null, 1, 1, search2, null, d1);
+        DecisionNode d2 = new DecisionNode(0, 1, null, null, null, null, 
+                                           new PropoagatedEnvironment(null, task2));
+        c2.setChild(d2);
+
+        List<Integer> task31 = new ArrayList<>();
+        task31.add(3);
+        task31.add(0);
+        SearchObjective search31 = new SearchObjective(task31, null, null, 0, null);
+        ChanceNode c31 = new ChanceNode(null, 1, 1, search31, null, d2);
+        DecisionNode d31 = new DecisionNode(1, 1, null, null, null, null, 
+                                            new PropoagatedEnvironment(null, task31));
+        c31.setChild(d31);
+
+        // Set up discrepancy vectors of leaf nodes
+        long extractedId = d2.getId();
+        Map<Long, double[]> otherSearch = new HashMap<Long, double[]>();
+        otherSearch.put(Long.valueOf(extractedId), new double[]{0., 0.});
+        otherSearch.put(Long.valueOf(10), new double[]{0.03, 0.03});
+        otherSearch.put(Long.valueOf(11), new double[]{0.03, 0.03});
+        otherSearch.put(Long.valueOf(12), new double[]{0.37, 0.37});
+        otherSearch.put(Long.valueOf(13), new double[]{0.03, 0.03});
+        otherSearch.put(Long.valueOf(14), new double[]{0.37, 0.37});
+        otherSearch.put(Long.valueOf(15), new double[]{0.37, 0.37});
+        otherSearch.put(Long.valueOf(16), new double[]{0.7, 0.7});
+    }
 }

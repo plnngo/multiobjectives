@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Map;
 
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.util.FastMath;
@@ -16,6 +17,7 @@ import org.orekit.time.AbsoluteDate;
 import lombok.Getter;
 import sensortasking.stripescanning.Stripe;
 import sensortasking.stripescanning.Tasking;
+import tools.OptimisingVector;
 import tools.WeightedRandomNumberPicker;
 
 @Getter
@@ -103,37 +105,13 @@ public class MultiObjectiveMcts {
         //List<Node> outputUCB = new ArrayList<Node>();
         List<Node> outputRobustMax = new ArrayList<Node>();
 
-        for(int i=0; i<iterations; i++) {
-
-                        
+        for(int i=0; i<iterations; i++) {                        
             selectNew(this.initial);
-
-            /* // Retrieve pointing strategy UCB
-            Node current = initial;
-            //initial.incrementNumVisits();
-            outputUCB.add(initial);
-            // Travers decision until leaf node
-            while(!Objects.isNull(current) && current.getChildren().size() !=0){
-                current = selectChildUCB(current);
-                outputUCB.add(current);
-/*                 if (!Objects.isNull(current)){
-                    current.incrementNumVisits();
-                } 
-            }
-
-            outputUCB = new ArrayList<Node>(); */
         }
 
         // Retrieve pointing strategy UCB
         Node current = initial;
-/*         outputUCB.add(initial);
-        // Travers decision until leaf node
-        while(!Objects.isNull(current) && current.getChildren().size() !=0){
-            current = selectChildUCB(current);
-            outputUCB.add(current);
-        } */
 
-        //current = initial;
         outputRobustMax.add(initial);
         // Travers decision until leaf node
         while(!Objects.isNull(current) && current.getChildren().size() !=0){
@@ -425,9 +403,7 @@ public class MultiObjectiveMcts {
                                         0., 0, objective, pointing, leaf);   
         expandedChance.setId(this.initial.incrementIdCounter());
       
-
         // Update 
-        //DecisionNode grandparent = (DecisionNode) leaf.getParent();
         double[] priorTimeResources = leaf.getTimeResources();
         double[] postTimeResources = new double[priorTimeResources.length];
         double[] postWeights = new double[leaf.getWeights().length];
@@ -441,8 +417,8 @@ public class MultiObjectiveMcts {
         double executionDuration = obsTimeInterval[1].durationFrom(obsTimeInterval[0]);
         double postTobs = priorTobs - executionDuration;
 
-            // Update weights
-            for (int i=0; i<postWeights.length; i++) {
+        // Update weights
+        for (int i=0; i<postWeights.length; i++) {
             postWeights[i] = priorTimeResources[i]/postTobs;
         }
 
@@ -477,38 +453,6 @@ public class MultiObjectiveMcts {
         postWeights = new double[]{0.5, 0.5};
 
         AbsoluteDate propEpoch = leaf.getEpoch().shiftedBy(executionDuration);
-
-        // Need to propagate the environment under the selected macro/micro action pair
-        /* List<Object> propEnviroment = objective.propagateOutcome();  
-        if (propEnviroment.get(0) instanceof ObservedObject) {
-            // tracking objective has been selected
-            // Add object that was not considered for tracking back to propEnvironment
-            for(int parent=0; parent<leaf.getEnvironment().getStateTracking().size(); parent++) {
-                long idParent = leaf.getEnvironment().getStateTracking().get(parent).getId();
-                boolean found = false;
-                for(int child=0; child<propEnviroment.size(); child++) {
-                    if (idParent == ((ObservedObject)propEnviroment.get(child))
-                                                                   .getId()) {
-                        found = true;
-                    }
-                }
-                if(!found) {
-                    ObservedObject notTargeted = 
-                        new ObservedObject(idParent, leaf.getEnvironment().getStateTracking().get(parent).getState(),
-                                        leaf.getEnvironment().getStateTracking().get(parent).getCovariance(), 
-                                        leaf.getEnvironment().getStateTracking().get(parent).getEpoch(), 
-                                        leaf.getEnvironment().getStateTracking().get(parent).getFrame());
-                    propEnviroment.add(notTargeted);
-                }
-            }
-        } else if(propEnviroment.get(0) instanceof Integer) {
-            // searching objective has been selected
-            // for now, only stripe scan is performed TODO: implement bullseye
-            propEnviroment.set(0, (Integer)propEnviroment.get(0) + 1);
-
-        } else {
-            // other objective was selected
-        } */
 
         if(objective instanceof TrackingObjective) {
             List<ObservedObject> propEnviroment = objective.propagateOutcome();
@@ -627,7 +571,7 @@ public class MultiObjectiveMcts {
             parent = lastDecision;
         }
         // Compute utility value of last node
-        double[] utilityVec = computeUtilityVector(lastDecision);
+        double[] utilityVec = computeUtilityVector(lastDecision, (DecisionNode)leaf);
         
         double[] spentResources = new double[lastDecision.getTimeResources().length];
         double[] initWeights = ((DecisionNode)this.initial).getWeights();
@@ -687,7 +631,7 @@ public class MultiObjectiveMcts {
         }
     }
 
-    private double[] computeUtilityVector(DecisionNode last) {
+    private double[] computeUtilityVector(DecisionNode last, DecisionNode leaf) {
 
         // Compute tracking reward
         List<ObservedObject> targetsBefore = ((DecisionNode)this.initial).getEnvironment().getStateTracking();
@@ -704,6 +648,15 @@ public class MultiObjectiveMcts {
         }
 
         // Compute searching reward
+        double searchReward = computeSearchReward(last, leaf);
+        
+
+        // Build up utility vector from macro action rewards                
+        return new double[]{searchReward, trackingReward};
+    }
+
+
+    private double computeSearchReward(DecisionNode last, DecisionNode leaf) {
         double[] weightsSearch = this.initial.getWeightsSearch();
         List<Integer> completedSearchTasks = last.getEnvironment().getStateSearching();
         int numTotalSearchTaskCompleted = 0;
@@ -719,10 +672,41 @@ public class MultiObjectiveMcts {
                                 - weightsSearch[i]);
         }
 
-        List<double[]> otherSearch = this.initial.getSearchDiscrepancyVecs();
+        DecisionNode grand = (DecisionNode)leaf.getParent().getParent();
+        Map<Long, double[]> otherSearch = this.initial.getSearchDiscrepancyVecs();
         
-        
-        return null;
+
+        // check if leaf has any siblings
+        if(grand.getChildren().size()>1) {
+            // leaf has siblings --> need to add to list of vecs
+
+        } else {
+            // leaf does not have siblings --> need to replace parental vec in list of vecs
+            otherSearch.remove(Long.valueOf(grand.getId()));
+
+        }
+        List<double[]> vecs = new ArrayList<double[]>(otherSearch.values());
+
+        double searchReward = 0;
+        if(vecs.size()>0) {
+            int dim = vecs.get(0).length;
+            OptimisingVector opt = new OptimisingVector(vecs, dim);
+
+            // search utility vectors dominate by minimising
+            boolean[] domMin = new boolean[dim];
+            for(int i=0; i<dim; i++) {
+                domMin[i] = false;
+            }
+            List<double[]> dominating = opt.getDominatingVecs(discrepance, domMin, 0);
+            if(dominating.size() != 0) {
+                searchReward = dominating.size() * (-1);
+            }
+
+        } else {
+            // TODO: catch case when vecs is empty --> no leaf nodes yet
+        }
+        this.initial.addSearchDiscrepancyVec(leaf.getId(), discrepance);
+        return searchReward;
     }
 
 
