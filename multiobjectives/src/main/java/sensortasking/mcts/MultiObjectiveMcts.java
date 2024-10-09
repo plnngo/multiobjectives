@@ -400,7 +400,8 @@ public class MultiObjectiveMcts {
             return null;
         }
         expandedChance = new ChanceNode(objective.getExecusionDuration(leaf.getEpoch()), 
-                                        0., 0, objective, pointing, leaf);   
+                                        0., 0, objective, pointing, leaf, 
+                                        this.initial.incrementIdCounter());
         expandedChance.setId(this.initial.incrementIdCounter());
       
         // Update 
@@ -478,7 +479,8 @@ public class MultiObjectiveMcts {
                 new PropoagatedEnvironment(propEnviroment, 
                                            leaf.getEnvironment().stateSearching);
             expandedDecision = new DecisionNode(0., 0, sensorPointing, postWeights, 
-                                                postTimeResources, propEpoch, environment);  
+                                                postTimeResources, propEpoch, environment,
+                                                this.initial.incrementIdCounter());  
         } else if (objective instanceof SearchObjective) {
             // searching objective has been selected
             // for now, only stripe scan is performed TODO: implement bullseye
@@ -488,14 +490,15 @@ public class MultiObjectiveMcts {
                 new PropoagatedEnvironment(leaf.getEnvironment().getStateTracking(), 
                                            propEnviroment);
             expandedDecision = new DecisionNode(0., 0, sensorPointing, postWeights, 
-                                                postTimeResources, propEpoch, environment);
+                                                postTimeResources, propEpoch, environment,
+                                                this.initial.incrementIdCounter());
 
         } else {
             // other objective was selected
         }
 
         expandedChance.setChild(expandedDecision); 
-        expandedDecision.setId(this.initial.incrementIdCounter());
+        //expandedDecision.setId(this.initial.incrementIdCounter());
                  
         return expandedDecision;
     }
@@ -555,15 +558,18 @@ public class MultiObjectiveMcts {
             DecisionNode fakeRoot = 
                 new DecisionNode(0., 0, null, null, 
                                  ((DecisionNode)leaf.getParent().getParent()).getTimeResources(), 
-                                 leaf.getParent().getParent().getEpoch(), null);
+                                 leaf.getParent().getParent().getEpoch(), null,
+                                 this.initial.incrementIdCounter());
             lastChance = 
                 new ChanceNode(((ChanceNode)leaf.getParent()).getExecutionDuration(), leaf.getParent().getUtility(), 
                                 leaf.getParent().getNumVisits(), ((ChanceNode)leaf.getParent()).getMacro(), 
-                                ((ChanceNode)leaf.getParent()).getMicro(), fakeRoot);
+                                ((ChanceNode)leaf.getParent()).getMicro(), fakeRoot,
+                                this.initial.incrementIdCounter());
             lastDecision = 
                 new DecisionNode(leaf.getUtility(), leaf.getNumVisits(), ((DecisionNode)leaf).getSensorPointing(), 
                                 ((DecisionNode)leaf).getWeights(), ((DecisionNode)leaf).getTimeResources(), 
-                                leaf.getEpoch(), ((DecisionNode)leaf).getEnvironment());
+                                leaf.getEpoch(), ((DecisionNode)leaf).getEnvironment(),
+                                this.initial.incrementIdCounter());
             Node.setParent(lastDecision, lastChance);
             parent = leaf;
         } else {
@@ -656,7 +662,7 @@ public class MultiObjectiveMcts {
     }
 
 
-    private double computeSearchReward(DecisionNode last, DecisionNode leaf) {
+    protected double computeSearchReward(DecisionNode last, DecisionNode leaf) {
         double[] weightsSearch = this.initial.getWeightsSearch();
         List<Integer> completedSearchTasks = last.getEnvironment().getStateSearching();
         int numTotalSearchTaskCompleted = 0;

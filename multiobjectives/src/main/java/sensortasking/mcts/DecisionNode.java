@@ -32,7 +32,7 @@ public class DecisionNode extends Node{
 
 
     public DecisionNode(double utility, int numVisits, AngularDirection pointing, double[] weights,
-                        double[] timeResources, AbsoluteDate epoch, PropoagatedEnvironment environment) {
+                        double[] timeResources, AbsoluteDate epoch, PropoagatedEnvironment environment, long id) {
 
         this.sensorPointing = pointing;
         this.weights = weights;
@@ -41,6 +41,7 @@ public class DecisionNode extends Node{
         super.numVisits = numVisits;
         this.environment = environment;
         super.setEpoch(epoch);
+        super.setId(id);
     }
 
     public DecisionNode setWeightsSearchingTask(double[] weights) {

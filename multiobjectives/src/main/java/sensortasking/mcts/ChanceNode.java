@@ -17,7 +17,7 @@ public class ChanceNode extends Node{
     private AbsoluteDate[] executionDuration;
 
     public ChanceNode(AbsoluteDate[] obsTimeInterval, double utility, int numVisits, Objective objective, 
-    AngularDirection pointing, Node parent) {
+    AngularDirection pointing, Node parent, long id) {
 
         parent.setChild(this);
         this.micro = pointing;
@@ -27,5 +27,6 @@ public class ChanceNode extends Node{
         super.parent = parent;
         this.executionDuration = obsTimeInterval;
         super.setEpoch(parent.getEpoch());
+        super.setId(id);
     }
 }
