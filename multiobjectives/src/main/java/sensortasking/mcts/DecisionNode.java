@@ -28,7 +28,7 @@ public class DecisionNode extends Node{
     Map<Long, double[]> searchDiscrepancyVec = new HashMap<Long, double[]>();
 
     /** Node ID counter. */
-    protected long idCounter = 1;
+    protected long idCounter = 0;
 
 
     public DecisionNode(double utility, int numVisits, AngularDirection pointing, double[] weights,
