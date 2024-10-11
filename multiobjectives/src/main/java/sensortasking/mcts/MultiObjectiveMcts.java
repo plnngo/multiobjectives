@@ -696,7 +696,7 @@ public class MultiObjectiveMcts {
         double searchReward = 0;
         if(vecs.size()>0) {
             int dim = vecs.get(0).length;
-            OptimisingVector opt = new OptimisingVector(vecs, dim);
+            OptimisingVector opt = new OptimisingVector(vecs, 0);
 
             // search utility vectors dominate by minimising
             boolean[] domMin = new boolean[dim];

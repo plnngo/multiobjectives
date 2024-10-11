@@ -89,8 +89,12 @@ public class OptimisingVector {
                 }
             }
             dim++;
-            OptimisingVector ov = new OptimisingVector(dominating, dim);
-            return ov.getDominatingVecs(toCompare, order, dim);
+            if(dim<toCompare.length){
+                OptimisingVector ov = new OptimisingVector(dominating, dim);
+                return ov.getDominatingVecs(toCompare, order, dim);
+            } else {
+                return dominating;
+            }
         } 
     }
 

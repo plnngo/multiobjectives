@@ -1388,17 +1388,17 @@ public class MultiObjectiveMctsTest {
 
         // Set up discrepancy vectors of leaf nodes
         long extractedId = d2.getId();
-        Map<Long, double[]> otherSearch = new HashMap<Long, double[]>();
-        otherSearch.put(Long.valueOf(extractedId), new double[]{0., 0.});
-        otherSearch.put(Long.valueOf(10), new double[]{0.03, 0.03});
-        otherSearch.put(Long.valueOf(11), new double[]{0.03, 0.03});
-        otherSearch.put(Long.valueOf(12), new double[]{0.37, 0.37});
-        otherSearch.put(Long.valueOf(13), new double[]{0.03, 0.03});
-        otherSearch.put(Long.valueOf(14), new double[]{0.37, 0.37});
-        otherSearch.put(Long.valueOf(15), new double[]{0.37, 0.37});
-        otherSearch.put(Long.valueOf(16), new double[]{0.7, 0.7});
+        root.addSearchDiscrepancyVec(Long.valueOf(extractedId), new double[]{0., 0.});
+        root.addSearchDiscrepancyVec(Long.valueOf(10), new double[]{0.03, 0.03});
+        root.addSearchDiscrepancyVec(Long.valueOf(11), new double[]{0.03, 0.03});
+        root.addSearchDiscrepancyVec(Long.valueOf(12), new double[]{0.37, 0.37});
+        root.addSearchDiscrepancyVec(Long.valueOf(13), new double[]{0.03, 0.03});
+        root.addSearchDiscrepancyVec(Long.valueOf(14), new double[]{0.37, 0.37});
+        root.addSearchDiscrepancyVec(Long.valueOf(15), new double[]{0.37, 0.37});
+        root.addSearchDiscrepancyVec(Long.valueOf(16), new double[]{0.7, 0.7});
 
-        AbsoluteDate current = (new AbsoluteDate(2024, 8, 2, 3, 24, 0., TimeScalesFactory.getUTC())).shiftedBy(4000.);
+        AbsoluteDate current = (new AbsoluteDate(2024, 8, 2, 3, 24, 0., 
+                                                 TimeScalesFactory.getUTC())).shiftedBy(4000.);
         AbsoluteDate endCampaign = current.shiftedBy(10.* 60.);
         List<String> objectives = new ArrayList<String>(Arrays.asList("SEARCH", "TRACK"));
 
@@ -1426,7 +1426,11 @@ public class MultiObjectiveMctsTest {
         TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "TDRS Station");
 
         List<ObservedObject> ooiAll = setListOOI(current);
-        MultiObjectiveMcts mcts = new MultiObjectiveMcts(root, objectives, current, endCampaign, topohorizon, ooiAll, new ArrayList<ObservedObject>(), sensor);
-        mcts.computeSearchReward(d31, d31);
+        MultiObjectiveMcts mcts = new MultiObjectiveMcts(root, objectives, current, endCampaign, 
+                                                         topohorizon, ooiAll, 
+                                                         new ArrayList<ObservedObject>(), sensor);
+        double actualReward = mcts.computeSearchReward(d31, d31);
+
+        Assert.assertEquals(-3., actualReward, 1e-16);
     }
 }
