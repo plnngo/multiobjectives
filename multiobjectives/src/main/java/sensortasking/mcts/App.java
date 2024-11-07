@@ -82,7 +82,7 @@ public class App {
 
         //App.testPropo2();
         //App.propagateKeplerianDynamics();
-        App.propagateCovarianceOrekitExample();
+        //App.propagateCovarianceOrekitExample();
         //App.compareNormalPropWithKalmanPrediction();
         App.setUpOwnKalmanFilter();
         //App.compareCovTdrs();
@@ -228,8 +228,10 @@ public class App {
 
         // Definition of initial conditions with position and velocity
         //------------------------------------------------------------
-        Vector3D position = new Vector3D(7.0e6, 1.0e6, 4.0e6);
-        Vector3D velocity = new Vector3D(-500.0, 8000.0, 1000.0);
+/*         Vector3D position = new Vector3D(7.0e6, 1.0e6, 4.0e6);
+        Vector3D velocity = new Vector3D(-500.0, 8000.0, 1000.0) */;
+        Vector3D position = new Vector3D(7.1e6, 1.0e6, 3.9e6);
+        Vector3D velocity = new Vector3D(-500.1, 8000.0, 999.9);
         PVCoordinates pvInit = new PVCoordinates(position, velocity);
         double mu = 3.9860047e14;
         System.out.println("----- Initial condition -----");
@@ -254,12 +256,12 @@ public class App {
         final SpacecraftState initialState = extrapolator.getInitialState();
  
         // Initial covariance
-        RealMatrix covInitMatrix = 
+/*         RealMatrix covInitMatrix = 
             MatrixUtils.createRealDiagonalMatrix(new double[]{100*1e3, 100*1e3, 100*1e3, 
-                                                              0.1, 0.1, 0.1});
-       /*  StateCovariance covInit = 
-            new StateCovariance(covInitMatrix, initDate, eci, OrbitType.CARTESIAN, 
-                                PositionAngleType.MEAN); */
+                                                              0.1, 0.1, 0.1}); */
+        RealMatrix covInitMatrix = 
+            MatrixUtils.createRealDiagonalMatrix(new double[]{99*1e3, 100*1e3, 101*1e3, 
+                                                              0.2, 0.2, 0.2});
         final String stmAdditionalName = "stm";
         final MatricesHarvester harvester = 
             extrapolator.setupMatricesComputation(stmAdditionalName, null, null);

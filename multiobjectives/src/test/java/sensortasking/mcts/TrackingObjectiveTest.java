@@ -468,7 +468,7 @@ public class TrackingObjectiveTest {
         postCov = ObservedObject.stateCovToCartesianCov(orbit , covStateCov, eci);
         ObservedObject post = new ObservedObject(0, postState, postCov, date, eci);
 
-        // Define posterior object
+        // Define prior object
         StateVector priorState = new StateVector();
         priorState.setX(2);
         priorState.setY(3);

@@ -653,15 +653,79 @@ public class MultiObjectiveMcts {
             }
         }
 
+        // Compute tracking reward
+        double trackReward = computeTrackReward(last, leaf);
+        
         // Compute searching reward
         double searchReward = computeSearchReward(last, leaf);
-        
 
         // Build up utility vector from macro action rewards                
         return new double[]{searchReward, trackingReward};
     }
 
+    protected double computeTrackReward(DecisionNode last, DecisionNode leaf) {
+        
+        // Compute common epoch
+        List<ObservedObject> trackedObjs = leaf.getEnvironment().getStateTracking();
+        AbsoluteDate latestUpdate = new AbsoluteDate();
+        for(ObservedObject tracked : trackedObjs) {
+            if(tracked.getEpoch().compareTo(latestUpdate) > 0) {
+                // Newest update
+                latestUpdate = tracked.getEpoch();
+            }
+        }
 
+        // Propagate all targets from their intial state towards common epoch with Kepler dynamics
+        List<ObservedObject> targetsInitial = 
+            ((DecisionNode)this.initial).getEnvironment().getStateTracking();
+        List<ObservedObject> targetsPredicted = 
+            ObservedObject.propagateTargets(targetsInitial, latestUpdate);
+
+        // Propagate all targets from their updated final state towards common epoch
+        List<ObservedObject> targetsUpdated = leaf.getEnvironment().getStateTracking();
+        List<ObservedObject> targetsFinal = 
+            ObservedObject.propagateTargets(targetsUpdated, latestUpdate);
+
+        // Calculate information gain
+        if(targetsPredicted.size() != targetsFinal.size()) {
+            throw new IllegalArgumentException("Information gain cannot be computed due to " 
+                                                + "dimension error in targets.");
+        }
+        double accumulatedIG = 0;
+
+        for(int i=0; i<targetsPredicted.size(); i++) {
+            int j=0;
+            while(j<targetsFinal.size()) {
+
+                // Make sure that ID of objects are the same when computing information gain
+                if(targetsPredicted.get(i).getId() != targetsFinal.get(j).getId()) {
+                    // Move to next object in targetFinals
+                    j++;
+                } else {
+                    // Same ID found
+                    accumulatedIG += 
+                        TrackingObjective.computeInformationGain(targetsPredicted.get(i), 
+                                                                 targetsFinal.get(j));
+
+                    // No need to continue searching in targetFinals
+                    targetsFinal.remove(j);
+                    j=0;
+                    break;
+                }
+            }
+        }
+
+        return accumulatedIG;
+    }
+
+
+    /**
+     * Return number of dominating solutions with respect to the new {@code leaf} node.
+     * 
+     * @param last              Last node.
+     * @param leaf              Current leaf node.
+     * @return                  Number of dominating solutions.
+     */
     protected double computeSearchReward(DecisionNode last, DecisionNode leaf) {
         double[] weightsSearch = this.initial.getWeightsSearch();
         List<Integer> completedSearchTasks = last.getEnvironment().getStateSearching();
@@ -670,7 +734,7 @@ public class MultiObjectiveMcts {
             numTotalSearchTaskCompleted += completedSearchTasks.get(i);
         }
         
-        // Compute discrepance 
+        // Compute discrepance vector of leaf node
         double[] discrepance = new double[2];
         for(int i=0; i<completedSearchTasks.size(); i++){
             discrepance[i] = 

@@ -1,15 +1,26 @@
 package sensortasking.mcts;
 
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
+import org.hipparchus.linear.RealMatrix;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
 import org.orekit.frames.Frame;
+import org.orekit.orbits.CartesianOrbit;
 import org.orekit.orbits.Orbit;
+import org.orekit.orbits.OrbitType;
+import org.orekit.orbits.PositionAngleType;
+import org.orekit.propagation.MatricesHarvester;
 import org.orekit.propagation.SpacecraftState;
 import org.orekit.propagation.StateCovariance;
+import org.orekit.propagation.analytical.KeplerianPropagator;
 import org.orekit.propagation.analytical.tle.TLE;
 import org.orekit.time.AbsoluteDate;
+import org.orekit.utils.Constants;
+import org.orekit.utils.PVCoordinates;
 import org.orekit.utils.TimeStampedPVCoordinates;
+
+import java.util.List;
+import java.util.ArrayList;
 
 import lombok.Getter;
 
@@ -109,5 +120,47 @@ public class ObservedObject {
             }
         }
         return output;
+    }
+
+    public static List<ObservedObject> propagateTargets(List<ObservedObject> objs, 
+                                                        AbsoluteDate epoch) {
+
+        // Initialise output                                                    
+        List<ObservedObject> out = new ArrayList<ObservedObject>();
+
+        for(ObservedObject obj : objs) {
+            Vector3D pos = obj.getState().getPositionVector();
+            Vector3D vel = obj.getState().getVelocityVector();
+            PVCoordinates pv = new PVCoordinates(pos, vel);
+            Orbit initialOrbit = 
+                new CartesianOrbit(pv, obj.getFrame(), 
+                                   obj.getEpoch(), Constants.WGS84_EARTH_MU);
+            KeplerianPropagator kepPropo = new KeplerianPropagator(initialOrbit);
+
+             // Set up covariance matrix provider and add it to the propagator
+            final String stmName = "stm";
+            final MatricesHarvester harvester = 
+                kepPropo.setupMatricesComputation(stmName, null, null);
+
+            // Propagate
+            SpacecraftState predState = kepPropo.propagate(epoch);
+            RealMatrix dYdY0 = harvester.getStateTransitionMatrix(predState);
+            RealMatrix covInit = obj.getCovariance().getCovarianceMatrix();
+            RealMatrix predictedCov = dYdY0.multiply(covInit).multiplyTransposed(dYdY0);
+            StateCovariance stateCov = 
+                new StateCovariance(predictedCov, predState.getDate(), predState.getFrame(), 
+                                    OrbitType.CARTESIAN, PositionAngleType.MEAN);
+            ObservedObject targetPred = 
+                new ObservedObject(obj.getId(), 
+                                   ObservedObject
+                                    .spacecraftStateToStateVector(predState, predState.getFrame()),
+                                   ObservedObject
+                                    .stateCovToCartesianCov(predState.getOrbit(), stateCov, 
+                                                            predState.getFrame()), 
+                                   epoch, predState.getFrame());
+            out.add(targetPred);
+        }
+        return out;
+
     }
 }

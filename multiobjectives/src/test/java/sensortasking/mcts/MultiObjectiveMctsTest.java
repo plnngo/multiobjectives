@@ -1433,4 +1433,135 @@ public class MultiObjectiveMctsTest {
 
         Assert.assertEquals(-3., actualReward, 1e-16);
     }
+
+    @Test
+    public void testComputeTrackReward(){
+
+        // Dates
+        AbsoluteDate initDate = AbsoluteDate.J2000_EPOCH.shiftedBy(584.);
+        AbsoluteDate target = new AbsoluteDate("2000-01-01T15:50:04.36035985407872Z", TimeScalesFactory.getUTC());
+
+        // Set up targets initial state
+        Vector3D posA = new Vector3D(7.0e6, 1.0e6, 4.0e6);
+        Vector3D velA = new Vector3D(-500.0, 8000.0, 1000.0);
+        Orbit orbitA = new CartesianOrbit(new PVCoordinates(posA, velA), j2000, initDate, 
+                                          Constants.WGS84_EARTH_MU);
+        SpacecraftState stateA = new SpacecraftState(orbitA);
+        StateVector stateVecA = ObservedObject.spacecraftStateToStateVector(stateA, j2000);
+        RealMatrix covInitMatrixA = 
+            MatrixUtils.createRealDiagonalMatrix(new double[]{100*1e3, 100*1e3, 100*1e3, 
+                                                              0.1, 0.1, 0.1});
+        StateCovariance covA = new StateCovariance(covInitMatrixA, initDate, j2000, 
+                                                   OrbitType.CARTESIAN, PositionAngleType.MEAN);
+        CartesianCovariance cartCovA = ObservedObject.stateCovToCartesianCov(orbitA, covA, j2000);
+        ObservedObject objA = new ObservedObject(11111, stateVecA, cartCovA, initDate, j2000);
+
+        Vector3D posB = new Vector3D(7.1e6, 1.0e6, 3.9e6);
+        Vector3D velB = new Vector3D(-500.1, 8000.0, 999.9);
+        Orbit orbitB = new CartesianOrbit(new PVCoordinates(posB, velB), j2000, initDate, 
+                                          Constants.WGS84_EARTH_MU);
+        SpacecraftState stateB = new SpacecraftState(orbitB);
+        StateVector stateVecB = ObservedObject.spacecraftStateToStateVector(stateB, j2000);
+        RealMatrix covInitMatrixB = 
+            MatrixUtils.createRealDiagonalMatrix(new double[]{99*1e3, 100*1e3, 101*1e3, 
+                                                              0.2, 0.2, 0.2});
+        StateCovariance covB = new StateCovariance(covInitMatrixB, initDate, j2000, 
+                                                   OrbitType.CARTESIAN, PositionAngleType.MEAN);
+        CartesianCovariance cartCovB = ObservedObject.stateCovToCartesianCov(orbitB, covB, j2000);
+        ObservedObject objB = new ObservedObject(22222, stateVecB, cartCovB, initDate, j2000);
+
+        // Set up targets updated state
+        Vector3D posUpdatedA = posA;
+        Vector3D velUpdatedA = velA;
+        Orbit orbitUpdatedA = new CartesianOrbit(new PVCoordinates(posUpdatedA, velUpdatedA),  
+                                                 j2000, target, Constants.WGS84_EARTH_MU);
+        SpacecraftState stateUpdatedA = new SpacecraftState(orbitUpdatedA);
+        StateVector stateVecUpdatedA = 
+            ObservedObject.spacecraftStateToStateVector(stateUpdatedA, j2000);
+
+        double[][] covArrayA = new double[][]{{5.402139881e+04,  7.715437798e+03,  3.158651844e+04, -4.062297642e+00, -4.184765975e+01, -8.887067576e+00},
+                                            {7.715437798e+03,  1.156989368e+03,  4.515760025e+03, -6.156051795e-01, -5.983722439e+00, -1.289856904e+00},
+                                            {3.158651844e+04,  4.515760025e+03,  1.856532417e+04, -2.385340451e+00, -2.450072498e+01, -5.205936632e+00},
+                                            {-4.062297642e+00, -6.156051795e-01, -2.385340451e+00,  1.451090187e-01,  1.174814384e-02,  2.653099702e-02},
+                                            {-4.184765975e+01, -5.983722439e+00, -2.450072498e+01,  1.174814384e-02,  3.859792809e-02, -3.367440602e-03},
+                                            {-8.887067576e+00, -1.289856904e+00, -5.205936632e+00,  2.653099702e-02, -3.367440602e-03,  1.141828017e-01}};
+        RealMatrix covMatrixA = new Array2DRowRealMatrix(covArrayA);
+        StateCovariance covUpdatedA = new StateCovariance(covMatrixA, target, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
+        
+        CartesianCovariance cartCovUpdatedA = 
+            ObservedObject.stateCovToCartesianCov(orbitUpdatedA, covUpdatedA, j2000);
+        ObservedObject objUpdatedA = 
+            new ObservedObject(11111, stateVecUpdatedA, cartCovUpdatedA, target, j2000);
+
+        Vector3D posUpdatedB = new Vector3D(7.026977162e+06, -1.264918180e+06, 3.503803802e+06);
+        Vector3D velUpdatedB = new Vector3D(1.034823223e+03, 7.968025511e+03, 1.803833605e+03);
+        Orbit orbitUpdatedB = new CartesianOrbit(new PVCoordinates(posUpdatedB, velUpdatedB), 
+                                                 j2000, target, Constants.WGS84_EARTH_MU);
+        SpacecraftState stateUpdatedB = new SpacecraftState(orbitUpdatedB);
+        StateVector stateVecUpdatedB = 
+            ObservedObject.spacecraftStateToStateVector(stateUpdatedB, j2000);
+
+        double[][] covArrayB = new double[][]{{8.243199250e+04, -1.482804669e+04,  4.219116446e+04, -6.399749455e+01, -5.088743142e+01, -4.176143991e+01},
+                                            {-1.482804669e+04,  2.715566494e+03, -7.593739807e+03,  1.148752913e+01,  9.165024829e+00,  7.504224162e+00},
+                                            {4.219116446e+04, -7.593739807e+03,  2.166857172e+04, -3.277663953e+01, -2.605994761e+01, -2.140814806e+01},
+                                            {-6.399749455e+01,  1.148752913e+01, -3.277663953e+01,  2.534003488e-01,  1.806549691e-02,  3.968955271e-02},
+                                            {-5.088743142e+01,  9.165024829e+00, -2.605994761e+01,  1.806549691e-02,  4.591038606e-02, -1.234796175e-02},
+                                            {-4.176143991e+01,  7.504224162e+00, -2.140814806e+01,  3.968955271e-02, -1.234796175e-02,  2.030162605e-01}};
+        RealMatrix covMatrixB = new Array2DRowRealMatrix(covArrayB);
+        StateCovariance covUpdatedB = 
+            new StateCovariance(covMatrixB, target, j2000, OrbitType.CARTESIAN, 
+                                PositionAngleType.MEAN);
+        CartesianCovariance cartCovUpdatedB = 
+            ObservedObject.stateCovToCartesianCov(orbitUpdatedB, covUpdatedB, j2000);
+        ObservedObject objUpdatedB = 
+            new ObservedObject(22222, stateVecUpdatedB, cartCovUpdatedB, target, j2000);
+
+        // Set up nodes
+        List<ObservedObject> targetsInit = new ArrayList<ObservedObject>();
+        targetsInit.add(objA);
+        targetsInit.add(objB);
+        PropoagatedEnvironment env = 
+            new PropoagatedEnvironment(targetsInit, new ArrayList<Integer>());
+        DecisionNode root = 
+            new DecisionNode(1, 1, null, null, null, new AbsoluteDate(), env, 0);
+
+        List<ObservedObject> targetsUpdated = new ArrayList<ObservedObject>();
+        targetsUpdated.add(objUpdatedA);
+        targetsUpdated.add(objUpdatedB);
+        PropoagatedEnvironment envUpdated = 
+            new PropoagatedEnvironment(targetsUpdated, new ArrayList<Integer>());
+        DecisionNode leaf = 
+            new DecisionNode(0, 0, null, null, null, target, envUpdated, 0);
+
+        List<String> objectives = new ArrayList<String>(Arrays.asList("SEARCH", "TRACK"));
+
+        // Frame
+        Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+
+        // Model Earth
+        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                                Constants.WGS84_EARTH_FLATTENING,
+                                                ecef);
+
+        // Ground station
+        GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(6.),   // Geodetic latitude
+                                              FastMath.toRadians(-37.),   // Longitude
+                                     0.);              // in [m]
+
+        double readout = 7.;
+        double exposure = 8.;
+        double settling = 10.;
+        double cutOff = FastMath.toRadians(5.);
+        Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
+        double slewVel = FastMath.toRadians(1.)/1.;     // 1 deg per second
+        Sensor sensor = new Sensor("TDRS Station", fov, pos, exposure, readout, slewVel, settling, cutOff);
+
+        TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "TDRS Station");
+
+        MultiObjectiveMcts mcts = new MultiObjectiveMcts(root, objectives, initDate, target, 
+                                                         topohorizon, targetsInit, 
+                                                         new ArrayList<ObservedObject>(), sensor);
+        double actualReward = mcts.computeTrackReward(leaf, leaf);
+        Assert.assertEquals(2.7682235805565E7, actualReward, 1e-16);
+   }
 }
