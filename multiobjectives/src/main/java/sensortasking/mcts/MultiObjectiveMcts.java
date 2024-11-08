@@ -548,7 +548,7 @@ public class MultiObjectiveMcts {
      * @param leaf              Current leaf node of the decision tree (not including simulated nodes).
      * @param last              Termination node.
      */
-    public Node backpropagate(Node leaf, Node last) {
+    public Node backpropagateTimeUtility(Node leaf, Node last) {
 
         DecisionNode lastDecision;
         ChanceNode lastChance;
@@ -578,6 +578,37 @@ public class MultiObjectiveMcts {
         }
         // Compute utility value of last node
         double[] utilityVec = computeUtilityVector(lastDecision, (DecisionNode)leaf);
+
+        // Compare with other solutions
+        Map<Long, double[]> otherUtilities = this.initial.getAllUtilityVecs();
+
+        DecisionNode grand = (DecisionNode)leaf.getParent().getParent();
+        
+        // Number of solutions current leaf dominates
+        int nDom = 0;
+        
+        if(otherUtilities.containsKey(grand.getId())) {
+            // new utility vector should replace old leaf
+            this.initial.removeUtilityVec(grand.getId());
+        } 
+        List<double[]> otherLeafs = new ArrayList<double[]>(this.initial.getAllUtilityVecs().values());
+
+        if(otherLeafs.size()>0) {
+            int dim = otherLeafs.get(0).length;
+            OptimisingVector opt = new OptimisingVector(otherLeafs, 0);
+
+            // search utility vectors dominate by maximising
+            boolean[] domMax = new boolean[dim];
+            for(int i=0; i<dim; i++) {
+                domMax[i] = true;
+            }
+            List<double[]> dominating = opt.getDominatingVecs(utilityVec, domMax, 0);
+            if(dominating.size() != 0) {
+                nDom = dominating.size() * (-1);
+            }
+        }
+        // add new utility vector to list of utilities
+        this.initial.addUtilityVec(leaf.getId(), utilityVec);
         
         double[] spentResources = new double[lastDecision.getTimeResources().length];
         double[] initWeights = ((DecisionNode)this.initial).getWeights();
@@ -637,11 +668,89 @@ public class MultiObjectiveMcts {
         }
     }
 
+    public Node backpropagate(Node leaf, Node last) {
+
+        DecisionNode lastDecision;
+        ChanceNode lastChance;
+        Node parent;
+        if (Objects.isNull(last)) {
+            //No simulation was performed
+            DecisionNode fakeRoot = 
+                new DecisionNode(0., 0, null, null, 
+                                 ((DecisionNode)leaf.getParent().getParent()).getTimeResources(), 
+                                 leaf.getParent().getParent().getEpoch(), null,
+                                 this.initial.incrementIdCounter());
+            lastChance = 
+                new ChanceNode(((ChanceNode)leaf.getParent()).getExecutionDuration(), leaf.getParent().getUtility(), 
+                                leaf.getParent().getNumVisits(), ((ChanceNode)leaf.getParent()).getMacro(), 
+                                ((ChanceNode)leaf.getParent()).getMicro(), fakeRoot,
+                                this.initial.incrementIdCounter());
+            lastDecision = 
+                new DecisionNode(leaf.getUtility(), leaf.getNumVisits(), ((DecisionNode)leaf).getSensorPointing(), 
+                                ((DecisionNode)leaf).getWeights(), ((DecisionNode)leaf).getTimeResources(), 
+                                leaf.getEpoch(), ((DecisionNode)leaf).getEnvironment(),
+                                this.initial.incrementIdCounter());
+            Node.setParent(lastDecision, lastChance);
+            parent = leaf;
+        } else {
+            lastDecision = (DecisionNode) last;
+            parent = lastDecision;
+        }
+        // Compute utility value of leaf node
+        double[] utilityVec = computeUtilityVector(lastDecision, (DecisionNode)leaf);
+
+        // Compare with other solutions
+        Map<Long, double[]> otherUtilities = this.initial.getAllUtilityVecs();
+
+        DecisionNode grand = (DecisionNode)last.getParent().getParent();
+        
+        // Number of solutions current leaf dominates
+        int nDom = 0;
+        
+        if(otherUtilities.containsKey(grand.getId())) {
+            // new utility vector should replace old leaf
+            this.initial.removeUtilityVec(grand.getId());
+        } 
+        List<double[]> otherLeafs = new ArrayList<double[]>(this.initial.getAllUtilityVecs().values());
+
+        if(otherLeafs.size()>0) {
+            int dim = otherLeafs.get(0).length;
+            OptimisingVector opt = new OptimisingVector(otherLeafs, 0);
+
+            // search utility vectors dominate by maximising
+            boolean[] domMax = new boolean[dim];
+            for(int i=0; i<dim; i++) {
+                domMax[i] = true;
+            }
+            List<double[]> dominating = opt.getDominatingVecs(utilityVec, domMax, 0);
+            if(dominating.size() != 0) {
+                nDom = dominating.size() * (-1);
+            }
+        }
+        // add new utility vector to list of utilities
+        this.initial.addUtilityVec(last.getId(), utilityVec);
+        
+        lastDecision.setUtility(nDom);
+
+        if (!leaf.equals(this.initial)) {
+            leaf.incrementNumVisits();
+            double updatedUtility = leaf.getUtility() + lastDecision.getUtility();
+            leaf.setUtility(updatedUtility); 
+            return backpropagate(leaf.getParent(), lastDecision);
+        } else {
+            // Update root too
+            this.initial.incrementNumVisits();
+            double updatedUtility = this.initial.getUtility() + lastDecision.getUtility();
+            this.initial.setUtility(updatedUtility);
+            return this.initial;
+        }
+    }
+
     private double[] computeUtilityVector(DecisionNode last, DecisionNode leaf) {
 
         // Compute tracking reward
-        List<ObservedObject> targetsBefore = ((DecisionNode)this.initial).getEnvironment().getStateTracking();
-        double trackingReward = 0;
+        //List<ObservedObject> targetsBefore = ((DecisionNode)this.initial).getEnvironment().getStateTracking();
+/*         double trackingReward = 0;
         
         for(int i=0; i<targetsBefore.size(); i++){
             for(ObservedObject obj : last.getEnvironment().getStateTracking()){
@@ -651,7 +760,7 @@ public class MultiObjectiveMcts {
                     break;
                 }
             }
-        }
+        } */
 
         // Compute tracking reward
         double trackReward = computeTrackReward(last, leaf);
@@ -660,13 +769,13 @@ public class MultiObjectiveMcts {
         double searchReward = computeSearchReward(last, leaf);
 
         // Build up utility vector from macro action rewards                
-        return new double[]{searchReward, trackingReward};
+        return new double[]{searchReward, trackReward};
     }
 
     protected double computeTrackReward(DecisionNode last, DecisionNode leaf) {
         
         // Compute common epoch
-        List<ObservedObject> trackedObjs = leaf.getEnvironment().getStateTracking();
+        List<ObservedObject> trackedObjs = last.getEnvironment().getStateTracking();
         AbsoluteDate latestUpdate = new AbsoluteDate();
         for(ObservedObject tracked : trackedObjs) {
             if(tracked.getEpoch().compareTo(latestUpdate) > 0) {
@@ -682,7 +791,7 @@ public class MultiObjectiveMcts {
             ObservedObject.propagateTargets(targetsInitial, latestUpdate);
 
         // Propagate all targets from their updated final state towards common epoch
-        List<ObservedObject> targetsUpdated = leaf.getEnvironment().getStateTracking();
+        List<ObservedObject> targetsUpdated = last.getEnvironment().getStateTracking();
         List<ObservedObject> targetsFinal = 
             ObservedObject.propagateTargets(targetsUpdated, latestUpdate);
 
@@ -722,7 +831,7 @@ public class MultiObjectiveMcts {
     /**
      * Return number of dominating solutions with respect to the new {@code leaf} node.
      * 
-     * @param last              Last node.
+     * @param last              (Simulated) termination node.
      * @param leaf              Current leaf node.
      * @return                  Number of dominating solutions.
      */
@@ -745,7 +854,6 @@ public class MultiObjectiveMcts {
         DecisionNode grand = (DecisionNode)leaf.getParent().getParent();
         Map<Long, double[]> otherSearch = this.initial.getSearchDiscrepancyVecs();
         
-
         // check if leaf has any siblings
         if(grand.getChildren().size()>1) {
             // leaf has siblings --> need to add to list of vecs

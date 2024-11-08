@@ -27,6 +27,9 @@ public class DecisionNode extends Node{
     /** Search discrepancy vectors of all existing leaf nodes */
     Map<Long, double[]> searchDiscrepancyVec = new HashMap<Long, double[]>();
 
+    /** Utility vectors of all existing leaf nodes.*/
+    Map<Long, double[]> allUtilityVecs = new HashMap<Long, double[]>();
+
     /** Node ID counter. */
     protected long idCounter = 0;
 
@@ -64,6 +67,23 @@ public class DecisionNode extends Node{
 
     public Map<Long, double[]> getSearchDiscrepancyVecs() {
         return this.searchDiscrepancyVec;
+    }
+
+    public void addUtilityVec(long id, double[] toAdd) {
+        allUtilityVecs.put(id, toAdd);
+    }
+
+    public void removeUtilityVec(long id) {
+        if (this.allUtilityVecs.containsKey(id)) {
+            this.allUtilityVecs.remove(id);
+        } else {
+            throw new IllegalArgumentException("List of utility vector does not contain the ID " 
+                                                + "that shall get removed");
+        }
+    }
+
+    public Map<Long, double[]> getAllUtilityVecs() {
+        return this.allUtilityVecs;
     }
 
     public AngularDirection getSensorPointing() {
