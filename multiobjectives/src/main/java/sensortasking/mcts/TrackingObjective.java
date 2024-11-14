@@ -39,6 +39,7 @@ import org.orekit.orbits.CartesianOrbit;
 import org.orekit.orbits.Orbit;
 import org.orekit.orbits.OrbitType;
 import org.orekit.orbits.PositionAngleType;
+import org.orekit.propagation.AbstractPropagator;
 import org.orekit.propagation.MatricesHarvester;
 import org.orekit.propagation.Propagator;
 import org.orekit.propagation.SpacecraftState;
@@ -121,22 +122,20 @@ public class TrackingObjective implements Objective{
 
     TopocentricFrame stationHorizon;
 
-    Frame topoInertial;
+    //Frame topoInertial;
 
     /** Sensor. */
-    static Sensor sensor;
+    Sensor sensor;
 
 
-    public TrackingObjective(List<ObservedObject> targets, TopocentricFrame horizon, Frame topocentric, Sensor sensor) {
+    public TrackingObjective(List<ObservedObject> targets, Sensor sensor) {
 
         // Initialise list of targets
         for (ObservedObject target : targets) {
             updatedTargets.add(target);
         }
-
-        this.stationHorizon = horizon;
-        this.topoInertial = topocentric;
-        TrackingObjective.sensor = sensor;
+        this.stationHorizon = sensor.getTopoHorizon();
+        this.sensor = sensor;
         this.sensorApartureRadius = sensor.getFov().getWidth()/2;       // TODO: currently assumed that aparture is circular
 
     }
@@ -145,9 +144,6 @@ public class TrackingObjective implements Objective{
         this.stationHorizon = frame;
     }
 
-    public void setTopoInertialFrame(Frame frame) {
-        this.topoInertial = frame;
-    }
     
 //     public AngularDirection setMicroActionMultiMeasurements(AbsoluteDate current) { 
 
@@ -508,9 +504,6 @@ public class TrackingObjective implements Objective{
                                                           Frame topoInertial,
                                                           double[] angleResiduals,
                                                           double[] xhatPreData) {
-        // Frames
-        FactoryManagedFrame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
-
         Frame j2000 = FramesFactory.getEME2000();
       
         // Initialise Kalman setting
@@ -606,14 +599,34 @@ public class TrackingObjective implements Objective{
 
    
 
-    protected static ObservedObject[] estimateStateWithOwnExtendedKalman(AngularDirection meas, RealMatrix R,
-                                                          SpacecraftState predicted, 
-                                                          MatricesHarvester harvester, 
-                                                          ObservedObject candidate,
-                                                          Frame topoInertial,
-                                                          double[] angleResiduals) {
-        // Frames
-        FactoryManagedFrame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+    /**
+     * 
+     * @param prop
+     * @param meas              RaDec measurement in topocentric inertial frame.
+     * @param R
+     * @param candidate
+     * @param topoInertial
+     * @param angleResiduals
+     * @return                  ObservedObject[] where prediction is stored in first and correction
+     *                          in second field.
+     */
+    protected static ObservedObject[] estimateStateWithOwnExtendedKalman(AbstractPropagator prop,
+                                                                         AbsoluteDate epoch, 
+                                                                         RealMatrix R,
+                                                                         ObservedObject candidate,
+                                                                         double[] angleResiduals,
+                                                                         Sensor sensor) {
+        
+        // Topocentric frame
+        Frame topocentric = sensor.getTopoInertialFrame(epoch);
+
+        // Set up covariance matrix provider and add it to the propagator
+        final String stmName = "stm";
+        final MatricesHarvester harvester = 
+            prop.setupMatricesComputation(stmName, null, null);
+        SpacecraftState predicted = prop.propagate(epoch);
+        AngularDirection meas = 
+            TrackingObjective.transformStateToPointing(predicted, topocentric);
 
         Frame j2000 = FramesFactory.getEME2000();
       
@@ -643,18 +656,15 @@ public class TrackingObjective implements Objective{
             new double[]{predictedPos.getX(), predictedPos.getY(), predictedPos.getZ(),
                          predictedVel.getX(), predictedVel.getY(), predictedVel.getZ()};
         RealMatrix predictedStateColumnVec = new Array2DRowRealMatrix(dataPredictedState);
-/*         System.out.println("Predicted");
-        App.printCovariance(predictedStateColumnVec);
-        App.printCovariance(predictedCov); */
 
         // Measurement
         Transform toTopo = 
-            predicted.getFrame().getTransformTo(topoInertial, predicted.getDate());
+            predicted.getFrame().getTransformTo(meas.getFrame(), predicted.getDate());
         PVCoordinates pvTopo = toTopo.transformPVCoordinates(predicted.getPVCoordinates());
         Vector3D posTopo = pvTopo.getPosition();
 
         RealMatrix H = App.getObservationPartialDerivative(posTopo, false);
-        AngularDirection radec = App.predictMeasurement(posTopo, topoInertial); 
+        AngularDirection radec = App.predictMeasurement(posTopo, meas.getFrame()); 
        
         // Compute Kalman Gain
         RealMatrix covInMeasSpace = H.multiply(predictedCov).multiplyTransposed(H);
@@ -680,9 +690,6 @@ public class TrackingObjective implements Objective{
         RealMatrix iMinusKgH = identity.subtract(kalmanGain.multiply(H));
         RealMatrix updatedCov = 
             iMinusKgH.multiply(predictedCov).multiplyTransposed(iMinusKgH).add(kRkT);
-/*         System.out.println("Corrected:");
-        App.printCovariance(updatedState);
-        App.printCovariance(updatedCov); */
         
         // Set up output prediction
         StateVector predState = ObservedObject.spacecraftStateToStateVector(predicted, predicted.getFrame());
@@ -844,13 +851,14 @@ public class TrackingObjective implements Objective{
      * TODO: move function to AngularDirection class
      * 
      * @param state         Spacecraft state.
+     * @param topo          Topocentric frame (either inertial or horizon frame).
      * @return              Angular pointing direction with respect to topocentric frame.
      */
     protected static AngularDirection transformStateToPointing(SpacecraftState state, Frame topo) {
 
-        Transform toHorizon = state.getFrame().getTransformTo(topo, state.getDate());
+        Transform toTopo = state.getFrame().getTransformTo(topo, state.getDate());
         TimeStampedPVCoordinates stateTopo = 
-            toHorizon.transformPVCoordinates(state.getPVCoordinates());
+            toTopo.transformPVCoordinates(state.getPVCoordinates());
         Vector3D posTopo = stateTopo.getPosition();
         AngleType angleType;
         if(topo.getClass().isInstance(TopocentricFrame.class)) {
@@ -940,6 +948,8 @@ public class TrackingObjective implements Objective{
     @Override
     public AngularDirection setMicroAction(AbsoluteDate current, AngularDirection sensorPointing) {
 
+        Frame topoInertial = this.sensor.getTopoInertialFrame(current);
+
         // Output
         double maxIG = Double.NEGATIVE_INFINITY;
         AngularDirection pointing = new AngularDirection(topoInertial, new double[]{0., 0.},
@@ -947,8 +957,8 @@ public class TrackingObjective implements Objective{
         ObservedObject target = null;    
 
         AbsoluteDate targetDate = 
-                current.shiftedBy(allocation + TrackingObjective.sensor.getSettlingT() + preparation 
-                                + TrackingObjective.sensor.getExposureT()/2);
+                current.shiftedBy(allocation + this.sensor.getSettlingT() + preparation 
+                                + this.sensor.getExposureT()/2);
 
         // Iterate through list of objects of interest
         for (ObservedObject candidate : updatedTargets) {
@@ -984,13 +994,7 @@ public class TrackingObjective implements Objective{
             kepPropo.addEventDetector(horizonLogger.monitorDetector(visibility));
             kepPropo.addEventDetector(earthShadowLogger.monitorDetector(eclipseDetector));
 
-            // Set up covariance matrix provider and add it to the propagator
-            final String stmName = "stm";
-            final MatricesHarvester harvester = 
-                kepPropo.setupMatricesComputation(stmName, null, null);
-/*             final StateCovarianceMatrixProvider providerCov = 
-                new StateCovarianceMatrixProvider("covariance", stmName, harvester, covInit);
-            kepPropo.addAdditionalStateProvider(providerCov); */
+            
 
             // Propagate
             SpacecraftState predState = kepPropo.propagate(targetDate);
@@ -1021,14 +1025,14 @@ public class TrackingObjective implements Objective{
                 continue;
             }
             double actualSlewT = 
-                TrackingObjective.sensor.computeRepositionT(sensorPointing, raDecPointing, true);
+                this.sensor.computeRepositionT(sensorPointing, raDecPointing, true);
             if(actualSlewT > TrackingObjective.allocation) {
                 // not enough time to slew to target pointing direction
                 continue;
             }
             
             // Generate real measurement
-            AngularDirection realRaDec = generateOneMeasurement(predState, targetDate);
+            //AngularDirection realRaDec = generateOneMeasurement(predState, targetDate);
             RealMatrix R = 
                 MatrixUtils.createRealDiagonalMatrix(new double[]{FastMath.pow(1./206265, 2), 
                                                                   FastMath.pow(1./206265, 2)});
@@ -1036,8 +1040,7 @@ public class TrackingObjective implements Objective{
             
             double[] residuals = new double[2];
             ObservedObject[] predAndCorr = 
-                estimateStateWithOwnExtendedKalman(realRaDec, R, predState, harvester, candidate, 
-                                           this.topoInertial, residuals);
+                estimateStateWithOwnExtendedKalman(kepPropo, targetDate, R, candidate, residuals, sensor);
             double iG = computeInformationGain(predAndCorr[0], predAndCorr[1]);
             
             if (iG>maxIG) {
@@ -1072,6 +1075,7 @@ public class TrackingObjective implements Objective{
 
     private AngularDirection generateOneMeasurement(SpacecraftState predState, AbsoluteDate targetDate) {
 
+        Frame topoInertial = this.sensor.getTopoInertialFrame(targetDate);
         Transform eciToTopo = predState.getFrame().getTransformTo(topoInertial, targetDate);
         PVCoordinates pvTopo = 
             eciToTopo.transformPVCoordinates(predState.getPVCoordinates());

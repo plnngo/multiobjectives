@@ -8,11 +8,15 @@ import java.util.Map;
 
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.util.FastMath;
+import org.orekit.bodies.BodyShape;
+import org.orekit.bodies.OneAxisEllipsoid;
 import org.orekit.frames.Frame;
 import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
 import org.orekit.time.AbsoluteDate;
+import org.orekit.utils.Constants;
+import org.orekit.utils.IERSConventions;
 
 import lombok.Getter;
 import sensortasking.stripescanning.Stripe;
@@ -22,9 +26,6 @@ import tools.WeightedRandomNumberPicker;
 
 @Getter
 public class MultiObjectiveMcts {
-
-    /** Structure of the decision tree. */
-    //TreeStructure descisionTree;
 
     /** Root node. */
     DecisionNode initial;
@@ -50,12 +51,6 @@ public class MultiObjectiveMcts {
     /** Tuning parameter (0;1) for progressive widening */
     final static double alpha = 0.3;
 
-    /** List of objects of interest to be tracked. */
-    //final List<ObservedObject> trackedObjects;
-
-    /** List of objects that have been detected.*/
-    //List<ObservedObject> detectedObjects = new ArrayList<ObservedObject>();
-
     /** Stripe for searching objective. */
     final Stripe scanStripe; 
 
@@ -73,7 +68,7 @@ public class MultiObjectiveMcts {
      * @param end
      */
     public MultiObjectiveMcts(Node descisionTree, List<String> objectives,
-                              AbsoluteDate start, AbsoluteDate end, TopocentricFrame stationFrame,
+                              AbsoluteDate start, AbsoluteDate end, String stationName,
                               List<ObservedObject> trackedObjects, List<ObservedObject> detectedObjects,
                               Sensor sensor) {
 
@@ -81,12 +76,17 @@ public class MultiObjectiveMcts {
         MultiObjectiveMcts.objectives = objectives;
         this.startCampaign = start;
         this.endCampaign = end;
-        this.stationFrame = stationFrame;
-/*         this.trackedObjects = trackedObjects;
-        this.detectedObjects = detectedObjects; */
-        this.sensor = sensor;
 
-        //this.scanStripe = null;
+        // Frame
+        Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+
+        // Model Earth
+        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                               Constants.WGS84_EARTH_FLATTENING,
+                                               ecef);
+
+        this.stationFrame = new TopocentricFrame(earth, sensor.getPosition(), stationName);
+        this.sensor = sensor;
         this.scanStripe = computeScanStripe();
     }
 
@@ -363,7 +363,8 @@ public class MultiObjectiveMcts {
                     // No candidate to track but try search
                     indexSelectedObjective = 2;
                 } else {
-                    objective = new TrackingObjective(ooi, stationFrame, topoInertial, sensor);
+                    //objective = new TrackingObjective(ooi, stationFrame, topoInertial, sensor);
+                    objective = new TrackingObjective(ooi, sensor);
                     break;
                 }
             case 2:
@@ -668,11 +669,19 @@ public class MultiObjectiveMcts {
         }
     }
 
+    /**
+     * Update the state of every parent node along the episode from the initial node down to the 
+     * newest expanded node, i.e. simulated nodes (including termination node) do not get added to  
+     * the decision tree and do not need to get updated.
+     * 
+     * @param leaf              Current leaf node of the decision tree (not including simulated nodes).
+     * @param last              Termination node.
+     */
     public Node backpropagate(Node leaf, Node last) {
 
         DecisionNode lastDecision;
         ChanceNode lastChance;
-        Node parent;
+        
         if (Objects.isNull(last)) {
             //No simulation was performed
             DecisionNode fakeRoot = 
@@ -691,10 +700,8 @@ public class MultiObjectiveMcts {
                                 leaf.getEpoch(), ((DecisionNode)leaf).getEnvironment(),
                                 this.initial.incrementIdCounter());
             Node.setParent(lastDecision, lastChance);
-            parent = leaf;
         } else {
             lastDecision = (DecisionNode) last;
-            parent = lastDecision;
         }
         // Compute utility value of leaf node
         double[] utilityVec = computeUtilityVector(lastDecision, (DecisionNode)leaf);
@@ -702,14 +709,14 @@ public class MultiObjectiveMcts {
         // Compare with other solutions
         Map<Long, double[]> otherUtilities = this.initial.getAllUtilityVecs();
 
-        DecisionNode grand = (DecisionNode)last.getParent().getParent();
+        //DecisionNode grand = (DecisionNode)last.getParent().getParent();
         
         // Number of solutions current leaf dominates
         int nDom = 0;
         
-        if(otherUtilities.containsKey(grand.getId())) {
+        if(otherUtilities.containsKey(leaf.getId())) {
             // new utility vector should replace old leaf
-            this.initial.removeUtilityVec(grand.getId());
+            this.initial.removeUtilityVec(leaf.getId());
         } 
         List<double[]> otherLeafs = new ArrayList<double[]>(this.initial.getAllUtilityVecs().values());
 
@@ -728,39 +735,25 @@ public class MultiObjectiveMcts {
             }
         }
         // add new utility vector to list of utilities
-        this.initial.addUtilityVec(last.getId(), utilityVec);
+        this.initial.addUtilityVec(leaf.getId(), utilityVec);
         
-        lastDecision.setUtility(nDom);
+        //lastDecision.setUtility(nDom);
 
-        if (!leaf.equals(this.initial)) {
-            leaf.incrementNumVisits();
-            double updatedUtility = leaf.getUtility() + lastDecision.getUtility();
-            leaf.setUtility(updatedUtility); 
-            return backpropagate(leaf.getParent(), lastDecision);
-        } else {
-            // Update root too
-            this.initial.incrementNumVisits();
-            double updatedUtility = this.initial.getUtility() + lastDecision.getUtility();
-            this.initial.setUtility(updatedUtility);
-            return this.initial;
+        Node current = leaf;
+
+        while (!current.equals(this.initial)) {
+            current.incrementNumVisits();
+            double updatedUtility = current.getUtility() + nDom;
+            current.setUtility(updatedUtility);
+            current = current.getParent();
         }
+        this.initial.incrementNumVisits();
+        double updatedUtility = this.initial.getUtility() + nDom;
+        this.initial.setUtility(updatedUtility);
+        return this.initial;
     }
 
     private double[] computeUtilityVector(DecisionNode last, DecisionNode leaf) {
-
-        // Compute tracking reward
-        //List<ObservedObject> targetsBefore = ((DecisionNode)this.initial).getEnvironment().getStateTracking();
-/*         double trackingReward = 0;
-        
-        for(int i=0; i<targetsBefore.size(); i++){
-            for(ObservedObject obj : last.getEnvironment().getStateTracking()){
-                if(targetsBefore.get(i).getId() == obj.getId()) {
-                    trackingReward += TrackingObjective
-                                        .computeInformationGain(targetsBefore.get(i), obj);
-                    break;
-                }
-            }
-        } */
 
         // Compute tracking reward
         double trackReward = computeTrackReward(last, leaf);
@@ -880,9 +873,7 @@ public class MultiObjectiveMcts {
                 searchReward = dominating.size() * (-1);
             }
 
-        } else {
-            // TODO: catch case when vecs is empty --> no leaf nodes yet
-        }
+        } 
         this.initial.addSearchDiscrepancyVec(leaf.getId(), discrepance);
         return searchReward;
     }

@@ -335,7 +335,7 @@ public class TrackingObjectiveTest {
         Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
         Transform eciToTopo = new Transform(target, coordinatesStationEci.negate());
         Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
-        TrackingObjective tracking = new TrackingObjective(ooi, topohorizon, topocentric, null);
+        TrackingObjective tracking = new TrackingObjective(ooi, null);
 
         for (int simulation=0; simulation<10; simulation++) {
             AngularDirection pointing = tracking.setMicroAction(current, null);
@@ -353,7 +353,7 @@ public class TrackingObjectiveTest {
             coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
             eciToTopo = new Transform(target, coordinatesStationEci.negate());
             topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
-            tracking.setTopoInertialFrame(topocentric);
+            
         }
         
     }
@@ -424,7 +424,9 @@ public class TrackingObjectiveTest {
             new ObservedObject(987, stateEci, stateCovEci, current, eci);
         List<ObservedObject> ooi = new ArrayList<ObservedObject>();
         ooi.add(singleKeplerianTestCase);
-        TrackingObjective track = new TrackingObjective(ooi, topoHorizon, topoCentric, sensor);
+        //TrackingObjective track = new TrackingObjective(ooi, topoHorizon, topoCentric, sensor);
+        TrackingObjective track = new TrackingObjective(ooi, sensor);
+
         AngularDirection initPointing = 
             new AngularDirection(topoCentric, new double[]{0.,0.}, AngleType.RADEC);
         AngularDirection micro = track.setMicroAction(current, initPointing);
@@ -512,7 +514,8 @@ public class TrackingObjectiveTest {
         ooi.add(this.singleTestCase);
 
         // Call test function 
-        TrackingObjective trackTask = new TrackingObjective(ooi, this.topoHorizon, null, this.sensor);
+        //TrackingObjective trackTask = new TrackingObjective(ooi, this.topoHorizon, null, this.sensor);
+        TrackingObjective trackTask = new TrackingObjective(ooi, this.sensor);
 
         // Compute sensor pointing
         Entry<SpacecraftState, StateCovariance> stateAndCov = 
@@ -546,7 +549,8 @@ public class TrackingObjectiveTest {
         ooi.add(this.singleTestCase);
 
         // Call test function 
-        TrackingObjective trackTask = new TrackingObjective(ooi, this.topoHorizon, null, this.sensor);
+        //TrackingObjective trackTask = new TrackingObjective(ooi, this.topoHorizon, null, this.sensor);
+        TrackingObjective trackTask = new TrackingObjective(ooi, this.sensor);
         
         // Compute sensor pointing
         Entry<SpacecraftState, StateCovariance> stateAndCov = 
