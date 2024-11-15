@@ -61,4 +61,20 @@ public class OptimisingVectorTest {
         out = test.getDominatingVecs(new double[]{7, 8, 4}, new boolean[]{true, true, true}, 0);
         Assert.assertEquals(0, out.size());
     }
+
+    @Test
+    public void testGetDominatingVecs2(){
+        List<double[]> testSet = new ArrayList<double[]>();
+        testSet.add(new double[]{0.3, 0.3, 0.3});
+        testSet.add(new double[]{0.7, 0.7, 0.3});
+
+        OptimisingVector test = new OptimisingVector(testSet, 0);
+        List<double[]> out = 
+            test.getDominatingVecs(new double[]{0.7, 0.3, 0.3}, new boolean[]{false, false, false}, 0);
+        Assert.assertEquals(1, out.size());
+        for(int i=0; i<out.get(0).length; i++) {
+            Assert.assertEquals(testSet.get(0)[i], out.get(0)[i], 1e-16);
+        }
+
+    }
 }

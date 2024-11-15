@@ -71,6 +71,7 @@ public class OptimisingVector {
                 // descending order = vector entry dominates by maximising
                 for(int entry=0; entry<this.all.size(); entry++) {
                     int endIndex = this.all.size() - 1;
+                    // TODO: Check for equality too
                     if(this.all.get(endIndex - entry)[dim] > toCompare[dim]) {
                         dominating.add(this.all.get(endIndex - entry));
                     } else {
@@ -81,7 +82,7 @@ public class OptimisingVector {
             } else {
                 // ascending order = vector entry dominates by minimising
                 for(int entry=0; entry<this.all.size(); entry++) {
-                    if (this.all.get(entry)[dim] < toCompare[dim]) {
+                    if (this.all.get(entry)[dim] <= toCompare[dim]) {
                         dominating.add(this.all.get(entry));
                     } else {
                         break;
@@ -93,6 +94,13 @@ public class OptimisingVector {
                 OptimisingVector ov = new OptimisingVector(dominating, dim);
                 return ov.getDominatingVecs(toCompare, order, dim);
             } else {
+
+                // Check if assumed to be dominating vector is actually not just equal to toCompare
+                for(double[] other : dominating) {
+                    if(Arrays.equals(other, toCompare)) {
+                        dominating.remove(other);
+                    }
+                }
                 return dominating;
             }
         } 
