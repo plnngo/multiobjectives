@@ -76,7 +76,10 @@ public class DecisionNode extends Node{
     public void removeUtilityVec(long id) {
         if (this.allUtilityVecs.containsKey(id)) {
             this.allUtilityVecs.remove(id);
-        } else {
+        } else if (this.allUtilityVecs.size()==0 && id ==0) {
+            // nothing to be removed
+        }
+        else {
             throw new IllegalArgumentException("List of utility vector does not contain the ID " 
                                                 + "that shall get removed");
         }

@@ -705,19 +705,19 @@ public class MultiObjectiveMcts {
         }
         // Compute utility value of leaf node
         double[] utilityVec = computeUtilityVector(lastDecision, (DecisionNode)leaf);
-
-        // Compare with other solutions
-        Map<Long, double[]> otherUtilities = this.initial.getAllUtilityVecs();
-
-        //DecisionNode grand = (DecisionNode)last.getParent().getParent();
         
         // Number of solutions current leaf dominates
         int nDom = 0;
         
-        if(otherUtilities.containsKey(leaf.getId())) {
-            // new utility vector should replace old leaf
-            this.initial.removeUtilityVec(leaf.getId());
-        } 
+        // check if leaf has any siblings
+        DecisionNode grand = (DecisionNode)leaf.getParent().getParent();
+        if(grand.getChildren().size()>1) {
+            // leaf has siblings --> need to add to list of vecs
+
+        } else {
+            // leaf does not have siblings --> need to replace parental vec in list of vecs
+            this.initial.removeUtilityVec(grand.getId());
+        }
         List<double[]> otherLeafs = new ArrayList<double[]>(this.initial.getAllUtilityVecs().values());
 
         if(otherLeafs.size()>0) {
@@ -769,24 +769,24 @@ public class MultiObjectiveMcts {
         
         // Compute common epoch
         List<ObservedObject> trackedObjs = last.getEnvironment().getStateTracking();
-        AbsoluteDate latestUpdate = new AbsoluteDate();
+/*         AbsoluteDate latestUpdate = new AbsoluteDate();
         for(ObservedObject tracked : trackedObjs) {
             if(tracked.getEpoch().compareTo(latestUpdate) > 0) {
                 // Newest update
                 latestUpdate = tracked.getEpoch();
             }
-        }
+        } */
 
         // Propagate all targets from their intial state towards common epoch with Kepler dynamics
         List<ObservedObject> targetsInitial = 
             ((DecisionNode)this.initial).getEnvironment().getStateTracking();
         List<ObservedObject> targetsPredicted = 
-            ObservedObject.propagateTargets(targetsInitial, latestUpdate);
+            ObservedObject.propagateTargets(targetsInitial, this.endCampaign);
 
         // Propagate all targets from their updated final state towards common epoch
-        List<ObservedObject> targetsUpdated = last.getEnvironment().getStateTracking();
+        //List<ObservedObject> targetsUpdated = last.getEnvironment().getStateTracking();
         List<ObservedObject> targetsFinal = 
-            ObservedObject.propagateTargets(targetsUpdated, latestUpdate);
+            ObservedObject.propagateTargets(trackedObjs, this.endCampaign);
 
         // Calculate information gain
         if(targetsPredicted.size() != targetsFinal.size()) {
@@ -839,9 +839,14 @@ public class MultiObjectiveMcts {
         // Compute discrepance vector of leaf node
         double[] discrepance = new double[2];
         for(int i=0; i<completedSearchTasks.size(); i++){
-            discrepance[i] = 
+            if (numTotalSearchTaskCompleted == 0) {
+                discrepance[i] = weightsSearch[i];
+            } else {
+                discrepance[i] = 
                 FastMath.abs(((double)completedSearchTasks.get(i)/numTotalSearchTaskCompleted) 
                                 - weightsSearch[i]);
+            }
+            
         }
 
         DecisionNode grand = (DecisionNode)leaf.getParent().getParent();

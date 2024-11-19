@@ -1544,36 +1544,36 @@ public class MultiObjectiveMctsTest {
         // Set up targets initial state
         Vector3D posA = new Vector3D(7.0e6, 1.0e6, 4.0e6);
         Vector3D velA = new Vector3D(-500.0, 8000.0, 1000.0);
-        Orbit orbitA = new CartesianOrbit(new PVCoordinates(posA, velA), j2000, initDate, 
+        Orbit orbit1 = new CartesianOrbit(new PVCoordinates(posA, velA), j2000, initDate, 
                                         Constants.WGS84_EARTH_MU);
-        SpacecraftState stateA = new SpacecraftState(orbitA);
+        SpacecraftState stateA = new SpacecraftState(orbit1);
         StateVector stateVecA = ObservedObject.spacecraftStateToStateVector(stateA, j2000);
         RealMatrix covInitMatrixA = 
             MatrixUtils.createRealDiagonalMatrix(new double[]{100*1e3, 100*1e3, 100*1e3, 
                                                             0.1, 0.1, 0.1});
         StateCovariance covA = new StateCovariance(covInitMatrixA, initDate, j2000, 
                                                 OrbitType.CARTESIAN, PositionAngleType.MEAN);
-        CartesianCovariance cartCovA = ObservedObject.stateCovToCartesianCov(orbitA, covA, j2000);
-        ObservedObject objA = new ObservedObject(11111, stateVecA, cartCovA, initDate, j2000);
+        CartesianCovariance cartCovA = ObservedObject.stateCovToCartesianCov(orbit1, covA, j2000);
+        ObservedObject obj1 = new ObservedObject(11111, stateVecA, cartCovA, initDate, j2000);
 
         Vector3D posB = new Vector3D(7.1e6, 1.0e6, 3.9e6);
         Vector3D velB = new Vector3D(-500.1, 8000.0, 999.9);
-        Orbit orbitB = new CartesianOrbit(new PVCoordinates(posB, velB), j2000, initDate, 
+        Orbit orbit2 = new CartesianOrbit(new PVCoordinates(posB, velB), j2000, initDate, 
                                         Constants.WGS84_EARTH_MU);
-        SpacecraftState stateB = new SpacecraftState(orbitB);
+        SpacecraftState stateB = new SpacecraftState(orbit2);
         StateVector stateVecB = ObservedObject.spacecraftStateToStateVector(stateB, j2000);
         RealMatrix covInitMatrixB = 
             MatrixUtils.createRealDiagonalMatrix(new double[]{99*1e3, 100*1e3, 101*1e3, 
                                                             0.2, 0.2, 0.2});
         StateCovariance covB = new StateCovariance(covInitMatrixB, initDate, j2000, 
                                                 OrbitType.CARTESIAN, PositionAngleType.MEAN);
-        CartesianCovariance cartCovB = ObservedObject.stateCovToCartesianCov(orbitB, covB, j2000);
-        ObservedObject objB = new ObservedObject(22222, stateVecB, cartCovB, initDate, j2000);
+        CartesianCovariance cartCovB = ObservedObject.stateCovToCartesianCov(orbit2, covB, j2000);
+        ObservedObject obj2 = new ObservedObject(22222, stateVecB, cartCovB, initDate, j2000);
 
         // Set root node
         List<ObservedObject> targetsInit = new ArrayList<ObservedObject>();
-        targetsInit.add(objA);
-        targetsInit.add(objB);
+        targetsInit.add(obj1);
+        targetsInit.add(obj2);
         PropoagatedEnvironment env = 
             new PropoagatedEnvironment(targetsInit, new ArrayList<Integer>());
         DecisionNode root = 
@@ -1595,15 +1595,15 @@ public class MultiObjectiveMctsTest {
         chanceA.setChild(decisionA);
 
         AbsoluteDate epochAPrime = epochA.shiftedBy(2. * 60.);
-        KeplerianPropagator kepPropo = new KeplerianPropagator(orbitA);
+        KeplerianPropagator kepPropo = new KeplerianPropagator(orbit1);
         RealMatrix R = 
                 MatrixUtils.createRealDiagonalMatrix(new double[]{FastMath.pow(1./206265, 2), 
                                                                     FastMath.pow(1./206265, 2)});
         ObservedObject[] predAndCorr = 
-                TrackingObjective.estimateStateWithOwnExtendedKalman(kepPropo, epochAPrime, R, objA, new double[2], sensor);
+                TrackingObjective.estimateStateWithOwnExtendedKalman(kepPropo, epochAPrime, R, obj1, new double[2], sensor);
         List<ObservedObject> targetsPropA = new ArrayList<ObservedObject>();
         targetsPropA.add(predAndCorr[1]);
-        targetsPropA.add(objB);
+        targetsPropA.add(obj2);
         TrackingObjective track1 = new TrackingObjective(targetsInit, sensor);
         ChanceNode chanceAPrime = 
             new ChanceNode(null, 1, 1, track1, null, decisionA, root.incrementIdCounter());
@@ -1626,6 +1626,117 @@ public class MultiObjectiveMctsTest {
         Assert.assertEquals(2, chanceA.getNumVisits());
         Assert.assertEquals(0., decisionA.getUtility(), 1e-16);
         Assert.assertEquals(2, decisionA.getNumVisits());
-                    
+
+        // Set nodes b
+        AbsoluteDate epochB = initDate.shiftedBy(2. * 60.);
+        KeplerianPropagator kepPropo1 = new KeplerianPropagator(orbit1);
+        ObservedObject[] predAndCorrB = 
+            TrackingObjective.estimateStateWithOwnExtendedKalman(kepPropo1, epochB, R, obj1, new double[2], sensor);
+        List<Integer> taskB = new ArrayList<>();
+        taskB.add(0);
+        taskB.add(0);
+        List<ObservedObject> targetsPropB = new ArrayList<ObservedObject>();
+        targetsPropB.add(predAndCorrB[1]);
+        targetsPropB.add(obj2);
+        ChanceNode chanceB =
+            new ChanceNode(null, 1, 1, track1, null, root, root.incrementIdCounter());
+        DecisionNode decisionB = new DecisionNode(1, 1, null, null, null, epochB, 
+                                                  new PropoagatedEnvironment(targetsPropB, taskB), 
+                                                  root.incrementIdCounter());
+        chanceB.setChild(decisionB);
+        AbsoluteDate epochBPrime = epochB.shiftedBy(2. * 60.);
+        KeplerianPropagator kepPropo2 = new KeplerianPropagator(orbit2);
+        ObservedObject[] predAndCorrBPrime = 
+                TrackingObjective.estimateStateWithOwnExtendedKalman(kepPropo2, epochBPrime, R, obj2, new double[2], sensor);     
+        List<ObservedObject> targetsPropBPrime = new ArrayList<ObservedObject>();
+        targetsPropBPrime.add(predAndCorrB[1]);
+        targetsPropBPrime.add(predAndCorrBPrime[1]);     
+        ChanceNode chanceBPrime = 
+            new ChanceNode(null, 1, 1, track1, null, decisionB, root.incrementIdCounter());
+        DecisionNode decisionBPrime = new DecisionNode(0, 1, null, null, null, epochBPrime, 
+                                                       new PropoagatedEnvironment(targetsPropBPrime, taskB), 
+                                                       root.incrementIdCounter());
+        DecisionNode.setParent(decisionBPrime, chanceBPrime);  
+        MultiObjectiveMcts mcts2 = 
+            new MultiObjectiveMcts(root, objectives, initDate, epochAPrime, "TDRS Station", 
+                                   targetsInit, new ArrayList<ObservedObject>(), sensor);
+        mcts2.backpropagate(decisionB, decisionBPrime);
+
+        // Compare
+        Assert.assertEquals(1., root.getUtility(), 1e-16);
+        Assert.assertEquals(3, root.getNumVisits());
+        Assert.assertEquals(1., chanceB.getUtility(), 1e-16);
+        Assert.assertEquals(2, chanceB.getNumVisits());
+        Assert.assertEquals(1., decisionB.getUtility(), 1e-16);
+        Assert.assertEquals(2, decisionB.getNumVisits());
+
+        // Set nodes c
+        decisionB.clearChildren();
+        AbsoluteDate epochC = epochB.shiftedBy(10. * 60.);
+        ChanceNode chanceC = 
+            new ChanceNode(null, 1, 1, search1, null, decisionB, root.incrementIdCounter());
+        DecisionNode decisionC = new DecisionNode(0, 1, null, null, null, epochC, 
+                                                new PropoagatedEnvironment(targetsInit, taskA),
+                                                root.incrementIdCounter());
+        chanceC.setChild(decisionC);
+        AbsoluteDate epochCPrime = epochC.shiftedBy(2. * 60.);
+        KeplerianPropagator kepPropo3 = new KeplerianPropagator(orbit2);
+        ObservedObject[] predAndCorrCPrime = 
+                TrackingObjective.estimateStateWithOwnExtendedKalman(kepPropo3, epochCPrime, R, obj2, new double[2], sensor);
+        List<ObservedObject> targetsPropCPrime = new ArrayList<ObservedObject>();
+        targetsPropCPrime.add(predAndCorrB[1]);
+        targetsPropCPrime.add(predAndCorrCPrime[1]);
+        TrackingObjective track2 = new TrackingObjective(targetsPropB, sensor);
+        ChanceNode chanceCPrime = 
+            new ChanceNode(null, 1, 1, track2, null, decisionC, root.incrementIdCounter());
+        DecisionNode decisionCPrime = new DecisionNode(0, 1, null, null, null, epochCPrime, 
+                                                   new PropoagatedEnvironment(targetsPropCPrime, taskA), 
+                                                   root.incrementIdCounter());
+        DecisionNode.setParent(decisionCPrime, chanceCPrime);
+        MultiObjectiveMcts mcts3 = 
+            new MultiObjectiveMcts(root, objectives, initDate, epochCPrime, "TDRS Station", 
+                                   targetsInit, new ArrayList<ObservedObject>(), sensor);
+        mcts3.backpropagate(decisionC, decisionCPrime);
+
+        // Compare
+        Assert.assertEquals(1., root.getUtility(), 1e-16);
+        Assert.assertEquals(4, root.getNumVisits());
+        Assert.assertEquals(1., chanceB.getUtility(), 1e-16);
+        Assert.assertEquals(3, chanceB.getNumVisits());
+        Assert.assertEquals(1., decisionB.getUtility(), 1e-16);
+        Assert.assertEquals(3, decisionB.getNumVisits());
+        Assert.assertEquals(2, chanceC.getNumVisits());
+        Assert.assertEquals(1., chanceC.getUtility(), 1e-16);
+        Assert.assertEquals(2, decisionC.getNumVisits());
+        Assert.assertEquals(0., decisionC.getUtility(), 1e-16);
+
+        // Expand branch A 
+        AbsoluteDate epochAPrimePrime = epochAPrime.shiftedBy(10. * 60.);
+        List<Integer> taskAPrimePrime = new ArrayList<>();
+        taskA.add(2);
+        taskA.add(0);
+        SearchObjective search4 = new SearchObjective(taskAPrimePrime, null, null, 0, null);
+        ChanceNode chanceAPrimePrime = 
+            new ChanceNode(null, 1, 1, search4, null, decisionAPrime, root.incrementIdCounter());
+        DecisionNode decisionAPrimePrime = new DecisionNode(0, 1, null, null, null, 
+                                                epochAPrimePrime, 
+                                                new PropoagatedEnvironment(targetsPropA, taskAPrimePrime),
+                                                root.incrementIdCounter());
+        DecisionNode.setParent(decisionAPrimePrime, chanceAPrimePrime);
+        MultiObjectiveMcts mcts4 =
+            new MultiObjectiveMcts(root, objectives, initDate, epochAPrimePrime, "TDRS Station", 
+                                   targetsInit, new ArrayList<ObservedObject>(), sensor);
+        mcts4.backpropagate(decisionAPrime, decisionAPrimePrime);
+        Assert.assertEquals(0., root.getUtility(), 1e-16);
+        Assert.assertEquals(5, root.getNumVisits());
+        Assert.assertEquals(0., chanceA.getUtility(), 1e-16);
+        Assert.assertEquals(3, chanceA.getNumVisits());
+        Assert.assertEquals(-1., decisionA.getUtility(), 1e-16);
+        Assert.assertEquals(3, decisionA.getNumVisits());
+        Assert.assertEquals(0., chanceAPrime.getUtility(), 1e-16);
+        Assert.assertEquals(2, chanceAPrime.getNumVisits());
+        Assert.assertEquals(-1., decisionAPrime.getUtility(), 1e-16);
+        Assert.assertEquals(2, decisionAPrime.getNumVisits());
+
    }
 }
