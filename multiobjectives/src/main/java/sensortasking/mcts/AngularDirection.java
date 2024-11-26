@@ -44,7 +44,6 @@ public class AngularDirection {
     }
 
     /** 
-     * @deprecated
      * Transform the pointing direction into {@code dest} frame.
      * 
      * @param dest                  Destination reference frame.
@@ -54,9 +53,10 @@ public class AngularDirection {
      * @return                      Angular direction with respect to the destination frame.
      */
     public AngularDirection transformReference(Frame dest, AbsoluteDate date, 
-                                               AngleType destAngleType) {
+                                               AngleType destAngleType, double scale) {
         Transform t = this.frame.getTransformTo(dest, date);
-        Vector3D transformedDir = t.transformVector(new Vector3D(angles[0], angles[1]));
+        Vector3D transformedDir = 
+            t.transformPosition(new Vector3D(scale, new Vector3D(angles[0], angles[1])));
         double angle1 = transformedDir.getAlpha();
         if(angle1 < 0){
             angle1 += 2*FastMath.PI;
