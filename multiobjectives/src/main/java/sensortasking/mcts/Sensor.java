@@ -141,7 +141,7 @@ public class Sensor {
 
         if(origin.getFrame() != dest.getFrame()) {
             if(origin.getFrame().getName().equals(dest.getFrame().getName())) {
-                origin = origin.transformReference(dest.getFrame(), dest.getDate(), dest.getAngleType());
+                origin = origin.transformReference(dest.getFrame(), dest.getDate(), dest.getAngleType(), 1.);
             } else{
                 System.out.println(origin.getFrame().getName() + " vs " + dest.getFrame().getName());
                 throw new InputMismatchException("Pointing directions were not defined in the " 
@@ -199,7 +199,9 @@ public class Sensor {
         // The transform vector from ECI to topocentric frame is not the vector from ECI's origin 
         // to topocentric origin (expressed in ECI) but rather the negative
         Transform geo2topoEci = new Transform(date, posEci.negate());
-        Frame topoFrame = new Frame(FramesFactory.getGCRF(), geo2topoEci, "Topocentric-Inertial", 
+        /* Frame topoFrame = new Frame(FramesFactory.getGCRF(), geo2topoEci, "Topocentric-Inertial", 
+                     true); */
+        Frame topoFrame = new Frame(FramesFactory.getEME2000(), geo2topoEci, "Topocentric", 
                      true);
 
         return topoFrame;

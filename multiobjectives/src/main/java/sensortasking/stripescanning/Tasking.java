@@ -1027,7 +1027,7 @@ public class Tasking {
         AngularDirection posFirstField = stripe.getFirstPosField();
                 // TODO: check if conversion is true by using values in Vallado p.173
         AngularDirection lonlatFirstPos = 
-            posFirstField.transformReference(ecef, date, AngleType.LONLAT);
+            posFirstField.transformReference(ecef, date, AngleType.LONLAT,1.);
         double lonCurrent = lonlatFirstPos.getAngle1();
 
         Stripe[] scanPrev = prevNight.getScanStripes();
@@ -1041,7 +1041,7 @@ public class Tasking {
                     Stripe stripePrev = slot.getStripe();
                     AngularDirection lonlatFirstPosPrev = 
                         stripePrev.getFirstPosField()
-                                  .transformReference(ecef, startPre, AngleType.LONLAT);
+                                  .transformReference(ecef, startPre, AngleType.LONLAT, 1.);
                     double lonPrev = lonlatFirstPosPrev.getAngle1();
 
                     //TODO: think of a way to define a threshold
@@ -1082,7 +1082,7 @@ public class Tasking {
 
         // Convert pointing direction of first stripe into az/el horizon topocentric frame
         AngularDirection posFirstFieldTopoHorizon = 
-            posFirstField.transformReference(topoHorizon, date, AngleType.AZEL);
+            posFirstField.transformReference(topoHorizon, date, AngleType.AZEL, 1.);
         //System.out.println("Stripe Topo 1st field: " + FastMath.toDegrees(posFirstFieldTopoHorizon.getAngle1()) + " and " + FastMath.toDegrees(posFirstFieldTopoHorizon.getAngle2()));
         
         // Compute time when end of stripe is reached (incl. exposure of last field, too)
@@ -1091,7 +1091,7 @@ public class Tasking {
 
         //TODO: date might needs to get shifted so that it corresponds to the epoch when the sensor reaches the last field
         AngularDirection posLastFieldTopoHorizon = 
-            posLastField.transformReference(topoHorizon, endOfStripe, AngleType.AZEL);
+            posLastField.transformReference(topoHorizon, endOfStripe, AngleType.AZEL, 1.);
         if(posFirstFieldTopoHorizon.getAngle2() < sensor.getElevCutOff()) {
 
             return false;

@@ -9,6 +9,7 @@ import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
 import org.orekit.time.AbsoluteDate;
+import org.orekit.utils.Constants;
 
 import lombok.Getter;
 import sensortasking.stripescanning.Stripe;
@@ -61,9 +62,11 @@ public class SearchObjective implements Objective{
         List<AngularDirection> scheduleTopo = new ArrayList<AngularDirection>();
         List<AngularDirection> scheduleGeo = new ArrayList<AngularDirection>();
 
-        // TODO: re-compute allocation period to slew from current sensor position towards stripe position
+        // Re-compute allocation period to slew from current sensor position towards stripe position
+        double geoDistance = Constants.WGS84_EARTH_EQUATORIAL_RADIUS + 35786 * 1e3;  // in m
         AngularDirection newSensorPointing = 
-            scan.getPosField(0).transformReference(sensorPointing.getFrame(), start, sensorPointing.getAngleType());
+            scan.getPosField(0).transformReference(sensorPointing.getFrame(), start, sensorPointing.getAngleType(), geoDistance);
+        newSensorPointing.setDate(start);
         double actualSlewT = 
                 this.sensor.computeRepositionT(sensorPointing, newSensorPointing, true);
         this.allocation = actualSlewT;
@@ -88,7 +91,7 @@ public class SearchObjective implements Objective{
                 Transform eciToTopo = new Transform(nextPointing, coordinatesStationEci.negate());
                 Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
                 AngularDirection decFieldTopo = 
-                    decField.transformReference(topocentric, nextPointing, AngleType.RADEC);
+                    decField.transformReference(topocentric, nextPointing, AngleType.RADEC, geoDistance);
                 decFieldTopo.setDate(nextPointing);
                 
                 // In same declination field 
@@ -98,7 +101,9 @@ public class SearchObjective implements Objective{
             }
            
             // last measurement does not require extra time for read out (already covered by repos)
-            nextPointing = nextPointing.shiftedBy(reposDuration - sensor.getReadoutT());
+            // Compute time stamp for new dec field
+            nextPointing = nextPointing.shiftedBy(reposDuration - sensor.getReadoutT() 
+                                                    + preparation);
         }
 
         AbsoluteDate lastMeas = scheduleTopo.get(scheduleTopo.size()-1).getDate();
@@ -115,12 +120,13 @@ public class SearchObjective implements Objective{
     @Override
     public AbsoluteDate[] getExecusionDuration(AbsoluteDate current) {
         AbsoluteDate lastMeas = this.scheduleTopocentric.get(this.scheduleTopocentric.size()-1).getDate();
-        AbsoluteDate firstMeas = this.scheduleTopocentric.get(0).getDate();
-        double stripeT = lastMeas.durationFrom(firstMeas);
+        //AbsoluteDate firstMeas = this.scheduleTopocentric.get(0).getDate();
+        /* double stripeT = lastMeas.durationFrom(firstMeas);
         //System.out.println("Stripe duration: " + stripeT);
         double taskDuration = this.allocation + this.sensor.getSettlingT() + preparation + sensor.getExposureT() 
-                                + stripeT + sensor.getReadoutT();
-        AbsoluteDate[] interval = new AbsoluteDate[]{current, current.shiftedBy(taskDuration)};
+                                + stripeT + sensor.getReadoutT(); */
+        AbsoluteDate[] interval = 
+            new AbsoluteDate[]{current, lastMeas.shiftedBy(sensor.getReadoutT())};
         return interval;
     }
 

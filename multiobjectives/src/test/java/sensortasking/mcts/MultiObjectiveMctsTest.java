@@ -1019,21 +1019,103 @@ public class MultiObjectiveMctsTest {
         return ooi;
     }
 
-    @Test
-    public void testOnlySearch() {
 
+    @Test
+    public void testOnlyTrack() {
         // Epoch
         AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60.*60. * 2);
+        AbsoluteDate endCampaign = current.shiftedBy(60. * 20.);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
-        Frame j2000 = FramesFactory.getEME2000();
 
         // Ground station
         GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(6.),   // Geodetic latitude
                                               FastMath.toRadians(-37.),   // Longitude
                                               0.);              // in [m]
+        // Model Earth
+        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                               Constants.WGS84_EARTH_FLATTENING,
+                                               ecef);
+        TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "TDRS Station");
+
+        // Set environment storing the state of the tasking outputs
+        List<Integer> stripeBullseyeCompleted = new ArrayList<Integer>();
+        stripeBullseyeCompleted.add(0); // Stripe scan
+        stripeBullseyeCompleted.add(0); // Bullseye scan
+
+        List<ObservedObject> ooi =  setListOOI(current);
+
+        PropoagatedEnvironment enviro = new PropoagatedEnvironment(ooi, stripeBullseyeCompleted);
+
+        double[] initWeights = new double[]{0., 1.};
+
+        MultiObjectiveMcts mcts = setUpMcts(current, endCampaign, topohorizon, enviro, initWeights);
+
+        Node lastLeaf = mcts.select(mcts.getInitial());
+
+    }
+    @Test
+    public void testOnlySearch() {
+
+        // Epoch
+        AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
+        AbsoluteDate endCampaign = current.shiftedBy(60. * 20.);
+
+        // Frame
+        Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+
+        // Ground station
+        GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(6.),   // Geodetic latitude
+                                              FastMath.toRadians(-37.),   // Longitude
+                                              0.);              // in [m]
+        // Model Earth
+        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                               Constants.WGS84_EARTH_FLATTENING,
+                                               ecef);
+        TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "TDRS Station");
+
+        // Set environment storing the state of the tasking outputs
+        List<Integer> stripeBullseyeCompleted = new ArrayList<Integer>();
+        stripeBullseyeCompleted.add(0); // Stripe scan
+        stripeBullseyeCompleted.add(0); // Bullseye scan
+
+        List<ObservedObject> ooi = setListOOI(current);
+
+        PropoagatedEnvironment enviro = new PropoagatedEnvironment(ooi, stripeBullseyeCompleted);
+
+        double[] initWeights = new double[]{1., 0.};
+
+        MultiObjectiveMcts mcts = setUpMcts(current, endCampaign, topohorizon, enviro, initWeights);
+
+        Node lastLeaf = mcts.select(mcts.getInitial());
+
+        // Check that each node only has one child
+        Assert.assertEquals(1, mcts.getInitial().getChildren().size());
+
+        Node currentChild = mcts.getInitial().getChildren().get(0);
+        while(currentChild.getId() != lastLeaf.getId()) {
+            Assert.assertEquals(1, currentChild.getChildren().size());
+            currentChild = currentChild.getChildren().get(0);
+        }
+
+        // Check time stamp for first search 
+        ChanceNode search = (ChanceNode)mcts.getInitial().getChildren().get(0);
+        checkSearchNode(search, current, topohorizon, 195.750408);
+                
+        
+        // Check time stamp for second search task
+        current = search.getChildren().get(0).getEpoch();
+        ChanceNode search2 = (ChanceNode)lastLeaf.getParent();
+        checkSearchNode(search2, current, topohorizon, 31.608597);
+
+    }
+                
+    private MultiObjectiveMcts setUpMcts(AbsoluteDate current, AbsoluteDate endCampaign, 
+                                         TopocentricFrame topohorizon, 
+                                         PropoagatedEnvironment enviro,
+                                         double[] initWeights) {
+        
         double readout = 7.;
         double exposure = 8.;
         double settling = 30.;
@@ -1041,13 +1123,9 @@ public class MultiObjectiveMctsTest {
         double slewT = 9.;
         Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
         double slewVel = fov.getHeight()/slewT;
-        Sensor sensor = new Sensor("TDRS Station", fov, pos, exposure, readout, slewVel, settling, cutOff);
+        Sensor sensor = new Sensor("TDRS Station", fov, topohorizon.getPoint(), exposure, readout, 
+                                    slewVel, settling, cutOff);
 
-        // Model Earth
-        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
-                                               Constants.WGS84_EARTH_FLATTENING,
-                                               ecef);
-        TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "TDRS Station");
         Transform horizonToEci = topohorizon.getTransformTo(j2000, current);  // date has to be the measurement epoch
         Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
         Transform eciToTopo = new Transform(current, coordinatesStationEci.negate());
@@ -1059,67 +1137,52 @@ public class MultiObjectiveMctsTest {
         int numVisits = 1;
         AngularDirection initPointing = 
             new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
-        double[] initWeights = new double[]{1., 0.};
         double[] initTimeResources = new double[]{endCampaign.durationFrom(current), 0.};
 
-        // Set environment storing the state of the tasking outputs
-        List<Integer> stripeBullseyeCompleted = new ArrayList<Integer>();
-        stripeBullseyeCompleted.add(0); // Stripe scan
-        stripeBullseyeCompleted.add(0); // Bullseye scan
-
-        List<ObservedObject> ooi = new ArrayList<ObservedObject>();
-
-        PropoagatedEnvironment enviro = new PropoagatedEnvironment(ooi, stripeBullseyeCompleted);
+        
         Node root = new DecisionNode(initUtility, numVisits, initPointing, initWeights, 
                                      initTimeResources, current, enviro, 0);
-        MultiObjectiveMcts mctsTracking = 
+        MultiObjectiveMcts mcts = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", null, 
                                    new ArrayList<ObservedObject>(), sensor);
-        Node lastLeaf = mctsTracking.select(root);
-        Node parent = lastLeaf.getParent();
+        return mcts;
+        }
         
+    private void checkSearchNode(ChanceNode search, AbsoluteDate current, 
+                            TopocentricFrame topohorizon, double reloc) {
+        double geoDistance = Constants.WGS84_EARTH_EQUATORIAL_RADIUS + 35786 * 1e3;  // in m
 
-        // Extract observable objects
-        List<TLE> observables = getGEOSat(current);
+        List<AngularDirection> actualTopo = 
+            ((SearchObjective)search.getMacro()).getScheduleTopocentric();
+        List<AngularDirection> actualGeo = 
+            ((SearchObjective)search.getMacro()).getScheduleGeocentric();
+        // Shift by reloc, settling, prep and half of expose time
+        AbsoluteDate instance = current.shiftedBy(reloc + 30. + 6. + 4.);
+        //Check in time stamps and topocentric angles regarding first dec field
+        for(int i=0; i<actualTopo.size(); i++) {
 
-        // Perform tasks
-        List<AngularDirection> actualMeas = new ArrayList<AngularDirection>();
+            // Compute topocentric inertial frame
+            Transform horizonToEci = topohorizon.getTransformTo(j2000, instance);  // date has to be the measurement epoch
+            Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
+            Transform eciToTopo = new Transform(instance, coordinatesStationEci.negate());
+            Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
+            AngularDirection trans = 
+                actualGeo.get(i).transformReference(topocentric, instance, AngleType.RADEC, 
+                                                    geoDistance);
+            Assert.assertEquals(actualTopo.get(i).getAngle1(), trans.getAngle1(), 1e-9);
+            Assert.assertEquals(actualTopo.get(i).getAngle2(), trans.getAngle2(), 1e-9);
+            Assert.assertEquals(0., instance.durationFrom(actualTopo.get(i).getDate()), 1e-6);
+            // shift by expose and read out time
+            instance = instance.shiftedBy(8. + 7.);
 
-        while (!parent.equals(mctsTracking.getInitial())) {
-            if(parent.getClass().getSimpleName().equals("ChanceNode")) {
-                //System.out.println("Next node");
-                ChanceNode parentChance = (ChanceNode)parent;
-                List<AngularDirection> tasks = ((SearchObjective)parentChance.getMacro()).getScheduleGeocentric();
-
-                for(AngularDirection task: tasks) {
-                    AbsoluteDate epoch = task.getDate();
-                    double[] raRange = new double[]{task.getAngle1() - fov.getWidth()/2, 
-                                                    task.getAngle1() + fov.getWidth()/2};
-                    double[] decRange = new double[]{task.getAngle2() - fov.getHeight()/2,
-                                                    task.getAngle2() + fov.getHeight()/2};
-        
-                    for(TLE candidate : observables) {
-                        TLEPropagator prop = TLEPropagator.selectExtrapolator(candidate);
-                        Vector3D propPos = prop.propagate(epoch).getPVCoordinates(j2000).getPosition();
-                        AngularDirection anglePos = 
-                            new AngularDirection(j2000, 
-                                                new double[]{propPos.getAlpha(), propPos.getDelta()}, 
-                                                AngleType.RADEC);
-                        boolean inDecField = checkInAngularRange(anglePos, raRange, decRange);
-        
-                        // Extract measurement if object is in FOV
-                        if(inDecField) {
-                            anglePos.setDate(epoch);
-                            actualMeas.add(anglePos);
-                            System.out.println(candidate.getSatelliteNumber() + " at " + epoch);
-                        }
-                    }
-                }
+            int j = i+1;
+            if(j%5==0) {
+                // shift by repos and prep time and substract readout
+                instance = instance.shiftedBy(-7. + 39. + 6);
             }
-            parent = parent.getParent();
         }
     }
-
+        
     private static boolean checkInAngularRange(AngularDirection obj, double[] raRange, double[] decRange) {
         double ra = obj.getAngle1() ;
         if(ra< 0.) {
@@ -1360,14 +1423,6 @@ public class MultiObjectiveMctsTest {
         AbsoluteDate endCampaign = current.shiftedBy(10.* 60.);
         List<String> objectives = new ArrayList<String>(Arrays.asList("SEARCH", "TRACK"));
 
-        // Frame
-        Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
-
-        // Model Earth
-        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
-                                               Constants.WGS84_EARTH_FLATTENING,
-                                               ecef);
-
         // Ground station
         GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(6.),   // Geodetic latitude
                                               FastMath.toRadians(-37.),   // Longitude
@@ -1380,8 +1435,6 @@ public class MultiObjectiveMctsTest {
         Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
         double slewVel = FastMath.toRadians(1.)/1.;     // 1 deg per second
         Sensor sensor = new Sensor("TDRS Station", fov, pos, exposure, readout, slewVel, settling, cutOff);
-
-        TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "TDRS Station");
 
         List<ObservedObject> ooiAll = setListOOI(current);
         MultiObjectiveMcts mcts = new MultiObjectiveMcts(root, objectives, current, endCampaign, 

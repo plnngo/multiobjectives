@@ -6,14 +6,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Map;
 
-import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.util.FastMath;
 import org.orekit.bodies.BodyShape;
 import org.orekit.bodies.OneAxisEllipsoid;
 import org.orekit.frames.Frame;
 import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
-import org.orekit.frames.Transform;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
@@ -274,7 +272,7 @@ public class MultiObjectiveMcts {
         
         // Expand by Chance node first
         // Need to sample a new pair of macro and micro action
-        double[] weights = new double[]{0.5, 0.5};
+        double[] weights = new double[]{1., 1.};
 
         // Generate array filled with indexes representing the objective IDs
         int[] indexObjective = new int[weights.length];
@@ -299,14 +297,16 @@ public class MultiObjectiveMcts {
                 }
                 // Time until end of observation campaign
                 double leftT = this.endCampaign.durationFrom(leaf.getEpoch());
-                if(leftT < scanStripe.getStripeT(numExpo)){
-                    searchPossible = false; // Not enough time to complete search
-                }
                 List<Integer> completedSearchTasks = leaf.getEnvironment().getStateSearching();
 
-                // Increment stripe scan tasks by one
-                completedSearchTasks.set(0, completedSearchTasks.get(0) + 1);   
+                if(leftT < scanStripe.getStripeT(numExpo)){
+                    searchPossible = false; // Not enough time to complete search
+                } 
+                                       
                 if(searchPossible && !searchAlreadyPerformed) {
+
+                    // Increment stripe scan tasks by one
+                    completedSearchTasks.set(0, completedSearchTasks.get(0) + 1);
                     objective = new SearchObjective(completedSearchTasks, stationFrame, 
                                                     scanStripe, numExpo, sensor);
                     break;
@@ -328,18 +328,7 @@ public class MultiObjectiveMcts {
                                                 + TrackingObjective.preparation 
                                                 + this.sensor.getExposureT()/2);
 
-                // Extract new station position
-                Transform horizonToEci = stationFrame.getTransformTo(j2000, measEpoch); 
-                Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
-                Transform eciToTopo = new Transform(measEpoch, coordinatesStationEci.negate());
-                Frame topoInertial = new Frame(j2000, eciToTopo, "Topocentric", true);
-
-                // make sure that tree does not get expanded by the same node that already exist among siblings
-                DecisionNode current = leaf;
-                while(current.getEnvironment().getStateTracking().size()==0) {
-                    current = ((DecisionNode)current.getParent().getParent());
-                }
-                List<ObservedObject> ooi = new ArrayList<>(current.getEnvironment().getStateTracking());
+                List<ObservedObject> ooi = new ArrayList<>(leaf.getEnvironment().getStateTracking());
                 for(Node sibling : leaf.getChildren()) {
                     ChanceNode chance = (ChanceNode)sibling;
                     if (chance.getMacro().getClass().getSimpleName().equals("TrackingObjective")) {
@@ -358,8 +347,11 @@ public class MultiObjectiveMcts {
                         
                     }
                 }
+                AngularDirection pointing = 
+                    new TrackingObjective(ooi, sensor)
+                        .setMicroAction(leaf.getEpoch(), leaf.getSensorPointing());
 
-                if (ooi.size()==0) {
+                if (ooi.size()==0 || Objects.isNull(pointing)) {
                     // No candidate to track but try search
                     indexSelectedObjective = 2;
                 } else {
