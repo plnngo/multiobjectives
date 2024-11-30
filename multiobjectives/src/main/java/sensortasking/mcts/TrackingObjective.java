@@ -2,9 +2,11 @@ package sensortasking.mcts;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Random;
 
 import org.hipparchus.geometry.euclidean.threed.Rotation;
 import org.hipparchus.geometry.euclidean.threed.RotationConvention;
@@ -67,6 +69,7 @@ import org.orekit.utils.TimeStampedPVCoordinates;
 
 import lombok.Getter;
 import sensortasking.stripescanning.Tasking;
+import tools.OptimisingVector;
 
 @SuppressWarnings("rawtypes")
 @Getter
@@ -945,8 +948,165 @@ public class TrackingObjective implements Objective{
         
         return out;
     }
+    /**
+     * @param current           Epoch of the last decision node
+     * @param sensorPointing    Pointing location of the sensor at the current epoch
+     * 
+    */
     @Override
-    public AngularDirection setMicroAction(AbsoluteDate current, AngularDirection sensorPointing) {
+    public AngularDirection setMicroAction(AbsoluteDate current, AngularDirection sensorPointing){
+
+        // List of trackable objects with their potential IG and relocation duration
+        Map<AngularDirection, double[]> trackable = new HashMap<AngularDirection, double[]>();
+
+        // List of candidates that might be trackable
+        List<ObservedObject> checkTrackable = new ArrayList<ObservedObject>(updatedTargets);
+
+        AbsoluteDate measEpoch = 
+                    current.shiftedBy(TrackingObjective.allocation 
+                                        + this.sensor.getSettlingT() 
+                                        + TrackingObjective.preparation 
+                                        + this.sensor.getExposureT()/2);
+
+        // Check in the upcoming time range between 90s and 9.5min when objects are trackable  
+        for (int t=0; t<8.*60.; t=t+30) {
+            measEpoch = measEpoch.shiftedBy(t);
+
+            Frame topoInertial = this.sensor.getTopoInertialFrame(measEpoch);
+  
+            // Iterate through list of objects of interest
+            for (ObservedObject candidate : checkTrackable) {
+
+                final EventDetector visibility =
+                        new ElevationDetector(maxcheck, threshold, stationHorizon)
+                        .withConstantElevation(this.sensor.getElevCutOff())
+                        .withHandler((s, d, increasing) -> {
+                            System.out.println(" Visibility on object " +
+                                            candidate.getId() +
+                                            (increasing ? " begins at " : " ends at ") +
+                                            s.getDate().toStringWithoutUtcOffset(utc, 3));
+                            return increasing ? Action.CONTINUE : Action.STOP;  // stop propagation when object leaves FOR
+                        });
+                // set up eclipse detector
+                EclipseDetector eclipseDetector = new EclipseDetector(sun, Constants.SUN_RADIUS, earth)
+                                                    .withMaxCheck(60.0)
+                                                    .withThreshold(1.0e-3)
+                                                    .withHandler(new ContinueOnEvent())
+                                                    .withUmbra();
+
+                // Set up propagator
+                Vector3D pos = candidate.getState().getPositionVector();
+                Vector3D vel = candidate.getState().getVelocityVector();
+                PVCoordinates pv = new PVCoordinates(pos, vel);
+                Orbit initialOrbit = new CartesianOrbit(pv, candidate.getFrame(), 
+                                        candidate.getEpoch(), Constants.WGS84_EARTH_MU);
+                KeplerianPropagator kepPropo = new KeplerianPropagator(initialOrbit);
+                
+                // Add event to be detected
+                final EventsLogger horizonLogger = new EventsLogger();
+                EventsLogger earthShadowLogger = new EventsLogger();
+                kepPropo.addEventDetector(horizonLogger.monitorDetector(visibility));
+                kepPropo.addEventDetector(earthShadowLogger.monitorDetector(eclipseDetector));
+
+                // Propagate
+                SpacecraftState predState = kepPropo.propagate(measEpoch);
+                if (eclipseDetector.g(predState)<0.) {
+                    // Observation cannot be performed because object in Earth shadow
+                    continue;
+                } else if (visibility.g(predState) < 0.) {
+                    // Object not in FOV even though sensor was placed such that visibility is provided
+                    throw new IllegalArgumentException("Object is not in FOV");
+                }
+
+                // Transform spacecraft state into sensor pointing direction
+                AngularDirection raDecPointing = transformStateToPointing(predState, topoInertial);
+                raDecPointing.setDate(measEpoch);
+
+                boolean goodSolarPhase = 
+                    Tasking.checkSolarPhaseCondition(measEpoch, raDecPointing);
+
+                if (!goodSolarPhase) {
+                    // Observation cannot be performed because of lack of visibility
+                    continue;
+                }
+                double distMoon = 
+                    AngularDirection.computeAngularDistMoon(measEpoch, topoInertial, raDecPointing);
+                if (distMoon < minMoonDist) {
+                    // Observation cannot be performed because of lack of visibility
+                    continue;
+                }
+                double actualSlewT = 
+                    this.sensor.computeRepositionT(sensorPointing, raDecPointing, true);
+                double reloc = TrackingObjective.allocation + t;
+                if(actualSlewT > reloc) {
+                    // not enough time to slew to target pointing direction
+                    continue;
+                }
+                
+                // Generate real measurement
+                RealMatrix R = 
+                    MatrixUtils.createRealDiagonalMatrix(new double[]{FastMath.pow(1./206265, 2), 
+                                                                    FastMath.pow(1./206265, 2)});
+                
+                double[] residuals = new double[2];
+                ObservedObject[] predAndCorr = 
+                    estimateStateWithOwnExtendedKalman(kepPropo, measEpoch, R, candidate, residuals, sensor);
+                double iG = computeInformationGain(predAndCorr[0], predAndCorr[1]);
+                
+                // Generate optimisation vector with IG as 1st and relocation time as 2nd entry
+                double[] iGreloc = new double[]{iG, reloc};
+                trackable.put(raDecPointing, iGreloc);
+                
+                // Remove object that is trackable from list of check candidates
+                checkTrackable.remove(candidate); 
+            } 
+        }
+        // If list of trackable options is empty, tracking task not possible
+        if(trackable.isEmpty()) {
+            // none of the considered taregts is observable
+            return null;
+        } else if (trackable.size() == 1) {
+            // track object 
+            return trackable.keySet().iterator().next();
+        } else {
+            // select target based on optimisation: max IG, min 
+            List<double[]> toOpt = new ArrayList<double[]>(trackable.values());
+
+            // Compute number of dominating solutions
+            int[] numDominating = new int[3];
+            for (int i=0; i<toOpt.size(); i++) {
+                double[] toCompare = toOpt.get(0);
+                toOpt.remove(0);
+
+                OptimisingVector optIgReloc = new OptimisingVector(toOpt);
+                numDominating[i] = optIgReloc
+                                    .getDominatingVecs(toCompare, new boolean[]{true, false}, 0)
+                                    .size();
+                toOpt.add(toCompare);
+            }
+
+            // Find optimal solution(s) that minimises number of dominating solutions
+            List<Integer> solutionIndexes = new ArrayList<>();
+            int min = Integer.MAX_VALUE;
+            for (int i=0; i<numDominating.length; i++) {
+                if(numDominating[i] < min) {
+                    min = numDominating[i];
+                    solutionIndexes.clear();
+                    solutionIndexes.add(i);
+                } else if (numDominating[i] == min) {
+                    solutionIndexes.add(i);
+                }
+            }
+            // Select solution randomly from all left options
+            Random rand = new Random();
+            int indexOfIndexes = rand.nextInt(solutionIndexes.size());
+            int solutionIndex = solutionIndexes.get(indexOfIndexes);
+            List<AngularDirection> trackableDir = new ArrayList<AngularDirection>(trackable.keySet());
+            return trackableDir.get(solutionIndex);
+        }
+    }
+
+    public AngularDirection setMicroActionFixedAllocAngularDirection(AbsoluteDate current, AngularDirection sensorPointing) {
 
         Frame topoInertial = this.sensor.getTopoInertialFrame(current);
 
@@ -993,8 +1153,6 @@ public class TrackingObjective implements Objective{
             EventsLogger earthShadowLogger = new EventsLogger();
             kepPropo.addEventDetector(horizonLogger.monitorDetector(visibility));
             kepPropo.addEventDetector(earthShadowLogger.monitorDetector(eclipseDetector));
-
-            
 
             // Propagate
             SpacecraftState predState = kepPropo.propagate(targetDate);

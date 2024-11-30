@@ -282,6 +282,7 @@ public class MultiObjectiveMcts {
         int indexSelectedObjective = 
             WeightedRandomNumberPicker.pickNumber(indexObjective, weights);
         Objective objective;
+        AngularDirection pointing = null;
         //List<ObservedObject> propEnviroment = new ArrayList<ObservedObject>();
         switch (indexSelectedObjective) {
             case 0:
@@ -322,11 +323,11 @@ public class MultiObjectiveMcts {
 
             case 1:
                 // Macro action = track
-                AbsoluteDate measEpoch = 
+               /*  AbsoluteDate measEpoch = 
                     leaf.getEpoch().shiftedBy(TrackingObjective.allocation 
                                                 + this.sensor.getSettlingT() 
                                                 + TrackingObjective.preparation 
-                                                + this.sensor.getExposureT()/2);
+                                                + this.sensor.getExposureT()/2); */
 
                 List<ObservedObject> ooi = new ArrayList<>(leaf.getEnvironment().getStateTracking());
                 for(Node sibling : leaf.getChildren()) {
@@ -344,16 +345,23 @@ public class MultiObjectiveMcts {
                         if(index!=-1) {
                             ooi.remove(index);
                         }
-                        
                     }
                 }
-                AngularDirection pointing = 
-                    new TrackingObjective(ooi, sensor)
-                        .setMicroAction(leaf.getEpoch(), leaf.getSensorPointing());
+/*                 for(int t=0; t<scanStripe.getStripeT(numExpo); t=t+30) {
+                    if (ooi.size()==0 ) {
+                        // No candidate to track
+                        break;
+                    }
+                    measEpoch = measEpoch.shiftedBy(t);
+                    pointing = new TrackingObjective(ooi, sensor)
+                                    .setMicroAction(measEpoch, leaf.getSensorPointing());
+                     
+                } */
 
-                if (ooi.size()==0 || Objects.isNull(pointing)) {
+                if (Objects.isNull(pointing)) {
                     // No candidate to track but try search
                     indexSelectedObjective = 2;
+                    pointing = null;
                 } else {
                     //objective = new TrackingObjective(ooi, stationFrame, topoInertial, sensor);
                     objective = new TrackingObjective(ooi, sensor);
@@ -385,8 +393,9 @@ public class MultiObjectiveMcts {
         }
 
         List<ObservedObject> restore = leaf.getEnvironment().getStateTracking();
-        AngularDirection pointing = 
-            objective.setMicroAction(leaf.getEpoch(), leaf.getSensorPointing());
+        if(Objects.isNull(pointing)) {
+            pointing = objective.setMicroAction(leaf.getEpoch(), leaf.getSensorPointing());
+        }
         leaf.getEnvironment().setStateTracking(restore);
         if (Objects.isNull(pointing)) {
             // none of the considered targets was observable --> no expansion possible
@@ -478,7 +487,7 @@ public class MultiObjectiveMcts {
             // searching objective has been selected
             // for now, only stripe scan is performed TODO: implement bullseye
             List<Integer> propEnviroment = objective.propagateOutcome();
-            propEnviroment.set(0, (Integer)propEnviroment.get(0) + 1);
+            //propEnviroment.set(0, (Integer)propEnviroment.get(0) + 1);
             PropoagatedEnvironment environment = 
                 new PropoagatedEnvironment(leaf.getEnvironment().getStateTracking(), 
                                            propEnviroment);
@@ -588,7 +597,7 @@ public class MultiObjectiveMcts {
 
         if(otherLeafs.size()>0) {
             int dim = otherLeafs.get(0).length;
-            OptimisingVector opt = new OptimisingVector(otherLeafs, 0);
+            OptimisingVector opt = new OptimisingVector(otherLeafs);
 
             // search utility vectors dominate by maximising
             boolean[] domMax = new boolean[dim];
@@ -714,7 +723,7 @@ public class MultiObjectiveMcts {
 
         if(otherLeafs.size()>0) {
             int dim = otherLeafs.get(0).length;
-            OptimisingVector opt = new OptimisingVector(otherLeafs, 0);
+            OptimisingVector opt = new OptimisingVector(otherLeafs);
 
             // search utility vectors dominate by maximising
             boolean[] domMax = new boolean[dim];
@@ -858,7 +867,7 @@ public class MultiObjectiveMcts {
         double searchReward = 0;
         if(vecs.size()>0) {
             int dim = vecs.get(0).length;
-            OptimisingVector opt = new OptimisingVector(vecs, 0);
+            OptimisingVector opt = new OptimisingVector(vecs);
 
             // search utility vectors dominate by minimising
             boolean[] domMin = new boolean[dim];
