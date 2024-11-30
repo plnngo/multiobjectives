@@ -12,7 +12,7 @@ public class OptimisingVector {
 
     protected List<double[]> all;
 
-    public OptimisingVector(List<double[]> vectors, int dim) {
+    public OptimisingVector(List<double[]> vectors) {
         if(vectors.size()>0) {
             double[][] allVec = new double[vectors.size()][vectors.get(0).length];
 
@@ -24,13 +24,13 @@ public class OptimisingVector {
                 }
             }
 
-            // Sort array by first entries of vector
+            // Sort array in ascending order by first entries of vector
             Arrays.sort(allVec, new Comparator<double[]>() {
 
                 @Override
                 public int compare(double[] o1, double[] o2) {
-                    Double d1 = o1[dim];
-                    Double d2 = o2[dim];
+                    Double d1 = o1[0];
+                    Double d2 = o2[0];
                     return d1.compareTo(d2);
                 }
             });
@@ -90,7 +90,7 @@ public class OptimisingVector {
             }
             dim++;
             if(dim<toCompare.length){
-                OptimisingVector ov = new OptimisingVector(dominating, dim);
+                OptimisingVector ov = new OptimisingVector(dominating);
                 return ov.getDominatingVecs(toCompare, order, dim);
             } else {
 

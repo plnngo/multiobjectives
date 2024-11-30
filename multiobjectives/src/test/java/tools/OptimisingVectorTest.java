@@ -41,7 +41,7 @@ public class OptimisingVectorTest {
     @Test
     public void testSortingByFirstEntry() {
        
-        OptimisingVector test = new OptimisingVector(this.vectors, 0);
+        OptimisingVector test = new OptimisingVector(this.vectors);
         double[] firstActual = test.getAll().get(0);
         for(int i=0; i<firstActual.length; i++){
             Assert.assertEquals(vectors.get(7)[i], firstActual[i], 1e-16);
@@ -50,7 +50,7 @@ public class OptimisingVectorTest {
 
     @Test
     public void testGetDominatingVecs(){
-        OptimisingVector test = new OptimisingVector(this.vectors, 0);
+        OptimisingVector test = new OptimisingVector(this.vectors);
         List<double[]> out = 
             test.getDominatingVecs(new double[]{7, 8, 4}, new boolean[]{false, false, false}, 0);
         Assert.assertEquals(1, out.size());
@@ -68,7 +68,7 @@ public class OptimisingVectorTest {
         testSet.add(new double[]{0.3, 0.3, 0.3});
         testSet.add(new double[]{0.7, 0.7, 0.3});
 
-        OptimisingVector test = new OptimisingVector(testSet, 0);
+        OptimisingVector test = new OptimisingVector(testSet);
         List<double[]> out = 
             test.getDominatingVecs(new double[]{0.7, 0.3, 0.3}, new boolean[]{false, false, false}, 0);
         Assert.assertEquals(1, out.size());
