@@ -1024,7 +1024,7 @@ public class MultiObjectiveMctsTest {
     public void testOnlyTrack() {
         // Epoch
         AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60. * 20.);
+        AbsoluteDate endCampaign = current.shiftedBy(60. * 9.);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -1052,7 +1052,8 @@ public class MultiObjectiveMctsTest {
 
         MultiObjectiveMcts mcts = setUpMcts(current, endCampaign, topohorizon, enviro, initWeights);
 
-        Node lastLeaf = mcts.select(mcts.getInitial());
+        //Node lastLeaf = mcts.selectNew(mcts.getInitial());
+        List<Node> strategy = mcts.run(30);
 
     }
     @Test
@@ -1120,7 +1121,7 @@ public class MultiObjectiveMctsTest {
         double exposure = 8.;
         double settling = 30.;
         double cutOff = FastMath.toRadians(5.);
-        double slewT = 9.;
+        double slewT = 0.2;
         Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
         double slewVel = fov.getHeight()/slewT;
         Sensor sensor = new Sensor("TDRS Station", fov, topohorizon.getPoint(), exposure, readout, 
@@ -1657,7 +1658,7 @@ public class MultiObjectiveMctsTest {
         List<ObservedObject> targetsPropA = new ArrayList<ObservedObject>();
         targetsPropA.add(predAndCorr[1]);
         targetsPropA.add(obj2);
-        TrackingObjective track1 = new TrackingObjective(targetsInit, sensor);
+        TrackingObjective track1 = new TrackingObjective(targetsInit, sensor, epochAPrime);
         ChanceNode chanceAPrime = 
             new ChanceNode(null, 1, 1, track1, null, decisionA, root.incrementIdCounter());
         DecisionNode decisionAPrime = new DecisionNode(0, 1, null, null, null, epochAPrime, 
@@ -1739,7 +1740,7 @@ public class MultiObjectiveMctsTest {
         List<ObservedObject> targetsPropCPrime = new ArrayList<ObservedObject>();
         targetsPropCPrime.add(predAndCorrB[1]);
         targetsPropCPrime.add(predAndCorrCPrime[1]);
-        TrackingObjective track2 = new TrackingObjective(targetsPropB, sensor);
+        TrackingObjective track2 = new TrackingObjective(targetsPropB, sensor, epochCPrime);
         ChanceNode chanceCPrime = 
             new ChanceNode(null, 1, 1, track2, null, decisionC, root.incrementIdCounter());
         DecisionNode decisionCPrime = new DecisionNode(0, 1, null, null, null, epochCPrime, 

@@ -103,8 +103,9 @@ public class MultiObjectiveMcts {
         //List<Node> outputUCB = new ArrayList<Node>();
         List<Node> outputRobustMax = new ArrayList<Node>();
 
-        for(int i=0; i<iterations; i++) {                        
+        for(int i=0; i<iterations; i++) {   
             selectNew(this.initial);
+            System.out.println("Finished iteration: " + i);
         }
 
         // Retrieve pointing strategy UCB
@@ -148,6 +149,7 @@ public class MultiObjectiveMcts {
                     // already reached end of campaign
                     return current;
                 }
+                //System.out.println("After expansion leaf epoch: " + leaf.getEpoch().toString());
                 expandable = true;
                 List<Node> simulated = simulate(leaf, endCampaign);
                 if (simulated.size() != 0) {
@@ -235,14 +237,21 @@ public class MultiObjectiveMcts {
 
                 } else if (leaf.getEpoch().compareTo(endCampaign) >= 0) {
                     // already reached end of campaign
-                    if (((ChanceNode)leaf.getParent()).getMacro().getClass().getSimpleName().equals("TrackingObjective")) {
-                        leaf.getParent().getParent().clearChildren();
-                        return false;
+                    if (((ChanceNode)leaf.getParent()).getMacro().getClass().getSimpleName().equals("TrackingObjective")) {     // TODO: still necessary to perform backprop
+                        Node grand = leaf.getParent().getParent();   
+                        grand.removeChild(leaf.getParent());
+                        Node nextChild = grand;
+                        while(nextChild.getChildren().size() != 0) {
+                            nextChild = selectChildUCB(nextChild);
+                        }
+                        leaf = (DecisionNode) nextChild; 
+                        //System.out.println(" grand to leaf: " + leaf.getEpoch().toString());       
                     }
                 }
+                System.out.println("After expansion leaf epoch: " + leaf.getEpoch().toString());
                 expandable = true;
                 List<Node> simulated = simulate(leaf, endCampaign);
-                if (simulated.size() != 0) {
+                if (simulated.size() > 1) {
                     backpropagate(leaf, simulated.get(simulated.size()-1));
                 } else {
                     backpropagate(leaf, null);
@@ -265,8 +274,9 @@ public class MultiObjectiveMcts {
      */
     public DecisionNode expand(DecisionNode leaf, boolean simulationPhase){
 
-        //Node leaf = selected.get(selected.size()-1);
-        //String nodeType = leaf.getClass().getSimpleName();
+        if(!simulationPhase) {
+            System.out.println("Expansion phase leaf epoch " + leaf.getEpoch().toString());
+        }
         ChanceNode expandedChance = null;
         DecisionNode expandedDecision = null;
         
@@ -293,7 +303,7 @@ public class MultiObjectiveMcts {
                     ChanceNode chance = (ChanceNode)sibling;
                     
                     if (chance.getMacro().getClass().getSimpleName().equals("SearchObjective")) {
-                        searchAlreadyPerformed = true; // Search is already performed by another sibling
+                        searchAlreadyPerformed = true; // Search is already performed by another sibling TODO: break from for loop
                     }
                 }
                 // Time until end of observation campaign
@@ -301,7 +311,7 @@ public class MultiObjectiveMcts {
                 List<Integer> completedSearchTasks = leaf.getEnvironment().getStateSearching();
 
                 if(leftT < scanStripe.getStripeT(numExpo)){
-                    searchPossible = false; // Not enough time to complete search
+                    searchPossible = false; // Not enough time to complete search TODO: indexSelectedObjective = 1;
                 } 
                                        
                 if(searchPossible && !searchAlreadyPerformed) {
@@ -323,12 +333,6 @@ public class MultiObjectiveMcts {
 
             case 1:
                 // Macro action = track
-               /*  AbsoluteDate measEpoch = 
-                    leaf.getEpoch().shiftedBy(TrackingObjective.allocation 
-                                                + this.sensor.getSettlingT() 
-                                                + TrackingObjective.preparation 
-                                                + this.sensor.getExposureT()/2); */
-
                 List<ObservedObject> ooi = new ArrayList<>(leaf.getEnvironment().getStateTracking());
                 for(Node sibling : leaf.getChildren()) {
                     ChanceNode chance = (ChanceNode)sibling;
@@ -347,24 +351,14 @@ public class MultiObjectiveMcts {
                         }
                     }
                 }
-/*                 for(int t=0; t<scanStripe.getStripeT(numExpo); t=t+30) {
-                    if (ooi.size()==0 ) {
-                        // No candidate to track
-                        break;
-                    }
-                    measEpoch = measEpoch.shiftedBy(t);
-                    pointing = new TrackingObjective(ooi, sensor)
-                                    .setMicroAction(measEpoch, leaf.getSensorPointing());
-                     
-                } */
 
+                objective = new TrackingObjective(ooi, sensor, this.endCampaign);
+                pointing = objective.setMicroAction(leaf.getEpoch(), leaf.getSensorPointing());
                 if (Objects.isNull(pointing)) {
                     // No candidate to track but try search
                     indexSelectedObjective = 2;
                     pointing = null;
                 } else {
-                    //objective = new TrackingObjective(ooi, stationFrame, topoInertial, sensor);
-                    objective = new TrackingObjective(ooi, sensor);
                     break;
                 }
             case 2:
@@ -392,7 +386,7 @@ public class MultiObjectiveMcts {
                 throw new IllegalAccessError("Unknown objective.");
         }
 
-        List<ObservedObject> restore = leaf.getEnvironment().getStateTracking();
+        List<ObservedObject> restore = leaf.getEnvironment().getStateTracking();    // TODO: check if necessary
         if(Objects.isNull(pointing)) {
             pointing = objective.setMicroAction(leaf.getEpoch(), leaf.getSensorPointing());
         }
@@ -401,10 +395,12 @@ public class MultiObjectiveMcts {
             // none of the considered targets was observable --> no expansion possible
             return null;
         }
+        System.out.println("Before chance node expansion leaf epoch: " + leaf.getEpoch().toString());
         expandedChance = new ChanceNode(objective.getExecusionDuration(leaf.getEpoch()), 
                                         0., 0, objective, pointing, leaf, 
                                         this.initial.incrementIdCounter());
-        expandedChance.setId(this.initial.incrementIdCounter());
+        //System.out.println("After chance node expansion leaf epoch: " + leaf.getEpoch().toString());
+        
       
         // Update 
         double[] priorTimeResources = leaf.getTimeResources();
@@ -417,6 +413,7 @@ public class MultiObjectiveMcts {
             priorTobs += priorTimeResources[i];
         }
         AbsoluteDate[] obsTimeInterval = expandedChance.getExecutionDuration();
+        System.out.println("Task execusion epochs from: " + obsTimeInterval[0].toString() + " to " + obsTimeInterval[1].toString());
         double executionDuration = obsTimeInterval[1].durationFrom(obsTimeInterval[0]);
         double postTobs = priorTobs - executionDuration;
 
@@ -456,6 +453,7 @@ public class MultiObjectiveMcts {
         postWeights = new double[]{0.5, 0.5};
 
         AbsoluteDate propEpoch = leaf.getEpoch().shiftedBy(executionDuration);
+        System.out.println("Prop epoch " + leaf.getEpoch().toString() + " shifted by " + executionDuration);
 
         if(objective instanceof TrackingObjective) {
             List<ObservedObject> propEnviroment = objective.propagateOutcome();
@@ -500,7 +498,8 @@ public class MultiObjectiveMcts {
         }
 
         expandedChance.setChild(expandedDecision); 
-        //expandedDecision.setId(this.initial.incrementIdCounter());
+        System.out.println("After expansion prop epoch: " + propEpoch.toString() + " decision epoch " + expandedDecision.getEpoch().toString());
+
                  
         return expandedDecision;
     }
@@ -515,6 +514,7 @@ public class MultiObjectiveMcts {
      * @return                  List of nodes that have been simulated during roll-out.
      */
     public List<Node> simulate(DecisionNode leaf, AbsoluteDate campaignEndDate) {
+        System.out.println("Simulation " + leaf.getId() + " leaf node epoch " + leaf.getEpoch().toString());
 
         List<ObservedObject> restore = leaf.getEnvironment().getStateTracking();
         // Declare output
@@ -524,8 +524,9 @@ public class MultiObjectiveMcts {
         DecisionNode current = leaf;
         AbsoluteDate currentEndMeasEpoch = current.getEpoch();
 
+
         while(currentEndMeasEpoch.compareTo(campaignEndDate) <= 0) {
-            episode.add(current.getParent());
+            //episode.add(current.getParent());
             episode.add(current);
             current = expand(current, true); 
             if (Objects.isNull(current)) {
@@ -534,11 +535,9 @@ public class MultiObjectiveMcts {
             currentEndMeasEpoch = current.getEpoch();
         }
       
-        if(episode.size()>0) {
-            episode.remove(0);
-        }
         leaf.clearChildren();  
         leaf.getEnvironment().setStateTracking(restore);     
+        System.out.println("Simulation end " + currentEndMeasEpoch.toString());
         return episode;
     }
 
@@ -597,7 +596,7 @@ public class MultiObjectiveMcts {
 
         if(otherLeafs.size()>0) {
             int dim = otherLeafs.get(0).length;
-            OptimisingVector opt = new OptimisingVector(otherLeafs);
+            OptimisingVector opt = new OptimisingVector(otherLeafs, 0);
 
             // search utility vectors dominate by maximising
             boolean[] domMax = new boolean[dim];
@@ -680,6 +679,7 @@ public class MultiObjectiveMcts {
      */
     public Node backpropagate(Node leaf, Node last) {
 
+        //System.out.println("Backpropagate");
         DecisionNode lastDecision;
         ChanceNode lastChance;
         
@@ -723,7 +723,7 @@ public class MultiObjectiveMcts {
 
         if(otherLeafs.size()>0) {
             int dim = otherLeafs.get(0).length;
-            OptimisingVector opt = new OptimisingVector(otherLeafs);
+            OptimisingVector opt = new OptimisingVector(otherLeafs, 0);
 
             // search utility vectors dominate by maximising
             boolean[] domMax = new boolean[dim];
@@ -748,6 +748,8 @@ public class MultiObjectiveMcts {
             current.setUtility(updatedUtility);
             current = current.getParent();
         }
+        System.out.println("Backpropagate");
+
         this.initial.incrementNumVisits();
         double updatedUtility = this.initial.getUtility() + nDom;
         this.initial.setUtility(updatedUtility);
@@ -770,13 +772,6 @@ public class MultiObjectiveMcts {
         
         // Compute common epoch
         List<ObservedObject> trackedObjs = last.getEnvironment().getStateTracking();
-/*         AbsoluteDate latestUpdate = new AbsoluteDate();
-        for(ObservedObject tracked : trackedObjs) {
-            if(tracked.getEpoch().compareTo(latestUpdate) > 0) {
-                // Newest update
-                latestUpdate = tracked.getEpoch();
-            }
-        } */
 
         // Propagate all targets from their intial state towards common epoch with Kepler dynamics
         List<ObservedObject> targetsInitial = 
@@ -802,7 +797,7 @@ public class MultiObjectiveMcts {
 
                 // Make sure that ID of objects are the same when computing information gain
                 if(targetsPredicted.get(i).getId() != targetsFinal.get(j).getId()) {
-                    // Move to next object in targetFinals
+                    // Move to next object in targetFinals                                                                          
                     j++;
                 } else {
                     // Same ID found
@@ -867,7 +862,7 @@ public class MultiObjectiveMcts {
         double searchReward = 0;
         if(vecs.size()>0) {
             int dim = vecs.get(0).length;
-            OptimisingVector opt = new OptimisingVector(vecs);
+            OptimisingVector opt = new OptimisingVector(vecs, 0);
 
             // search utility vectors dominate by minimising
             boolean[] domMin = new boolean[dim];

@@ -33,9 +33,9 @@ public class Node {
         child.parent = this;
     }
 
-/*     public void setAsParentOf(Node child) {
-        child.parent = this;
-    } */
+    public void removeChild(Node child) {
+        children.remove(child);
+    }
 
     public static void setParent(Node child, Node parent) {
         child.parent = parent;

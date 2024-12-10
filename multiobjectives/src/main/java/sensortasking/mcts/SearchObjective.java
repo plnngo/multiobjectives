@@ -126,7 +126,7 @@ public class SearchObjective implements Objective{
         double taskDuration = this.allocation + this.sensor.getSettlingT() + preparation + sensor.getExposureT() 
                                 + stripeT + sensor.getReadoutT(); */
         AbsoluteDate[] interval = 
-            new AbsoluteDate[]{current, lastMeas.shiftedBy(sensor.getReadoutT())};
+            new AbsoluteDate[]{current, lastMeas.shiftedBy(sensor.getExposureT()/2 + sensor.getReadoutT())};
         return interval;
     }
 

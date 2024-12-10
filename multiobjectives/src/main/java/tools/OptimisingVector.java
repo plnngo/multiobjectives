@@ -12,7 +12,7 @@ public class OptimisingVector {
 
     protected List<double[]> all;
 
-    public OptimisingVector(List<double[]> vectors) {
+    public OptimisingVector(List<double[]> vectors, int dim) {
         if(vectors.size()>0) {
             double[][] allVec = new double[vectors.size()][vectors.get(0).length];
 
@@ -29,8 +29,8 @@ public class OptimisingVector {
 
                 @Override
                 public int compare(double[] o1, double[] o2) {
-                    Double d1 = o1[0];
-                    Double d2 = o2[0];
+                    Double d1 = o1[dim];
+                    Double d2 = o2[dim];
                     return d1.compareTo(d2);
                 }
             });
@@ -90,7 +90,7 @@ public class OptimisingVector {
             }
             dim++;
             if(dim<toCompare.length){
-                OptimisingVector ov = new OptimisingVector(dominating);
+                OptimisingVector ov = new OptimisingVector(dominating, dim);
                 return ov.getDominatingVecs(toCompare, order, dim);
             } else {
 

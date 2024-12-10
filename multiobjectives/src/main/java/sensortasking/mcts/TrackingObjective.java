@@ -3,7 +3,9 @@ package sensortasking.mcts;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
@@ -103,7 +105,7 @@ public class TrackingObjective implements Objective{
     static double preparation = 6.;
 
     /** Allocation time duration in [sec].  */
-    static double allocation = 90.;
+    static double allocation = 5.;
 
     /** Sun. */
     final static CelestialBody sun = CelestialBodyFactory.getSun();
@@ -125,13 +127,13 @@ public class TrackingObjective implements Objective{
 
     TopocentricFrame stationHorizon;
 
-    //Frame topoInertial;
-
     /** Sensor. */
     Sensor sensor;
 
+    AbsoluteDate endCampaign;
 
-    public TrackingObjective(List<ObservedObject> targets, Sensor sensor) {
+
+    public TrackingObjective(List<ObservedObject> targets, Sensor sensor, AbsoluteDate endCampaign) {
 
         // Initialise list of targets
         for (ObservedObject target : targets) {
@@ -140,7 +142,7 @@ public class TrackingObjective implements Objective{
         this.stationHorizon = sensor.getTopoHorizon();
         this.sensor = sensor;
         this.sensorApartureRadius = sensor.getFov().getWidth()/2;       // TODO: currently assumed that aparture is circular
-
+        this.endCampaign = endCampaign;
     }
 
     public void setStationHorizonFrame(TopocentricFrame frame){
@@ -879,25 +881,22 @@ public class TrackingObjective implements Objective{
 
     @Override
     public AbsoluteDate[] getExecusionDuration(AbsoluteDate current) {
-        //return 60.*5.;
-        double taskDuration = allocation + this.sensor.getSettlingT() + preparation 
-                                + this.sensor.getExposureT() + this.sensor.getReadoutT();
-        AbsoluteDate[] interval = new AbsoluteDate[]{current, current.shiftedBy(taskDuration)};
-/*         if (this.loggedFORpasses.size() == 2) {
-            // object is going to enter and exit FOR within upcoming 15min
-            interval = new AbsoluteDate[]{this.loggedFORpasses.get(0).getDate(), 
-                                          this.loggedFORpasses.get(1).getDate()};
-        }
-        for (LoggedEvent event : this.loggedFORpasses) {
-            if (event.isIncreasing()) {
-                // object is going to enter FOR within upcoming 15min
-                interval = new AbsoluteDate[]{this.loggedFORpasses.get(0).getDate(),
-                                              current.shiftedBy(maxPropDuration)};
-            } else {
-                // object is going to leave within upcoming 15min
-                interval[1] = this.loggedFORpasses.get(0).getDate();
+        // Get epoch of last tracking measurement
+        AbsoluteDate lastUpdateEpoch = new AbsoluteDate();
+        for(ObservedObject obj : this.getUpdatedTargets()) {
+            if (obj.getId() == this.lastUpdated) {
+                lastUpdateEpoch = obj.getEpoch();
+                break;
             }
-        } */
+        }
+        
+        if (lastUpdateEpoch.durationFrom(new AbsoluteDate()) < 10) {
+            System.out.println("Buggy epoch: " + lastUpdateEpoch.toString());
+        }
+        AbsoluteDate[] interval = 
+            new AbsoluteDate[]{current, lastUpdateEpoch.shiftedBy(sensor.getExposureT()/2 
+                                                                    + sensor.getReadoutT())};
+
         return interval;
     }
 
@@ -956,8 +955,11 @@ public class TrackingObjective implements Objective{
     @Override
     public AngularDirection setMicroAction(AbsoluteDate current, AngularDirection sensorPointing){
 
+        // List of potentially updated target 
+        List<ObservedObject> targets = new ArrayList<ObservedObject>();
+
         // List of trackable objects with their potential IG and relocation duration
-        Map<AngularDirection, double[]> trackable = new HashMap<AngularDirection, double[]>();
+        Map<AngularDirection, double[]> trackable = new LinkedHashMap<AngularDirection, double[]>();
 
         // List of candidates that might be trackable
         List<ObservedObject> checkTrackable = new ArrayList<ObservedObject>(updatedTargets);
@@ -968,14 +970,17 @@ public class TrackingObjective implements Objective{
                                         + TrackingObjective.preparation 
                                         + this.sensor.getExposureT()/2);
 
-        // Check in the upcoming time range between 90s and 9.5min when objects are trackable  
-        for (int t=0; t<8.*60.; t=t+30) {
-            measEpoch = measEpoch.shiftedBy(t);
-
+        // Check in the upcoming time range between 5s and 400s when objects are trackable 
+        double tShift = 2.; 
+        for (int t=0; t<200; t++) {
+            measEpoch = measEpoch.shiftedBy(tShift);
             Frame topoInertial = this.sensor.getTopoInertialFrame(measEpoch);
   
             // Iterate through list of objects of interest
-            for (ObservedObject candidate : checkTrackable) {
+             ListIterator<ObservedObject> iterator = checkTrackable.listIterator();
+            while (iterator.hasNext()) {
+            //for (ObservedObject candidate : checkTrackable) {
+            ObservedObject candidate = iterator.next();
 
                 final EventDetector visibility =
                         new ElevationDetector(maxcheck, threshold, stationHorizon)
@@ -1037,7 +1042,7 @@ public class TrackingObjective implements Objective{
                 }
                 double actualSlewT = 
                     this.sensor.computeRepositionT(sensorPointing, raDecPointing, true);
-                double reloc = TrackingObjective.allocation + t;
+                double reloc = TrackingObjective.allocation + t*tShift;
                 if(actualSlewT > reloc) {
                     // not enough time to slew to target pointing direction
                     continue;
@@ -1056,10 +1061,14 @@ public class TrackingObjective implements Objective{
                 // Generate optimisation vector with IG as 1st and relocation time as 2nd entry
                 double[] iGreloc = new double[]{iG, reloc};
                 trackable.put(raDecPointing, iGreloc);
+                targets.add(predAndCorr[1]);
                 
                 // Remove object that is trackable from list of check candidates
-                checkTrackable.remove(candidate); 
+                iterator.remove(); 
             } 
+            if(checkTrackable.isEmpty()) {
+                break;
+            }
         }
         // If list of trackable options is empty, tracking task not possible
         if(trackable.isEmpty()) {
@@ -1067,18 +1076,24 @@ public class TrackingObjective implements Objective{
             return null;
         } else if (trackable.size() == 1) {
             // track object 
+            ObservedObject candidate = targets.get(0);
+            this.updatedTargets.get(0).setState(candidate.getState());
+            this.updatedTargets.get(0).setCovariance(candidate.getCovariance());
+            this.updatedTargets.get(0).setEpoch(candidate.getEpoch());
+            this.lastUpdated = candidate.getId();
+            
             return trackable.keySet().iterator().next();
         } else {
             // select target based on optimisation: max IG, min 
             List<double[]> toOpt = new ArrayList<double[]>(trackable.values());
 
             // Compute number of dominating solutions
-            int[] numDominating = new int[3];
+            int[] numDominating = new int[trackable.size()];
             for (int i=0; i<toOpt.size(); i++) {
                 double[] toCompare = toOpt.get(0);
                 toOpt.remove(0);
 
-                OptimisingVector optIgReloc = new OptimisingVector(toOpt);
+                OptimisingVector optIgReloc = new OptimisingVector(toOpt, 0);
                 numDominating[i] = optIgReloc
                                     .getDominatingVecs(toCompare, new boolean[]{true, false}, 0)
                                     .size();
@@ -1096,12 +1111,42 @@ public class TrackingObjective implements Objective{
                 } else if (numDominating[i] == min) {
                     solutionIndexes.add(i);
                 }
+            }  
+            for (int i=0; i<solutionIndexes.size(); i++) {
+                int checkWithinCampaign = targets.get(solutionIndexes.get(i))
+                                                        .getEpoch()
+                                                        .shiftedBy(sensor.getExposureT()/2 
+                                                                    + sensor.getReadoutT())
+                                                        .compareTo(this.endCampaign);
+                if(checkWithinCampaign>=0) {
+                    // Tracking epoch outside campaign window
+                    solutionIndexes.remove(i);
+                }
             }
+
             // Select solution randomly from all left options
             Random rand = new Random();
+            if (solutionIndexes.size() == 0) {
+                // Targets not trackable because measurement epoch outside campaign window
+                return null; 
+            }
             int indexOfIndexes = rand.nextInt(solutionIndexes.size());
             int solutionIndex = solutionIndexes.get(indexOfIndexes);
-            List<AngularDirection> trackableDir = new ArrayList<AngularDirection>(trackable.keySet());
+            List<AngularDirection> trackableDir = 
+                new ArrayList<AngularDirection>(trackable.keySet());
+            ObservedObject target = targets.get(solutionIndex);
+
+            // Update targeted candidate in the list of objects of interest TODO: only update in expansion not simulation phase --> update in the frame of simulation but don't overwrite on expansion global level
+            for(ObservedObject candidate : updatedTargets) {
+                if(candidate.getId() == target.getId()) {
+                    candidate.setState(target.getState());
+                    candidate.setCovariance(target.getCovariance());
+                    candidate.setEpoch(target.getEpoch());
+                    this.lastUpdated = candidate.getId();
+                    break;
+                }
+            }   
+            
             return trackableDir.get(solutionIndex);
         }
     }

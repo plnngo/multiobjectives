@@ -1,7 +1,9 @@
 package sensortasking.mcts;
 
 import java.util.Map;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 import org.orekit.time.AbsoluteDate;
 
@@ -29,6 +31,8 @@ public class DecisionNode extends Node{
 
     /** Utility vectors of all existing leaf nodes.*/
     Map<Long, double[]> allUtilityVecs = new HashMap<Long, double[]>();
+
+    List<Long> removedLeafs = new ArrayList<Long>();
 
     /** Node ID counter. */
     protected long idCounter = 0;
@@ -76,12 +80,24 @@ public class DecisionNode extends Node{
     public void removeUtilityVec(long id) {
         if (this.allUtilityVecs.containsKey(id)) {
             this.allUtilityVecs.remove(id);
+            removedLeafs.add(id);
         } else if (this.allUtilityVecs.size()==0 && id ==0) {
             // nothing to be removed
         }
         else {
-            throw new IllegalArgumentException("List of utility vector does not contain the ID " 
+            for (int i=0; i<removedLeafs.size(); i++) {
+                if (removedLeafs.get(i) == id) {
+                    // nothing to be removed
+                    System.out.println("Attempt to remove a removed leaf node");
+                    break;
+                }
+                if (i == removedLeafs.size()-1) {
+                    throw new IllegalArgumentException("List of utility vector does not contain the ID " 
                                                 + "that shall get removed");
+                }
+            }
+            
+            
         }
     }
 
