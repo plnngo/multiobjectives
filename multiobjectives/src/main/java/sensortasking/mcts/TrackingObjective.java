@@ -1121,6 +1121,7 @@ public class TrackingObjective implements Objective{
                 if(checkWithinCampaign>=0) {
                     // Tracking epoch outside campaign window
                     solutionIndexes.remove(i);
+                    i--;
                 }
             }
 

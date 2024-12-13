@@ -3,6 +3,7 @@ package sensortasking.mcts;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -46,6 +47,8 @@ import org.orekit.utils.CartesianDerivativesFilter;
 import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
 import org.orekit.utils.PVCoordinates;
+
+import com.opencsv.CSVWriter;
 
 public class MultiObjectiveMctsTest {
 
@@ -977,7 +980,6 @@ public class MultiObjectiveMctsTest {
                                               {2.9071094424474166E-8, 4.306014824614407E-6, 6.298597666057694E-9, -8.212503178246334E-10, 1.7482251900748092E-8, -1.9276823004892938E-10},
                                               {7.50553956976887E-9, 6.301496942467037E-9, 4.283086978472644E-6, -2.109541457159083E-10, -1.9276823004892938E-10, 1.818503320357093E-8}};
         RealMatrix covMatrixTdrs05 = (new Array2DRowRealMatrix(covTdrs05)).scalarMultiply(1e6);
-        App.printCovariance(covMatrixTdrs05);
         StateCovariance covEciTdrs05 = new StateCovariance(covMatrixTdrs05, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
 
         double[][] covTdrs06 = new double[][]{{0.009855827555408531, 1.0287018380692445E-7, 3.910267644855593E-8, 4.318775659506618E-6, 3.082546456689512E-8, 7.3708924118463976E-9},
@@ -998,7 +1000,6 @@ public class MultiObjectiveMctsTest {
         RealMatrix covMatrixTdrs12 = (new Array2DRowRealMatrix(covTdrs12)).scalarMultiply(1e6);
         StateCovariance covEciTdrs12 = new StateCovariance(covMatrixTdrs12, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
 
-        
         CartesianCovariance stateCovTdrs05 =
             ObservedObject.stateCovToCartesianCov(spacecraftTdrs05.getOrbit(), covEciTdrs05, j2000); 
         CartesianCovariance stateCovTdrs06 =
@@ -1021,10 +1022,12 @@ public class MultiObjectiveMctsTest {
 
 
     @Test
-    public void testOnlyTrack() {
+    public void testOnlyTrack() throws IOException {
+        long start = System.currentTimeMillis();
+        
         // Epoch
         AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60. * 9.);
+        AbsoluteDate endCampaign = current.shiftedBy(60. * 4.);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -1039,21 +1042,72 @@ public class MultiObjectiveMctsTest {
                                                ecef);
         TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "TDRS Station");
 
-        // Set environment storing the state of the tasking outputs
-        List<Integer> stripeBullseyeCompleted = new ArrayList<Integer>();
-        stripeBullseyeCompleted.add(0); // Stripe scan
-        stripeBullseyeCompleted.add(0); // Bullseye scan
-
-        List<ObservedObject> ooi =  setListOOI(current);
-
-        PropoagatedEnvironment enviro = new PropoagatedEnvironment(ooi, stripeBullseyeCompleted);
-
-        double[] initWeights = new double[]{0., 1.};
-
-        MultiObjectiveMcts mcts = setUpMcts(current, endCampaign, topohorizon, enviro, initWeights);
-
         //Node lastLeaf = mcts.selectNew(mcts.getInitial());
-        List<Node> strategy = mcts.run(30);
+        List<List<Node>> solutions = new ArrayList<List<Node>>();
+        String out = "";
+
+        // create FileWriter object with file as parameter 
+        FileWriter outputfile = new FileWriter("Tuples.csv"); 
+    
+        // create CSVWriter object filewriter object as parameter 
+        CSVWriter writer = new CSVWriter(outputfile); 
+
+        for (int i=0; i<10000; i++) {
+             // Set environment storing the state of the tasking outputs
+            List<Integer> stripeBullseyeCompleted = new ArrayList<Integer>();
+            stripeBullseyeCompleted.add(0); // Stripe scan
+            stripeBullseyeCompleted.add(0); // Bullseye scan
+
+            List<ObservedObject> ooi =  setListOOI(current);
+
+            PropoagatedEnvironment enviro = new PropoagatedEnvironment(ooi, stripeBullseyeCompleted);
+
+            double[] initWeights = new double[]{0., 1.};
+
+            MultiObjectiveMcts mcts = setUpMcts(current, endCampaign, topohorizon, enviro, initWeights);
+
+            List<Node> strategy = mcts.run(50);
+            String[] selected = new String[4];
+            int j =0;
+            for(Node currentNode : strategy) {
+                if (currentNode.getClass().getSimpleName().equals("ChanceNode")) {
+                    String objective = ((ChanceNode) currentNode).getMacro().getClass().getSimpleName();
+                    if (objective.equals("TrackingObjective")) {
+                        long id = ((TrackingObjective)((ChanceNode) currentNode).getMacro())
+                                                                                    .getLastUpdated();
+
+                        if (id == 21639) {
+                            out = out + "A ";
+
+                        } else if(id == 22314) {
+                            out = out + "B ";
+                        } else {
+                            out = out + "C ";
+                        }
+                        selected[j] = Long.toString(id);
+                        j++;
+                        
+                    } else {
+                        out = out + "S ";
+                        selected[j] = "S";
+                        j++;
+                    }
+                } else {
+                    continue;
+                }
+            }
+            writer.writeNext(selected);
+            j=0;
+            out = out + "\n";
+            solutions.add(strategy);
+        }
+        System.out.println(out);
+        long finish = System.currentTimeMillis();
+        long elapsed = finish - start;
+        System.out.println("Time " + elapsed + " ms");
+        // closing writer connection 
+        writer.close(); 
+
 
     }
     @Test
@@ -1568,12 +1622,10 @@ public class MultiObjectiveMctsTest {
         double slewVel = FastMath.toRadians(1.)/1.;     // 1 deg per second
         Sensor sensor = new Sensor("TDRS Station", fov, pos, exposure, readout, slewVel, settling, cutOff);
 
-        TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "TDRS Station");
-
         MultiObjectiveMcts mcts = new MultiObjectiveMcts(root, objectives, initDate, target, 
                                                          "TDRS Station", targetsInit, 
                                                          new ArrayList<ObservedObject>(), sensor);
-        double actualReward = mcts.computeTrackReward(leaf, leaf);
+        double actualReward = mcts.computeTrackReward(leaf);
         Assert.assertEquals(2.7682235805565E7, actualReward, 1e-16);
    }
 

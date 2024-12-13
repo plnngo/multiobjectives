@@ -701,8 +701,8 @@ public class Tasking {
         }
 
         AngularDirection[] boundaries = getShadowBoundaryAngles(sun, earth, date);
-        System.out.println("Earth shadow 1: " + FastMath.toDegrees(boundaries[0].getAngle1()) + ", " + FastMath.toDegrees(boundaries[0].getAngle2()));
-        System.out.println("Earth shadow 2: " + FastMath.toDegrees(boundaries[1].getAngle1()) + ", " + FastMath.toDegrees(boundaries[1].getAngle2()));
+/*         System.out.println("Earth shadow 1: " + FastMath.toDegrees(boundaries[0].getAngle1()) + ", " + FastMath.toDegrees(boundaries[0].getAngle2()));
+        System.out.println("Earth shadow 2: " + FastMath.toDegrees(boundaries[1].getAngle1()) + ", " + FastMath.toDegrees(boundaries[1].getAngle2())); */
 
         double[] boundaryRAs = new double[]{boundaries[0].getAngle1(), boundaries[1].getAngle1()};
 

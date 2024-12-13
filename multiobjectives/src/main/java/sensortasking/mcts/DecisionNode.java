@@ -88,7 +88,6 @@ public class DecisionNode extends Node{
             for (int i=0; i<removedLeafs.size(); i++) {
                 if (removedLeafs.get(i) == id) {
                     // nothing to be removed
-                    System.out.println("Attempt to remove a removed leaf node");
                     break;
                 }
                 if (i == removedLeafs.size()-1) {

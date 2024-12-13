@@ -105,7 +105,6 @@ public class MultiObjectiveMcts {
 
         for(int i=0; i<iterations; i++) {   
             selectNew(this.initial);
-            System.out.println("Finished iteration: " + i);
         }
 
         // Retrieve pointing strategy UCB
@@ -244,11 +243,9 @@ public class MultiObjectiveMcts {
                         while(nextChild.getChildren().size() != 0) {
                             nextChild = selectChildUCB(nextChild);
                         }
-                        leaf = (DecisionNode) nextChild; 
-                        //System.out.println(" grand to leaf: " + leaf.getEpoch().toString());       
+                        leaf = (DecisionNode) nextChild;      
                     }
                 }
-                System.out.println("After expansion leaf epoch: " + leaf.getEpoch().toString());
                 expandable = true;
                 List<Node> simulated = simulate(leaf, endCampaign);
                 if (simulated.size() > 1) {
@@ -274,12 +271,16 @@ public class MultiObjectiveMcts {
      */
     public DecisionNode expand(DecisionNode leaf, boolean simulationPhase){
 
-        if(!simulationPhase) {
-            System.out.println("Expansion phase leaf epoch " + leaf.getEpoch().toString());
-        }
         ChanceNode expandedChance = null;
         DecisionNode expandedDecision = null;
-        
+        List<ObservedObject> restore = new ArrayList<>();
+        for(ObservedObject target : leaf.getEnvironment().getStateTracking()) {
+            ObservedObject copy = new ObservedObject(target.getId(), target.getState(), 
+                                                     target.getCovariance(), target.getEpoch(), 
+                                                     target.getFrame());
+            restore.add(copy);
+        }
+
         // Expand by Chance node first
         // Need to sample a new pair of macro and micro action
         double[] weights = new double[]{1., 1.};
@@ -354,6 +355,7 @@ public class MultiObjectiveMcts {
 
                 objective = new TrackingObjective(ooi, sensor, this.endCampaign);
                 pointing = objective.setMicroAction(leaf.getEpoch(), leaf.getSensorPointing());
+
                 if (Objects.isNull(pointing)) {
                     // No candidate to track but try search
                     indexSelectedObjective = 2;
@@ -383,23 +385,25 @@ public class MultiObjectiveMcts {
                 }
 
             default:
+
                 throw new IllegalAccessError("Unknown objective.");
         }
 
-        List<ObservedObject> restore = leaf.getEnvironment().getStateTracking();    // TODO: check if necessary
+
         if(Objects.isNull(pointing)) {
             pointing = objective.setMicroAction(leaf.getEpoch(), leaf.getSensorPointing());
         }
+
         leaf.getEnvironment().setStateTracking(restore);
+
+
         if (Objects.isNull(pointing)) {
             // none of the considered targets was observable --> no expansion possible
             return null;
         }
-        System.out.println("Before chance node expansion leaf epoch: " + leaf.getEpoch().toString());
         expandedChance = new ChanceNode(objective.getExecusionDuration(leaf.getEpoch()), 
                                         0., 0, objective, pointing, leaf, 
                                         this.initial.incrementIdCounter());
-        //System.out.println("After chance node expansion leaf epoch: " + leaf.getEpoch().toString());
         
       
         // Update 
@@ -413,7 +417,6 @@ public class MultiObjectiveMcts {
             priorTobs += priorTimeResources[i];
         }
         AbsoluteDate[] obsTimeInterval = expandedChance.getExecutionDuration();
-        System.out.println("Task execusion epochs from: " + obsTimeInterval[0].toString() + " to " + obsTimeInterval[1].toString());
         double executionDuration = obsTimeInterval[1].durationFrom(obsTimeInterval[0]);
         double postTobs = priorTobs - executionDuration;
 
@@ -453,10 +456,15 @@ public class MultiObjectiveMcts {
         postWeights = new double[]{0.5, 0.5};
 
         AbsoluteDate propEpoch = leaf.getEpoch().shiftedBy(executionDuration);
-        System.out.println("Prop epoch " + leaf.getEpoch().toString() + " shifted by " + executionDuration);
 
         if(objective instanceof TrackingObjective) {
-            List<ObservedObject> propEnviroment = objective.propagateOutcome();
+            List<ObservedObject> propEnviroment = new ArrayList<ObservedObject>();
+            for(ObservedObject obj: (List<ObservedObject>)objective.propagateOutcome()) {
+                ObservedObject copy = new ObservedObject(obj.getId(), obj.getState(), 
+                                                         obj.getCovariance(), obj.getEpoch(), 
+                                                         obj.getFrame());
+                propEnviroment.add(copy);
+            }
             for(int parent=0; parent<leaf.getEnvironment().getStateTracking().size(); parent++) {
                 long idParent = leaf.getEnvironment().getStateTracking().get(parent).getId();
                 boolean found = false;
@@ -482,7 +490,7 @@ public class MultiObjectiveMcts {
                                                 postTimeResources, propEpoch, environment,
                                                 this.initial.incrementIdCounter());  
         } else if (objective instanceof SearchObjective) {
-            // searching objective has been selected
+            // searching objective has been selected TODO: hard copy of propagatedOutcome might be necessary
             // for now, only stripe scan is performed TODO: implement bullseye
             List<Integer> propEnviroment = objective.propagateOutcome();
             //propEnviroment.set(0, (Integer)propEnviroment.get(0) + 1);
@@ -498,9 +506,7 @@ public class MultiObjectiveMcts {
         }
 
         expandedChance.setChild(expandedDecision); 
-        System.out.println("After expansion prop epoch: " + propEpoch.toString() + " decision epoch " + expandedDecision.getEpoch().toString());
-
-                 
+        
         return expandedDecision;
     }
 
@@ -514,9 +520,15 @@ public class MultiObjectiveMcts {
      * @return                  List of nodes that have been simulated during roll-out.
      */
     public List<Node> simulate(DecisionNode leaf, AbsoluteDate campaignEndDate) {
-        System.out.println("Simulation " + leaf.getId() + " leaf node epoch " + leaf.getEpoch().toString());
 
-        List<ObservedObject> restore = leaf.getEnvironment().getStateTracking();
+        //List<ObservedObject> restore = leaf.getEnvironment().getStateTracking();
+        List<ObservedObject> restore = new ArrayList<>();
+        for(ObservedObject target : leaf.getEnvironment().getStateTracking()) {
+            ObservedObject copy = new ObservedObject(target.getId(), target.getState(), 
+                                                     target.getCovariance(), target.getEpoch(), 
+                                                     target.getFrame());
+            restore.add(copy);
+        }
         // Declare output
         List<Node> episode = new ArrayList<Node>(); // TODO: not necessary to store in an array because node holds all the descendants
         //episode.add(leaf);
@@ -526,7 +538,7 @@ public class MultiObjectiveMcts {
 
 
         while(currentEndMeasEpoch.compareTo(campaignEndDate) <= 0) {
-            //episode.add(current.getParent());
+
             episode.add(current);
             current = expand(current, true); 
             if (Objects.isNull(current)) {
@@ -537,7 +549,7 @@ public class MultiObjectiveMcts {
       
         leaf.clearChildren();  
         leaf.getEnvironment().setStateTracking(restore);     
-        System.out.println("Simulation end " + currentEndMeasEpoch.toString());
+
         return episode;
     }
 
@@ -632,7 +644,6 @@ public class MultiObjectiveMcts {
         DecisionNode grandParent;
         double untilEnd = 0.;
         if(parent.getParent().getClass().getSimpleName().equals("ChanceNode")) {
-            System.out.println("Error occurs here");
             grandParent = (DecisionNode) parent;
         } else {
             grandParent = (DecisionNode) parent.getParent();
@@ -679,7 +690,6 @@ public class MultiObjectiveMcts {
      */
     public Node backpropagate(Node leaf, Node last) {
 
-        //System.out.println("Backpropagate");
         DecisionNode lastDecision;
         ChanceNode lastChance;
         
@@ -748,7 +758,6 @@ public class MultiObjectiveMcts {
             current.setUtility(updatedUtility);
             current = current.getParent();
         }
-        System.out.println("Backpropagate");
 
         this.initial.incrementNumVisits();
         double updatedUtility = this.initial.getUtility() + nDom;
@@ -759,7 +768,7 @@ public class MultiObjectiveMcts {
     private double[] computeUtilityVector(DecisionNode last, DecisionNode leaf) {
 
         // Compute tracking reward
-        double trackReward = computeTrackReward(last, leaf);
+        double trackReward = computeTrackReward(last);
         
         // Compute searching reward
         double searchReward = computeSearchReward(last, leaf);
@@ -768,7 +777,7 @@ public class MultiObjectiveMcts {
         return new double[]{searchReward, trackReward};
     }
 
-    protected double computeTrackReward(DecisionNode last, DecisionNode leaf) {
+    protected double computeTrackReward(DecisionNode last) {
         
         // Compute common epoch
         List<ObservedObject> trackedObjs = last.getEnvironment().getStateTracking();
