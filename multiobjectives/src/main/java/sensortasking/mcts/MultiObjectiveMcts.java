@@ -101,22 +101,49 @@ public class MultiObjectiveMcts {
     public List<Node> run(int iterations) {
 
         //List<Node> outputUCB = new ArrayList<Node>();
-        List<Node> outputRobustMax = new ArrayList<Node>();
+        //List<Node> outputRobustMax = new ArrayList<Node>();
+        List<Node> outputRobustMaxRatio = new ArrayList<Node>();
 
-        for(int i=0; i<iterations; i++) {   
+        for(int i=0; i<iterations; i++) {  
+            if (i==998) {
+                continue;
+            } 
             selectNew(this.initial);
         }
 
         // Retrieve pointing strategy UCB
         Node current = initial;
 
-        outputRobustMax.add(initial);
+        //outputRobustMax.add(initial);
+        outputRobustMaxRatio.add(initial);
         // Travers decision until leaf node
         while(!Objects.isNull(current) && current.getChildren().size() !=0){
-            current = selectChildRobustMax(current);
-            outputRobustMax.add(current);
+            //current = selectChildRobustMax(current);
+            current = selectChildRobustMaxRatio(current);
+            //outputRobustMax.add(current);
+            outputRobustMaxRatio.add(current);
         }
-        return outputRobustMax;
+        //return outputRobustMax;
+        return outputRobustMaxRatio;
+    }
+
+    public Node selectChildRobustMaxRatio(Node current) {
+        double robustMax = Double.NEGATIVE_INFINITY;
+        Node potentiallySelected = null;
+
+        for (Node child : current.getChildren()){
+            // Compute UCB 
+            double v = child.getUtility();
+            double n = child.getNumVisits();
+            double ratio = v / n;
+
+            // search for child that maximises the sum of visits and values
+            if (ratio>robustMax) {
+                potentiallySelected = child;
+                robustMax = ratio;
+            }
+        }
+        return potentiallySelected;
     }
 
 
@@ -196,21 +223,28 @@ public class MultiObjectiveMcts {
     public Node selectNew(Node current) {
 
         boolean widening = progressiveWidening(current);
-        if (!widening) {
+/*         if (!widening) {
             // already reached end of campaign
             return current;
-        }
+        } */
 
         //current.incrementNumVisits();
         Node nextChild = current;
         while(nextChild.getChildren().size() != 0) {
-            nextChild = selectChildUCB(nextChild);
-            if (Objects.isNull(nextChild)) {
-                // no time for further tasks
+            do{
+                nextChild = selectChildUCB(nextChild);
+                //children = current.getChildren();
+            } while (!nextChild.getClass().getSimpleName().equals("DecisionNode"));
+            widening = progressiveWidening(nextChild);
+            if (nextChild.getEpoch().compareTo(endCampaign) >= 0) {
+                // reached end of campaign
                 return current;
+            } else if (!widening){
+                // progressive widening not possible but not end of campaign yet
+                continue;
             }
         }
-        // Reached leaf node but not end of campaign yet --> progressiveWidening()
+        // Reached leaf node but not end of campaign yet --> progressiveWidening() --> TODO: remove last line
         widening = progressiveWidening(nextChild);
         return current;
     }
@@ -230,13 +264,17 @@ public class MultiObjectiveMcts {
                 DecisionNode leaf = expand((DecisionNode) current, false);
                 if (Objects.isNull(leaf)){
                     // objects not observable 
-                    children = current.getChildren();
-                    expandable = false;
+                    //expandable = false; // TODO: still backpropagate!
+                    do{
+                        current = selectChildUCB(current);
+                        children = current.getChildren();
+                    } while (!current.getClass().getSimpleName().equals("DecisionNode"));
+
                     continue;
 
                 } else if (leaf.getEpoch().compareTo(endCampaign) >= 0) {
                     // already reached end of campaign
-                    if (((ChanceNode)leaf.getParent()).getMacro().getClass().getSimpleName().equals("TrackingObjective")) {     // TODO: still necessary to perform backprop
+                    if (((ChanceNode)leaf.getParent()).getMacro().getClass().getSimpleName().equals("TrackingObjective")) {     
                         Node grand = leaf.getParent().getParent();   
                         grand.removeChild(leaf.getParent());
                         Node nextChild = grand;
@@ -244,6 +282,13 @@ public class MultiObjectiveMcts {
                             nextChild = selectChildUCB(nextChild);
                         }
                         leaf = (DecisionNode) nextChild;      
+                    } else if (((ChanceNode)leaf.getParent()).getMacro().getClass().getSimpleName().equals("SearchObjective")) {
+                        Node grand = leaf.getParent().getParent();
+                        if (grand.getEpoch().compareTo(endCampaign) >= 0) {
+                            grand.removeChild(leaf.getParent());
+                            return false;
+                        }
+
                     }
                 }
                 expandable = true;
@@ -253,9 +298,10 @@ public class MultiObjectiveMcts {
                 } else {
                     backpropagate(leaf, null);
                 }
+                return true;
             } 
         }
-        return true;
+        return false;
     }
 
 
@@ -895,12 +941,17 @@ public class MultiObjectiveMcts {
      * 
      * @param current           Current node with children out of which the next one shall be 
      *                          selected.
-     * @return                  Child node that maximises UCB criteria.
+     * @return                  Child node that maximises UCB criteria or parent node, in case no 
+     *                          children exist.
      */
     protected static Node selectChildUCB(Node current) {
         double maxUcb = Double.NEGATIVE_INFINITY;
         Node potentiallySelected = null;
         double nP = current.getNumVisits();
+
+        if(current.getChildren().size() == 0) {
+            return null;
+        }
 
         for (Node child : current.getChildren()){
             // Compute UCB 
@@ -927,7 +978,7 @@ public class MultiObjectiveMcts {
             double n = child.getNumVisits();
             double sum = v + n;
 
-            // search for child that maximises UCB
+            // search for child that maximises the sum of visits and values
             if (sum>robustMax) {
                 potentiallySelected = child;
                 robustMax = sum;

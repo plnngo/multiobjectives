@@ -980,6 +980,7 @@ public class MultiObjectiveMctsTest {
                                               {2.9071094424474166E-8, 4.306014824614407E-6, 6.298597666057694E-9, -8.212503178246334E-10, 1.7482251900748092E-8, -1.9276823004892938E-10},
                                               {7.50553956976887E-9, 6.301496942467037E-9, 4.283086978472644E-6, -2.109541457159083E-10, -1.9276823004892938E-10, 1.818503320357093E-8}};
         RealMatrix covMatrixTdrs05 = (new Array2DRowRealMatrix(covTdrs05)).scalarMultiply(1e6);
+        System.out.println("Trace Tdrs5 :" + covMatrixTdrs05.getTrace());
         StateCovariance covEciTdrs05 = new StateCovariance(covMatrixTdrs05, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
 
         double[][] covTdrs06 = new double[][]{{0.009855827555408531, 1.0287018380692445E-7, 3.910267644855593E-8, 4.318775659506618E-6, 3.082546456689512E-8, 7.3708924118463976E-9},
@@ -989,6 +990,8 @@ public class MultiObjectiveMctsTest {
                                               {3.082546456689512E-8, 4.31510301473182E-6, 8.144511266654299E-9, -8.194811351938942E-10, 1.7236789470442757E-8, -2.4269048963433104E-10},
                                               {7.3708924118463976E-9, 8.135870183215624E-9, 4.2834614349166915E-6, -1.983493667495804E-10, -2.4269048963433104E-10, 1.8175062188421707E-8}};
         RealMatrix covMatrixTdrs06 = (new Array2DRowRealMatrix(covTdrs06)).scalarMultiply(1e6);
+        System.out.println("Trace Tdrs6 :" + covMatrixTdrs06.getTrace());
+
         StateCovariance covEciTdrs06 = new StateCovariance(covMatrixTdrs06, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
 
         double[][] covTdrs12 = new double[][]{{0.009855823497499241, -8.671670864459313E-8, 2.5731929906032663E-9, 4.312988285731713E-6, 3.1286742156174934E-8, 1.7377594871342673E-9},
@@ -998,6 +1001,8 @@ public class MultiObjectiveMctsTest {
                                               {3.1286742156174934E-8, 4.322741590079748E-6, 2.3598727028774496E-9, -8.025283878518984E-10, 1.7031938068152258E-8, -6.947660259826142E-11},
                                               {1.7377594871342673E-9, 2.3545012547055407E-9, 4.281608195160761E-6, -4.580050494765601E-11, -6.947660259826142E-11, 1.8230352837789837E-8}};
         RealMatrix covMatrixTdrs12 = (new Array2DRowRealMatrix(covTdrs12)).scalarMultiply(1e6);
+        System.out.println("Trace Tdrs12 :" + covMatrixTdrs12.getTrace());
+
         StateCovariance covEciTdrs12 = new StateCovariance(covMatrixTdrs12, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
 
         CartesianCovariance stateCovTdrs05 =
@@ -1027,7 +1032,7 @@ public class MultiObjectiveMctsTest {
         
         // Epoch
         AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60. * 4.);
+        AbsoluteDate endCampaign = current.shiftedBy(60. * 30.);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -1047,12 +1052,13 @@ public class MultiObjectiveMctsTest {
         String out = "";
 
         // create FileWriter object with file as parameter 
-        FileWriter outputfile = new FileWriter("Tuples.csv"); 
+        FileWriter outputfile = new FileWriter("Tuples_5.csv"); 
     
         // create CSVWriter object filewriter object as parameter 
         CSVWriter writer = new CSVWriter(outputfile); 
 
-        for (int i=0; i<10000; i++) {
+        for (int i=0; i<2; i++) {
+            System.out.println(" MCTS number " + i);
              // Set environment storing the state of the tasking outputs
             List<Integer> stripeBullseyeCompleted = new ArrayList<Integer>();
             stripeBullseyeCompleted.add(0); // Stripe scan
@@ -1066,8 +1072,8 @@ public class MultiObjectiveMctsTest {
 
             MultiObjectiveMcts mcts = setUpMcts(current, endCampaign, topohorizon, enviro, initWeights);
 
-            List<Node> strategy = mcts.run(50);
-            String[] selected = new String[4];
+            List<Node> strategy = mcts.run(20000);
+            String[] selected = new String[(strategy.size()-1)/2 + 1];
             int j =0;
             for(Node currentNode : strategy) {
                 if (currentNode.getClass().getSimpleName().equals("ChanceNode")) {
@@ -1085,17 +1091,26 @@ public class MultiObjectiveMctsTest {
                             out = out + "C ";
                         }
                         selected[j] = Long.toString(id);
+                        System.out.print(selected[j] + " ");
                         j++;
                         
                     } else {
                         out = out + "S ";
                         selected[j] = "S";
+                        System.out.print(selected[j] + " ");
                         j++;
                     }
                 } else {
+                    //j=0;
                     continue;
                 }
             }
+            // Compute IG of final strategy
+            double iG = mcts.computeTrackReward((DecisionNode)strategy.get(strategy.size()-1));
+            selected[j] = Double.toString(iG);
+            System.out.print(selected[j] + "\n");
+            System.out.println();
+
             writer.writeNext(selected);
             j=0;
             out = out + "\n";
