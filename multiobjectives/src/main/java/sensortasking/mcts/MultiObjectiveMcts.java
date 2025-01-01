@@ -862,20 +862,30 @@ public class MultiObjectiveMcts {
     private double[] computeUtilityVector(DecisionNode last, DecisionNode leaf) {
 
         // Compute tracking reward
-        double trackReward = computeTrackReward(last);
+        double[] trackReward = computeTrackReward(last);
         
         // Compute searching reward
         //double searchReward = computeSearchReward(last, leaf); TODO: function errornous because rSearch sometimes not zero
         double searchReward = 0.;
 
+        double[] out = new double[trackReward.length + 1];
+        out[0] = searchReward;
+        for (int i=1; i<trackReward.length+1; i++) {
+            out[i] = trackReward[i-1];
+        }
+
         // Build up utility vector from macro action rewards                
-        return new double[]{searchReward, trackReward};
+        //return new double[]{searchReward, trackReward};
+        return out;
     }
 
-    protected double computeTrackReward(DecisionNode last) {
+    protected double[] computeTrackReward(DecisionNode last) {
         
         // Compute common epoch
         List<ObservedObject> trackedObjs = last.getEnvironment().getStateTracking();
+
+        // Initialise output
+        double[] out = new double[trackedObjs.size()];
 
         // Propagate all targets from their intial state towards common epoch with Kepler dynamics
         List<ObservedObject> targetsInitial = 
@@ -905,10 +915,10 @@ public class MultiObjectiveMcts {
                     j++;
                 } else {
                     // Same ID found
-                    accumulatedIG += 
-                        TrackingObjective.computeInformationGain(targetsPredicted.get(i), 
-                                                                 targetsFinal.get(j));
-
+                    out[i] = TrackingObjective.computeInformationGain(targetsPredicted.get(i), 
+                                                                      targetsFinal.get(j));
+                    accumulatedIG += out[i];
+                        
                     // No need to continue searching in targetFinals
                     targetsFinal.remove(j);
                     j=0;
@@ -917,7 +927,7 @@ public class MultiObjectiveMcts {
             }
         }
 
-        return accumulatedIG;
+        return out;
     }
 
 
@@ -995,6 +1005,7 @@ public class MultiObjectiveMcts {
      *                          children exist.
      */
     protected static Node selectChildUCB(Node current) {
+        double weight = 1./3.;
         double maxUcb = Double.NEGATIVE_INFINITY;
         Node potentiallySelected = null;
         double nP = current.getNumVisits();
@@ -1002,30 +1013,34 @@ public class MultiObjectiveMcts {
         if(current.getChildren().size() == 0) {
             return null;
         }
-        List<double[]> utilityChildrenNorm = new ArrayList<double[]>();
-        for (Node child : current.getChildren()) {
-            double[] utilityNorm = new double[child.getUtilityVec().length];
-            for(int i=0; i<utilityNorm.length; i++) {
-                utilityNorm[i] = child.getUtilityVec()[i] / child.getNumVisits();
-            }
-            utilityChildrenNorm.add(utilityNorm);
-        }
-
+        List<double[]> utilityChildrenNorm = 
+            normaliseUtilityChildren(current.getChildren(), weight);
+                
         for (int i=0; i<current.getChildren().size(); i++){
             double[] removedUtility = utilityChildrenNorm.remove(0);
             
             // Compute UCB 
             double n = current.getChildren().get(i).getNumVisits();
-            double[] utilityVec = current.getChildren().get(i).getUtilityVec();
+            //double[] utilityVec = current.getChildren().get(i).getUtilityVec();
+/*             double totalRewardNorm = 0.;
 
             // Normalise utility vector by number of visits
-            double[] utilityNorm = new double[utilityVec.length];
+            double[] utilityNorm = new double[utilityVec.length * 2 -1];
             for(int j=0; j<utilityNorm.length; j++) {
-                utilityNorm[j] = utilityVec[j] / n;
-            }
+                if(j<utilityVec.length) {
+                    utilityNorm[j] = utilityVec[j] / n;
+                    totalRewardNorm += utilityNorm[j];
+                } else {
+                    double rewardNorm = utilityNorm[j-utilityNorm.length+1];
+                    utilityNorm[j] = FastMath.abs((rewardNorm/totalRewardNorm) - weight);
+                }
+            } */
 
-            OptimisingVector opt = new OptimisingVector(utilityChildrenNorm, utilityNorm.length - 1);
-            List<double[]> domVecs = opt.getDominatingVecs(utilityNorm, new boolean[]{true, true}, 0);
+            OptimisingVector opt = new OptimisingVector(utilityChildrenNorm, removedUtility.length - 1);
+            List<double[]> domVecs = 
+                opt.getDominatingVecs(removedUtility, 
+                                      new boolean[]{true, true, true, true, false, false, false}, 
+                                      0);
             int utility = - domVecs.size();
             double ucb = utility + C * FastMath.sqrt(FastMath.log(nP)/n);
             utilityChildrenNorm.add(removedUtility);
@@ -1039,14 +1054,56 @@ public class MultiObjectiveMcts {
         return potentiallySelected;
     }
 
+    private static List<double[]> normaliseUtilityChildren(List<Node> children, double weight) {
+        List<double[]> utilityChildrenNorm = new ArrayList<double[]>();
+        for (Node child : children) {
+            double[] utilityNorm = new double[child.getUtilityVec().length * 2 -1];
+            double totalRewardNorm = 0.;
+            for(int i=0; i<utilityNorm.length; i++) {
+                
+                if (i<child.getUtilityVec().length) {
+                    utilityNorm[i] = child.getUtilityVec()[i] / child.getNumVisits();
+                    totalRewardNorm += utilityNorm[i];
+                } else {
+                    if(totalRewardNorm==0){
+                        utilityNorm[i] = weight;
+                    } else {
+                        double rewardNorm = utilityNorm[i-child.getUtilityVec().length+1];
+                        utilityNorm[i] = FastMath.abs((rewardNorm/totalRewardNorm) - weight);
+                    }    
+                }
+            }
+            utilityChildrenNorm.add(utilityNorm);
+        }
+        return utilityChildrenNorm;
+    }
+
+
     protected static Node selectChildRobustMax(Node current) {
         double robustMax = Double.NEGATIVE_INFINITY;
         Node potentiallySelected = null;
+        
+        // Reevaluate utility for every child
+        double weight = 1./3.;
+        List<double[]> utilityChildrenNorm = normaliseUtilityChildren(current.getChildren(), weight);
+        
+/*         for (Node child : current.getChildren()) {
+            double[] utilityNorm = new double[child.getUtilityVec().length];
+            for(int i=0; i<utilityNorm.length; i++) {
+                utilityNorm[i] = child.getUtilityVec()[i] / child.getNumVisits();
+            }
+            utilityChildrenNorm.add(utilityNorm);
+        } */
 
         for (Node child : current.getChildren()){
-            // Compute UCB 
-            double v = child.getUtility();      // Reevaluate utility
+            double[] removedUtility = utilityChildrenNorm.remove(0);
             double n = child.getNumVisits();
+            OptimisingVector opt = new OptimisingVector(utilityChildrenNorm, removedUtility.length - 1);
+            List<double[]> domVecs = 
+                opt.getDominatingVecs(removedUtility, 
+                                      new boolean[]{true, true, true, true, false, false, false}, 
+                                      0);
+            int v = - domVecs.size();
             double sum = v + n;
 
             // search for child that maximises the sum of visits and values
