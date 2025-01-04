@@ -28,5 +28,13 @@ public class ChanceNode extends Node{
         this.executionDuration = obsTimeInterval;
         super.setEpoch(parent.getEpoch());
         super.setId(id);
+        int numObj = 0;
+        if (!((DecisionNode) parent).getEnvironment().getStateSearching().isEmpty()) {
+            numObj++;
+        }
+        if (!((DecisionNode) parent).getEnvironment().getStateTracking().isEmpty()) {
+            numObj = numObj + ((DecisionNode) parent).getEnvironment().getStateTracking().size();
+        }
+        super.setUtilityVec(new double[numObj]);
     }
 }

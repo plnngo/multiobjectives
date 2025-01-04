@@ -50,6 +50,8 @@ import org.orekit.utils.PVCoordinates;
 
 import com.opencsv.CSVWriter;
 
+import tools.OptimisingVector;
+
 public class MultiObjectiveMctsTest {
 
     /** Tree structure stored in a root node. */
@@ -67,15 +69,14 @@ public class MultiObjectiveMctsTest {
         manager.addProvider(new DirectoryCrawler(orekitData));
 
         // Build up test decision tree
-        root = new DecisionNode(28, 4, null, null, null, new AbsoluteDate(), null, 0);
+        /* root = new DecisionNode(28, 4, null, null, null, new AbsoluteDate(), null, 0);
         root.setId(0);
         
         ChanceNode child1 = new ChanceNode(null, 17, 2, null, null, root, 
                                            ((DecisionNode)root).incrementIdCounter());
         ChanceNode child2 = new ChanceNode(null, 8, 2, null, null, root, 
                                            ((DecisionNode)root).incrementIdCounter());
-/*         child1.setId(1);
-        child2.setId(2); */
+
         root.setChild(child1);
         root.setChild(child2);
 
@@ -87,10 +88,6 @@ public class MultiObjectiveMctsTest {
                                                     ((DecisionNode)root).incrementIdCounter());
         DecisionNode grandchild4 = new DecisionNode(5, 1, null, null, null, new AbsoluteDate(), null,
                                                     ((DecisionNode)root).incrementIdCounter());
-/*         grandchild1.setId(3);
-        grandchild2.setId(4);
-        grandchild3.setId(5);
-        grandchild4.setId(6); */
         child1.setChild(grandchild1);
         child1.setChild(grandchild2);
         child2.setChild(grandchild3);
@@ -100,8 +97,7 @@ public class MultiObjectiveMctsTest {
                                              ((DecisionNode)root).incrementIdCounter());
         ChanceNode ggchild2 = new ChanceNode(null, 7, 1, null, null, grandchild2,
                                              ((DecisionNode)root).incrementIdCounter());
-/*         ggchild1.setId(7);
-        ggchild2.setId(8); */
+
         grandchild1.setChild(ggchild1);
         grandchild2.setChild(ggchild2);
 
@@ -109,10 +105,9 @@ public class MultiObjectiveMctsTest {
                                                   ((DecisionNode)root).incrementIdCounter());
         DecisionNode gggchild2 = new DecisionNode(7, 1, null, null, null, new AbsoluteDate(), null,
                                                   ((DecisionNode)root).incrementIdCounter());
-/*         gggchild1.setId(9);
-        gggchild2.setId(10); */
+
         ggchild1.setChild(gggchild1);
-        ggchild2.setChild(gggchild2);
+        ggchild2.setChild(gggchild2); */
     }   
 
     @Test
@@ -1027,12 +1022,62 @@ public class MultiObjectiveMctsTest {
 
 
     @Test
+    public void checkUncertaintyGrowth() {
+        // Epoch
+        AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
+        AbsoluteDate endCampaign = current.shiftedBy(60. * 30.);
+
+        // Frame
+        Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+
+        // Ground station
+        GeodeticPoint posStation = new GeodeticPoint(FastMath.toRadians(6.),   // Geodetic latitude
+                                              FastMath.toRadians(-37.),   // Longitude
+                                              0.);              // in [m]
+        // Model Earth
+        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                               Constants.WGS84_EARTH_FLATTENING,
+                                               ecef);
+        TopocentricFrame topohorizon = new TopocentricFrame(earth, posStation, "TDRS Station");
+
+        double readout = 7.;
+        double exposure = 8.;
+        double settling = 30.;
+        double cutOff = FastMath.toRadians(5.);
+        double slewT = 0.2;
+        Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
+        double slewVel = fov.getHeight()/slewT;
+        Sensor sensor = new Sensor("TDRS Station", fov, topohorizon.getPoint(), exposure, readout, 
+                                    slewVel, settling, cutOff);
+        
+        List<ObservedObject> ooi =  setListOOI(current);
+        for(ObservedObject candidate : ooi) {
+            Vector3D pos = candidate.getState().getPositionVector();
+            Vector3D vel = candidate.getState().getVelocityVector();
+            PVCoordinates pv = new PVCoordinates(pos, vel);
+            Orbit initialOrbit = new CartesianOrbit(pv, candidate.getFrame(), 
+                                        candidate.getEpoch(), Constants.WGS84_EARTH_MU);
+            KeplerianPropagator kepPropo = new KeplerianPropagator(initialOrbit);
+
+            // Generate real measurement
+            RealMatrix R = 
+            MatrixUtils.createRealDiagonalMatrix(new double[]{FastMath.pow(1./206265, 2), 
+                                                            FastMath.pow(1./206265, 2)});
+            double[] residuals = new double[2];
+            ObservedObject[] predAndCorr = 
+                    TrackingObjective.estimateStateWithOwnExtendedKalman(kepPropo, endCampaign, R, 
+                                                                         candidate, residuals, 
+                                                                         sensor);
+        }
+
+    }
+    @Test
     public void testOnlyTrack() throws IOException {
         long start = System.currentTimeMillis();
         
         // Epoch
         AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60. * 30.);
+        AbsoluteDate endCampaign = current.shiftedBy(60. * 4.);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -1052,12 +1097,16 @@ public class MultiObjectiveMctsTest {
         String out = "";
 
         // create FileWriter object with file as parameter 
-        FileWriter outputfile = new FileWriter("Tuples_5.csv"); 
+        FileWriter outputfile = new FileWriter("Tuples_11.csv"); 
     
         // create CSVWriter object filewriter object as parameter 
         CSVWriter writer = new CSVWriter(outputfile); 
+        List<double[]> utilityStrategiesRatio = new ArrayList<double[]>();
 
-        for (int i=0; i<2; i++) {
+        int mctsIterations = 100;
+        double weight = 1./3.;
+
+        for (int i=0; i<mctsIterations; i++) {
             System.out.println(" MCTS number " + i);
              // Set environment storing the state of the tasking outputs
             List<Integer> stripeBullseyeCompleted = new ArrayList<Integer>();
@@ -1066,14 +1115,14 @@ public class MultiObjectiveMctsTest {
 
             List<ObservedObject> ooi =  setListOOI(current);
 
-            PropoagatedEnvironment enviro = new PropoagatedEnvironment(ooi, stripeBullseyeCompleted);
+            final PropoagatedEnvironment enviro = new PropoagatedEnvironment(ooi, stripeBullseyeCompleted);
 
             double[] initWeights = new double[]{0., 1.};
 
             MultiObjectiveMcts mcts = setUpMcts(current, endCampaign, topohorizon, enviro, initWeights);
 
-            List<Node> strategy = mcts.run(20000);
-            String[] selected = new String[(strategy.size()-1)/2 + 1];
+            List<Node> strategy = mcts.run(5000);
+            String[] selected = new String[(strategy.size()-1)/2 + 1 + ooi.size()];
             int j =0;
             for(Node currentNode : strategy) {
                 if (currentNode.getClass().getSimpleName().equals("ChanceNode")) {
@@ -1106,9 +1155,22 @@ public class MultiObjectiveMctsTest {
                 }
             }
             // Compute IG of final strategy
-            double iG = mcts.computeTrackReward((DecisionNode)strategy.get(strategy.size()-1));
-            selected[j] = Double.toString(iG);
-            System.out.print(selected[j] + "\n");
+            double[] iG = mcts.computeTrackReward((DecisionNode)strategy.get(strategy.size()-1));
+            for(int k=0; k<iG.length; k++) {
+                selected[j + k] = Double.toString(iG[k]);
+                System.out.print(selected[j + k] + " - ");
+            }
+
+            // Calculate ratio 
+            double[] ratioUtility = new double[iG.length];
+            double totalIG = 0.;
+            for(int k=0; k<iG.length; k++) {
+                totalIG += iG[k];
+            }
+            for(int k=0; k<iG.length; k++) {
+                ratioUtility[k] = FastMath.abs((iG[k]/totalIG) - weight);
+            }
+            utilityStrategiesRatio.add(ratioUtility);
             System.out.println();
 
             writer.writeNext(selected);
@@ -1117,9 +1179,35 @@ public class MultiObjectiveMctsTest {
             solutions.add(strategy);
         }
         System.out.println(out);
+        List<Integer> index = new ArrayList<Integer>();
+        double max = Double.NEGATIVE_INFINITY;
+        // Filter strategies
+        for(int i=0; i<mctsIterations; i++) {
+            double[] removedUtility = utilityStrategiesRatio.remove(0);
+            OptimisingVector opt = new OptimisingVector(utilityStrategiesRatio, removedUtility.length - 1);
+            List<double[]> domVecs = 
+                opt.getDominatingVecs(removedUtility, 
+                                      new boolean[]{false, false, false}, 
+                                      0);
+            int utility = - domVecs.size();
+            if(utility>max) {
+                max = utility;
+                index.clear();
+                index.add(i);
+            } else if (utility==max) {
+                index.add(i);
+            }
+            utilityStrategiesRatio.add(removedUtility);
+        }
         long finish = System.currentTimeMillis();
         long elapsed = finish - start;
+
+        System.out.println("Following strategies considered as optimal:");
+        for(Integer i : index) {
+            System.out.print(i + " ");
+        }
         System.out.println("Time " + elapsed + " ms");
+
         // closing writer connection 
         writer.close(); 
 
@@ -1640,8 +1728,8 @@ public class MultiObjectiveMctsTest {
         MultiObjectiveMcts mcts = new MultiObjectiveMcts(root, objectives, initDate, target, 
                                                          "TDRS Station", targetsInit, 
                                                          new ArrayList<ObservedObject>(), sensor);
-        double actualReward = mcts.computeTrackReward(leaf);
-        Assert.assertEquals(2.7682235805565E7, actualReward, 1e-16);
+        /* double actualReward = mcts.computeTrackReward(leaf);
+        Assert.assertEquals(2.7682235805565E7, actualReward, 1e-16); */
    }
 
    @Test

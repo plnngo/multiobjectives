@@ -354,33 +354,9 @@ public class TrackingObjective implements Objective{
         System.out.println("Date end actually " + stateProp.getDate());
         System.out.println("Date end " + end.toString());
         System.out.println("Date begin " + tlePropBeginTask.getInitialState().getDate());
-
-        /*
-        System.out.println("Initial state: " + tlePropBeginTask.getInitialState().getDate());
-        System.out.println("End date prop: " + stateProp.getOrbit().getDate()); */
-        //tlePropBeginTask.propagate(taskEpoch);
-        
+      
         List<LoggedEvent> fovCrossings = logFovPass.getLoggedEvents();
-        /* SpacecraftState stateEvent = fovCrossings.get(0).getState();
-        System.out.println("Azimuth event: " + FastMath.toDegrees(transformStateToAzEl(stateEvent).getAngle1()));
-        System.out.println("El event: " + FastMath.toDegrees(transformStateToAzEl(stateEvent).getAngle2()));
-
-        AngularDirection azelEvent = 
-            new AngularDirection(stationFrame, 
-                                    new double[]{transformStateToAzEl(stateEvent).getAngle1(), 
-                                                transformStateToAzEl(stateEvent).getAngle2()}, 
-                                    AngleType.AZEL);
-        AngularDirection azelStart = 
-            new AngularDirection(stationFrame, 
-                                new double[]{transformStateToAzEl(tlePropBeginTask.getInitialState()).getAngle1(), 
-                                            transformStateToAzEl(tlePropBeginTask.getInitialState()).getAngle2()}, 
-                                AngleType.AZEL);
-        System.out.println("Angular distance begin to event: " + FastMath.toDegrees(azelStart.getEnclosedAngle(azelEvent)));
-*/
-/*         System.out.println("G value event: " + fovDetector.g(fovCrossings.get(0).getState())); 
-        System.out.println("G value before event: " + fovDetector.g(tlePropBeginTask.getInitialState())); 
-        System.out.println("G value after event: " + fovDetector.g(stateProp));  */
-
+        
         boolean objInFovBeginTask = fovDetector.g(tlePropBeginTask.getInitialState()) < 0.;
         boolean objInFovEndProp = fovDetector.g(stateProp) < 0.;
         if (!(objInFovBeginTask && fovCrossings.size()==1 && !objInFovEndProp)) {
@@ -460,7 +436,7 @@ public class TrackingObjective implements Objective{
         double detP = decomP.getDeterminant();
         double detQ = decomQ.getDeterminant();
 
-        double logDetCovQByDetCovP = FastMath.log10(detQ/detP);
+        double logDetCovQByDetCovP = FastMath.log(detQ/detP);
 
         // Compute inverse of covQ
         RealMatrix invCovQ = MatrixUtils.inverse(covQ);
@@ -675,6 +651,17 @@ public class TrackingObjective implements Objective{
        
         // Compute Kalman Gain
         RealMatrix covInMeasSpace = H.multiply(predictedCov).multiplyTransposed(H);
+        double sigmaRA = FastMath.sqrt(covInMeasSpace.getEntry(0, 0));
+        //System.out.println("Predicted uncertainty RA: " + FastMath.toDegrees(sigmaRA));
+        double sigmaDEC = FastMath.sqrt(covInMeasSpace.getEntry(1, 1));
+        //System.out.println("Predicted uncertainty Dec: " + FastMath.toDegrees(sigmaDEC));
+
+/*         if (sigmaRA > FastMath.toRadians(1.)) {
+            System.out.println("Uncertainty exceeds FOV in right ascesion dir");    
+        }
+        if (sigmaDEC > FastMath.toDegrees(1.)) {
+            System.out.println("Uncertainty exceeds FOV in declination dir");    
+        } */
         RealMatrix kalmanGain = predictedCov.multiplyTransposed(H)
                                             .multiply(MatrixUtils.inverse(covInMeasSpace.add(R)));
 
@@ -697,7 +684,7 @@ public class TrackingObjective implements Objective{
         RealMatrix iMinusKgH = identity.subtract(kalmanGain.multiply(H));
         RealMatrix updatedCov = 
             iMinusKgH.multiply(predictedCov).multiplyTransposed(iMinusKgH).add(kRkT);
-        
+
         // Set up output prediction
         StateVector predState = ObservedObject.spacecraftStateToStateVector(predicted, predicted.getFrame());
         StateCovariance stateCov = 
@@ -723,6 +710,20 @@ public class TrackingObjective implements Objective{
             ObservedObject.stateCovToCartesianCov(updatedOrbit, updatedStateCov, j2000);
         output[1] = new ObservedObject(candidate.getId(), corrState, corrCartCov, 
                                        predicted.getDate(), j2000);
+
+        // Corrected covariance projected in measurement space
+        Transform updatedToTopo = 
+            updated.getFrame().getTransformTo(meas.getFrame(), updated.getDate());
+        PVCoordinates pvUpdatedTopo = updatedToTopo.transformPVCoordinates(updated.getPVCoordinates());
+        Vector3D posUpdatedTopo = pvUpdatedTopo.getPosition();
+
+        RealMatrix Hupdated = App.getObservationPartialDerivative(posUpdatedTopo, false);
+        RealMatrix covUpdatedInMeasSpace = Hupdated.multiply(updatedCov).multiplyTransposed(Hupdated);
+        double sigmaRAUpdated = FastMath.sqrt(covUpdatedInMeasSpace.getEntry(0, 0));
+        //System.out.println("Updated uncertainty RA: " + FastMath.toDegrees(sigmaRAUpdated));
+        double sigmaDECUpdated = FastMath.sqrt(covUpdatedInMeasSpace.getEntry(1, 1));
+        //System.out.println("Updated uncertainty Dec: " + FastMath.toDegrees(sigmaDECUpdated));
+        
         return output;
     }
 
@@ -964,7 +965,13 @@ public class TrackingObjective implements Objective{
         Map<AngularDirection, double[]> trackable = new LinkedHashMap<AngularDirection, double[]>();
 
         // List of candidates that might be trackable
-        List<ObservedObject> checkTrackable = new ArrayList<ObservedObject>(updatedTargets);
+        List<ObservedObject> checkTrackable = new ArrayList<ObservedObject>();        
+        for (ObservedObject obj : updatedTargets) {
+            ObservedObject copy = new ObservedObject(obj.getId(), obj.getState(), 
+                                                     obj.getCovariance(), obj.getEpoch(), 
+                                                     obj.getFrame());
+            checkTrackable.add(copy);
+        }
 
         AbsoluteDate measEpoch = 
                     current.shiftedBy(TrackingObjective.allocation 
@@ -976,10 +983,11 @@ public class TrackingObjective implements Objective{
         double tShift = 2.; 
         for (int t=0; t<200; t++) {
             measEpoch = measEpoch.shiftedBy(tShift);
+            sensorPointing.setDate(measEpoch);      // Assume holding position of last task up until new task
             Frame topoInertial = this.sensor.getTopoInertialFrame(measEpoch);
   
             // Iterate through list of objects of interest
-             ListIterator<ObservedObject> iterator = checkTrackable.listIterator();
+            ListIterator<ObservedObject> iterator = checkTrackable.listIterator();
             while (iterator.hasNext()) {
             //for (ObservedObject candidate : checkTrackable) {
             ObservedObject candidate = iterator.next();
@@ -1058,6 +1066,22 @@ public class TrackingObjective implements Objective{
                 double[] residuals = new double[2];
                 ObservedObject[] predAndCorr = 
                     estimateStateWithOwnExtendedKalman(kepPropo, measEpoch, R, candidate, residuals, sensor);
+                
+                // Check if predicted uncertainty fits into FOV
+                // Topocentric frame
+                Frame topocentric = sensor.getTopoInertialFrame(measEpoch);
+                RealMatrix covPredGeocentric = predAndCorr[0].getCovariance().getCovarianceMatrix();
+                PVCoordinates pvPred = 
+                    new PVCoordinates(predAndCorr[0].getState().getPositionVector(),
+                                      predAndCorr[0].getState().getVelocityVector());
+                Orbit orbitPred = new CartesianOrbit(pvPred, predAndCorr[0].getFrame(), measEpoch, 
+                                                     Constants.WGS84_EARTH_MU);
+                StateCovariance stateCov = 
+                    new StateCovariance(covPredGeocentric, measEpoch, predAndCorr[0].getFrame(), 
+                                        OrbitType.CARTESIAN, PositionAngleType.MEAN);
+                StateCovariance stateCovTopo = 
+                    stateCov.changeCovarianceFrame(orbitPred, topocentric);
+
                 double iG = computeInformationGain(predAndCorr[0], predAndCorr[1]);
                 
                 // Generate optimisation vector with IG as 1st and relocation time as 2nd entry
@@ -1087,7 +1111,7 @@ public class TrackingObjective implements Objective{
             return trackable.keySet().iterator().next();
         } else {
             // select target based on optimisation: max IG, min 
-            List<double[]> toOpt = new ArrayList<double[]>(trackable.values());
+            /* List<double[]> toOpt = new ArrayList<double[]>(trackable.values());
 
             // Compute number of dominating solutions
             int[] numDominating = new int[trackable.size()];
@@ -1100,11 +1124,14 @@ public class TrackingObjective implements Objective{
                                     .getDominatingVecs(toCompare, new boolean[]{true, false}, 0)
                                     .size();
                 toOpt.add(toCompare);
-            }
+            } */
 
             // Find optimal solution(s) that minimises number of dominating solutions
             List<Integer> solutionIndexes = new ArrayList<>();
-            int min = Integer.MAX_VALUE;
+            for(int i=0; i<trackable.size(); i++) {
+                solutionIndexes.add(i);
+            }
+            /* int min = Integer.MAX_VALUE;
             for (int i=0; i<numDominating.length; i++) {
                 if(numDominating[i] < min) {
                     min = numDominating[i];
@@ -1113,7 +1140,7 @@ public class TrackingObjective implements Objective{
                 } else if (numDominating[i] == min) {
                     solutionIndexes.add(i);
                 }
-            }  
+            }   */
             for (int i=0; i<solutionIndexes.size(); i++) {
                 int checkWithinCampaign = targets.get(solutionIndexes.get(i))
                                                         .getEpoch()

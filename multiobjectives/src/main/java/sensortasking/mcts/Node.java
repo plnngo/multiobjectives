@@ -2,6 +2,7 @@ package sensortasking.mcts;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import org.orekit.time.AbsoluteDate;
 
@@ -28,6 +29,9 @@ public class Node {
     /** Node identifier. */
     protected long id;
 
+    /** Accumulated utility vector. */
+    double[] utilityVec;
+
     public void setChild(Node child) {
         children.add(child);
         child.parent = this;
@@ -48,6 +52,15 @@ public class Node {
 
     public void setUtility(double value){
         this.utility = value;
+    }
+
+    public void setUtilityVec(double[] utility) {
+        if (Objects.isNull(this.utilityVec)) {
+            this.utilityVec = new double[utility.length];
+        }
+        for(int i=0; i<utility.length; i++) {
+            this.utilityVec[i] = utility[i];
+        }
     }
 
     public void setNumVisits(int numVisits) {

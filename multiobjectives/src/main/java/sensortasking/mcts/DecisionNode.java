@@ -49,6 +49,14 @@ public class DecisionNode extends Node{
         this.environment = environment;
         super.setEpoch(epoch);
         super.setId(id);
+        int numObj = 0;
+        if(!environment.getStateSearching().isEmpty()) {
+            numObj++;
+        }
+        if(!environment.getStateTracking().isEmpty()) {
+            numObj = numObj + environment.getStateTracking().size();
+        }
+        super.setUtilityVec(new double[numObj]);
     }
 
     public DecisionNode setWeightsSearchingTask(double[] weights) {
@@ -98,6 +106,10 @@ public class DecisionNode extends Node{
             
             
         }
+    }
+
+    public void setEpochSensorPointing(AbsoluteDate epoch) {
+        this.sensorPointing.setDate(epoch);
     }
 
     public Map<Long, double[]> getAllUtilityVecs() {

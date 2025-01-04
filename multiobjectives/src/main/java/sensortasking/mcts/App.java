@@ -415,8 +415,11 @@ public class App {
         return gamma;
     }
 
+    /**
+     * Retrieve observation matrix H.
+    */
     public static RealMatrix getObservationPartialDerivative(Vector3D posTopo, boolean withRange) {
-        double range = posTopo.getNorm();
+        double range = posTopo.getNorm();       // Position of S/C in topocentric reference frame
         
         double h11 = posTopo.getX()/range;
         double h12 = posTopo.getY()/range;
@@ -432,11 +435,7 @@ public class App {
                             * FastMath.sqrt(1 - FastMath.pow(posTopo.getZ()/range,2)));
         double h33 = (1/range - FastMath.pow(posTopo.getZ(),2)/FastMath.pow(range, 3))
                         / FastMath.sqrt(1 - FastMath.pow(posTopo.getZ()/range, 2));
-/*         System.out.println("H21: " + h21);
-        System.out.println("H22: " + h22);
-        System.out.println("H31: " + h31);
-        System.out.println("H32: " + h32);
-        System.out.println("H33: " + h33); */
+
         if (withRange) {
             double[][] data = new double[3][6];
             data[0] = new double[]{h11, h12, h13, 0., 0., 0.};

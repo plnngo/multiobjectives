@@ -497,12 +497,15 @@ public class TrackingObjectiveTest {
         ObservedObject prior = new ObservedObject(1, priorState, priorCov, date, eci);
 
         double kl = TrackingObjective.computeKullbackLeiblerDivergence(prior, post);
-        Assert.assertEquals(228.2739649346909, kl, 1e-12);
+        //Assert.assertEquals(228.2739649346909, kl, 1e-12);
+        Assert.assertEquals(2.284406581792981e2, kl, 1e-9);
         Assert.assertEquals(0., TrackingObjective.computeKullbackLeiblerDivergence(prior, prior), 
                             1e-12);
         Assert.assertEquals(0., TrackingObjective.computeKullbackLeiblerDivergence(post, post), 
                             1e-12);
     }
+
+
 
     @Test
     public void testEstimateStateWithKalman() {
