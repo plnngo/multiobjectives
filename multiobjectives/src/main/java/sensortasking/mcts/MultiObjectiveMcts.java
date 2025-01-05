@@ -106,7 +106,7 @@ public class MultiObjectiveMcts {
         for(int i=0; i<iterations; i++) {  
             List<Node> outputRobustMaxRatio = new ArrayList<Node>();
 
-            if (i==3000) {
+            if (i==1998) {
                 continue;
             } 
             System.out.println("Iteration: " + i);
@@ -119,6 +119,7 @@ public class MultiObjectiveMcts {
             // Travers decision until leaf node
             while(!Objects.isNull(current) && current.getChildren().size() !=0){
                 current = selectChildRobustMax(current);
+                //current = selectChildUCB(current);
                 //current = selectChildRobustMaxRatio(current);
                 //outputRobustMax.add(current);
                 outputRobustMaxRatio.add(current);
@@ -800,7 +801,7 @@ public class MultiObjectiveMcts {
         // Compute utility value of leaf node
         double[] utilityVec = computeUtilityVector(lastDecision, (DecisionNode)leaf);
         
-        // Number of solutions current leaf dominates
+        /* // Number of solutions current leaf dominates
         int nDom = 0;
         
         // check if leaf has any siblings
@@ -827,7 +828,7 @@ public class MultiObjectiveMcts {
             if(dominating.size() != 0) {
                 nDom = dominating.size() * (-1);
             }
-        }
+        } */
         // add new utility vector to list of utilities
         this.initial.addUtilityVec(leaf.getId(), utilityVec);
         
@@ -837,8 +838,8 @@ public class MultiObjectiveMcts {
 
         while (!current.equals(this.initial)) {
             current.incrementNumVisits();
-            double updatedUtility = current.getUtility() + nDom;
-            current.setUtility(updatedUtility);
+            // double updatedUtility = current.getUtility() + nDom;
+            // current.setUtility(updatedUtility);
             double[] preUtilityVec = current.getUtilityVec();
             double[] postUtilityVec = new double[preUtilityVec.length];
             for(int i=0; i<preUtilityVec.length; i++) {
@@ -849,8 +850,8 @@ public class MultiObjectiveMcts {
         }
 
         this.initial.incrementNumVisits();
-        double updatedUtility = this.initial.getUtility() + nDom;
-        this.initial.setUtility(updatedUtility);
+        // double updatedUtility = this.initial.getUtility() + nDom;
+        // this.initial.setUtility(updatedUtility);
         double[] preUtilityVec = this.initial.getUtilityVec();
         double[] postUtilityVec = new double[preUtilityVec.length];
         for(int i=0; i<preUtilityVec.length; i++) {
@@ -1015,6 +1016,9 @@ public class MultiObjectiveMcts {
         double maxUtilityTotalReward = Double.MIN_VALUE;
         List<double[]> optimalIndividRtrackUtility = new ArrayList<double[]>();
         List<Long> optimalId = new ArrayList<Long>();
+
+        double[] ucb = new double[current.getChildren().size()];
+        double[] utilities = new double[current.getChildren().size()];
         
         if(current.getChildren().size() == 0) {
             return null;
@@ -1057,10 +1061,16 @@ public class MultiObjectiveMcts {
                 for(int j=1; j<removedUtility.length; j++) {
                     totalRewardNorm += removedUtility[j];
                 }
-                System.out.println(totalRewardNorm);
+                
+                //System.out.println(totalRewardNorm);
                 for(int j=1; j<removedUtility.length; j++) {
-                    System.out.println(removedUtility[j]);
-                    utilityWeight[j-1] = FastMath.abs((removedUtility[j]/totalRewardNorm)- weight);
+                    //System.out.println(removedUtility[j]);
+                    if(removedUtility[j]<1e-15) {
+                        utilityWeight[j-1] = weight;
+                    } else {
+                        utilityWeight[j-1] = 
+                            FastMath.abs((removedUtility[j]/totalRewardNorm)- weight);
+                    }
                 }
                 optimalIndividRtrackUtility.add(utilityWeight);
                 optimalId.add(current.getChildren().get(i).getId());
@@ -1074,17 +1084,13 @@ public class MultiObjectiveMcts {
                 }
                 optimalIndividRtrackUtility.add(utilityWeight);
                 optimalId.add(current.getChildren().get(i).getId());
-            }
+            } 
+            //TODO: retrieve child utility and it new utility(0) --> got filtered out 
+            //double n = current.getChildren().get(i).getNumVisits();
+            utilities[i] = current.getChildren().get(i).getUtility() + utility + 0;
+            //current.getChildren().get(i).setUtility(u);
+            //ucb[i] = u + C * FastMath.sqrt(FastMath.log(nP)/n);
             utilityChildrenNorm.add(removedUtility);
-  
-/*             double ucb = utility + C * FastMath.sqrt(FastMath.log(nP)/n);
-            utilityChildrenNorm.add(removedUtility); */
-
-/*             // search for child that maximises UCB
-            if (ucb>maxUcb) {
-                potentiallySelected = current.getChildren().get(i);
-                maxUcb = ucb;
-            } */
         }
         // Check weight utility
         List<Long> optimalWeightId = new ArrayList<Long>();
@@ -1098,7 +1104,8 @@ public class MultiObjectiveMcts {
                                       new boolean[]{false, false, false}, 
                                       0);
             int utility = - domVecs.size();
-            if(utility > maxUtilityWeightReward){
+            
+            if(utility >= maxUtilityWeightReward){
                 maxUtilityWeightReward = utility;
                 for (Node child : current.getChildren()) {
                     if(child.getId() == removedId) {
@@ -1113,27 +1120,45 @@ public class MultiObjectiveMcts {
                         } else if (totalReward==maxUtilityTotalReward){
                             optimalWeightId.add(removedId);
                         }
-                        break;
-
-                    } else {
-                        continue;
                     }
                 }
             }
+            // TODO: retrieve child utility and add new utility (1) --> got filtered out
+            for(int i =0; i<current.getChildren().size(); i ++) {
+                for(long id : optimalWeightId) {
+                    if(id == current.getChildren().get(i).getId()) {
+                        continue;
+                    } else {
+                        utilities[i] = optimalWeightId.size();
+                    }
+                }
+            }   
+            
+            optimalIndividRtrackUtility.add(removedUtility);
         }
-        for(Long id : optimalWeightId) {
-            for(Node child : current.getChildren()){
+        for(long id : optimalWeightId) {
+            for(int i=0; i<current.getChildren().size(); i++){
                 // Calculate UCT (utility equal among all nodes in optimalWeightId)
-                if(child.getId() == id) {
-                    double n = child.getNumVisits();
-                    double ucb = C * FastMath.sqrt(FastMath.log(nP)/n);
-                    if(ucb>maxUcb) {
-                        maxUcb = ucb;
-                        potentiallySelected = child;
-                        break;
-                    } 
-                } 
+                if(current.getChildren().get(i).getId() == id) {
+                    double n = current.getChildren().get(i).getNumVisits();
+                    utilities[i] = current.getChildren().get(i).getUtility();
+                    current.getChildren().get(i).setUtility(utilities[i]);
+                    // TODO: retrieve child utility and add new utility (3) to it
+                    ucb[i] = utilities[i] + C * FastMath.sqrt(FastMath.log(nP)/n);
+                } else {
+                    double n = current.getChildren().get(i).getNumVisits();
+                    ucb[i] = utilities[i] + C * FastMath.sqrt(FastMath.log(nP)/n);
+                    current.getChildren().get(i).setUtility(utilities[i]);
+                }
             }
+        }
+
+        // search for child that maximises ucb
+        for(int i=0; i<ucb.length; i++) { 
+            if(ucb[i]>maxUcb) {
+                maxUcb = ucb[i];
+                potentiallySelected = current.getChildren().get(i);
+            } 
         }
         return potentiallySelected;
     }

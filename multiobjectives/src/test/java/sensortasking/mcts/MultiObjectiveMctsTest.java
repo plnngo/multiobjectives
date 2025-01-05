@@ -1103,7 +1103,7 @@ public class MultiObjectiveMctsTest {
         CSVWriter writer = new CSVWriter(outputfile); 
         List<double[]> utilityStrategiesRatio = new ArrayList<double[]>();
 
-        int mctsIterations = 100;
+        int mctsIterations = 10;
         double weight = 1./3.;
 
         for (int i=0; i<mctsIterations; i++) {
@@ -1121,7 +1121,7 @@ public class MultiObjectiveMctsTest {
 
             MultiObjectiveMcts mcts = setUpMcts(current, endCampaign, topohorizon, enviro, initWeights);
 
-            List<Node> strategy = mcts.run(5000);
+            List<Node> strategy = mcts.run(9000);
             String[] selected = new String[(strategy.size()-1)/2 + 1 + ooi.size()];
             int j =0;
             for(Node currentNode : strategy) {
