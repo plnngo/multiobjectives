@@ -292,12 +292,11 @@ public class MultiObjectiveMctsTest {
         int numVisits = 1;
         AngularDirection initPointing = 
             new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
-        double[] initWeights = new double[]{1.0, 0.0};
+/*         double[] initWeights = new double[]{1.0, 0.0};
         double[] initTimeResources = 
             new double[]{initWeights[0] * endCampaign.durationFrom(current), 
-                         initWeights[1] * endCampaign.durationFrom(current)};
-        Node root = new DecisionNode(initUtility, numVisits, initPointing, initWeights, 
-                                     initTimeResources, current, enviro, 0, 0.);
+                         initWeights[1] * endCampaign.durationFrom(current)}; */
+        Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0.);
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", ooi, 
                                    new ArrayList<ObservedObject>(), sensor);
@@ -315,9 +314,9 @@ public class MultiObjectiveMctsTest {
                 }
             }
         }
-        double timeLeftSearch = ((DecisionNode)strategy.get(strategy.size()-1)).getTimeResources()[0];
+/*         double timeLeftSearch = ((DecisionNode)strategy.get(strategy.size()-1)).getTimeResources()[0];
         double timeLeftTrack = ((DecisionNode)strategy.get(strategy.size()-1)).getTimeResources()[1];
-        System.out.println("Time left search: " + timeLeftSearch + " and time left track: " + timeLeftTrack);
+        System.out.println("Time left search: " + timeLeftSearch + " and time left track: " + timeLeftTrack); */
     }
     @Test
     public void testMctsSearchAndTrackAsMC() {
@@ -381,12 +380,11 @@ public class MultiObjectiveMctsTest {
         int numVisits = 1;
         AngularDirection initPointing = 
             new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
-        double[] initWeights = new double[]{0.5, 0.5};
+/*         double[] initWeights = new double[]{0.5, 0.5};
         double[] initTimeResources = 
             new double[]{initWeights[0] * endCampaign.durationFrom(current), 
-                         initWeights[1] * endCampaign.durationFrom(current)};
-        Node root = new DecisionNode(initUtility, numVisits, initPointing, initWeights, 
-                                     initTimeResources, current, enviro, 0, 0.)
+                         initWeights[1] * endCampaign.durationFrom(current)}; */
+        Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0.)
                         .setWeightsSearchingTask(new double[]{1.0, 0.});
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", ooi, 
@@ -882,12 +880,11 @@ public class MultiObjectiveMctsTest {
         int numVisits = 1;
         AngularDirection initPointing = 
             new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
-        double[] initWeights = new double[]{0.5, 0.5};
+/*         double[] initWeights = new double[]{0.5, 0.5};
         double[] initTimeResources = 
             new double[]{initWeights[0] * endCampaign.durationFrom(current), 
-                         initWeights[1] * endCampaign.durationFrom(current)};
-        Node root = new DecisionNode(initUtility, numVisits, initPointing, initWeights, 
-                                     initTimeResources, current, enviro, 0, 0.);
+                         initWeights[1] * endCampaign.durationFrom(current)}; */
+        Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0.);
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", ooi, 
                                    new ArrayList<ObservedObject>(), sensor);
@@ -1296,11 +1293,8 @@ public class MultiObjectiveMctsTest {
         int numVisits = 1;
         AngularDirection initPointing = 
             new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
-        double[] initTimeResources = new double[]{endCampaign.durationFrom(current), 0.};
 
-        
-        Node root = new DecisionNode(initUtility, numVisits, initPointing, initWeights, 
-                                     initTimeResources, current, enviro, 0, 0.);
+        Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0.);
         MultiObjectiveMcts mcts = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", null, 
                                    new ArrayList<ObservedObject>(), sensor);
@@ -1516,10 +1510,7 @@ public class MultiObjectiveMctsTest {
         int numVisits = 1;
         AngularDirection initPointing = 
             new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
-        double[] initWeights = new double[]{0., 1.};
-        double[] initTimeResources = new double[]{0., endCampaign.durationFrom(current)};
-        Node root = new DecisionNode(initUtility, numVisits, initPointing, initWeights, 
-                                     initTimeResources, current, enviro, 0, 0.);
+        Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0.);
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", ooi, 
                                    new ArrayList<ObservedObject>(), sensor);
@@ -1530,7 +1521,7 @@ public class MultiObjectiveMctsTest {
     @Test
     public void testComputeSearchReward() {
         // Build up test decision tree
-        DecisionNode root = new DecisionNode(1, 1, null, null, null, new AbsoluteDate(), null, 0, 0.);
+        DecisionNode root = new DecisionNode(1, 1, null, new AbsoluteDate(), null, 0, 0.);
 
         // Stripe scan 70% and Bullseye scan 30%
         root.setWeightsSearchingTask(new double[]{0.7, 0.3});
@@ -1542,7 +1533,7 @@ public class MultiObjectiveMctsTest {
         SearchObjective search1 = new SearchObjective(task1, null, null, 0, null);
         ChanceNode c1 = new ChanceNode(null, 1, 1, search1, null, root, root.incrementIdCounter(), 
                                        root.getDepth() + 0.5);
-        DecisionNode d1 = new DecisionNode(0, 1, null, null, null, null, 
+        DecisionNode d1 = new DecisionNode(0, 1, null, null,  
                                            new PropoagatedEnvironment(null, task1),
                                            root.incrementIdCounter(), root.getDepth() + 1.0);
         c1.setChild(d1);
@@ -1553,7 +1544,7 @@ public class MultiObjectiveMctsTest {
         SearchObjective search2 = new SearchObjective(task2, null, null, 0, null);
         ChanceNode c2 = new ChanceNode(null, 1, 1, search2, null, d1, root.incrementIdCounter(), 
                                        d1.getDepth() + 0.5);
-        DecisionNode d2 = new DecisionNode(0, 1, null, null, null, null, 
+        DecisionNode d2 = new DecisionNode(0, 1, null, null, 
                                            new PropoagatedEnvironment(null, task2),
                                            root.incrementIdCounter(), d1.getDepth() + 1.0);
         c2.setChild(d2);
@@ -1564,7 +1555,7 @@ public class MultiObjectiveMctsTest {
         SearchObjective search31 = new SearchObjective(task31, null, null, 0, null);
         ChanceNode c31 = new ChanceNode(null, 1, 1, search31, null, d2, root.incrementIdCounter(), 
                                         d2.getDepth() + 0.5);
-        DecisionNode d31 = new DecisionNode(1, 1, null, null, null, null, 
+        DecisionNode d31 = new DecisionNode(1, 1, null, null,  
                                             new PropoagatedEnvironment(null, task31),
                                             root.incrementIdCounter(), d2.getDepth()+ 1.0);
         c31.setChild(d31);
@@ -1696,7 +1687,7 @@ public class MultiObjectiveMctsTest {
         PropoagatedEnvironment env = 
             new PropoagatedEnvironment(targetsInit, new ArrayList<Integer>());
         DecisionNode root = 
-            new DecisionNode(1, 1, null, null, null, new AbsoluteDate(), env, 0, 0.);
+            new DecisionNode(1, 1, null, new AbsoluteDate(), env, 0, 0.);
 
         List<ObservedObject> targetsUpdated = new ArrayList<ObservedObject>();
         targetsUpdated.add(objUpdatedA);
@@ -1790,7 +1781,7 @@ public class MultiObjectiveMctsTest {
         PropoagatedEnvironment env = 
             new PropoagatedEnvironment(targetsInit, new ArrayList<Integer>());
         DecisionNode root = 
-            new DecisionNode(1, 1, null, null, null, initDate, env, 0, 0.);
+            new DecisionNode(1, 1, null, initDate, env, 0, 0.);
         // 70% on search capacity shall be spent on stripe, 30% on bullseye scan
         root.setWeightsSearchingTask(new double[]{0.7, 0.3});   
         
@@ -1803,7 +1794,7 @@ public class MultiObjectiveMctsTest {
         ChanceNode chanceA = 
             new ChanceNode(null, 1, 1, search1, null, root, root.incrementIdCounter(), 
                            root.getDepth() + 0.5);
-        DecisionNode decisionA = new DecisionNode(0, 1, null, null, null, epochA, 
+        DecisionNode decisionA = new DecisionNode(0, 1, null, epochA, 
                                                 new PropoagatedEnvironment(targetsInit, taskA),
                                                 root.incrementIdCounter(), root.getDepth() + 1.0);
         chanceA.setChild(decisionA);
@@ -1822,7 +1813,7 @@ public class MultiObjectiveMctsTest {
         ChanceNode chanceAPrime = 
             new ChanceNode(null, 1, 1, track1, null, decisionA, root.incrementIdCounter(), 
                             decisionA.getDepth() + 0.5);
-        DecisionNode decisionAPrime = new DecisionNode(0, 1, null, null, null, epochAPrime, 
+        DecisionNode decisionAPrime = new DecisionNode(0, 1, null, epochAPrime, 
                                                        new PropoagatedEnvironment(targetsPropA, taskA), 
                                                        root.incrementIdCounter(), decisionA.getDepth() + 1.0);
         DecisionNode.setParent(decisionAPrime, chanceAPrime);
@@ -1856,7 +1847,7 @@ public class MultiObjectiveMctsTest {
         ChanceNode chanceB =
             new ChanceNode(null, 1, 1, track1, null, root, root.incrementIdCounter(), 
                             root.getDepth() + 0.5);
-        DecisionNode decisionB = new DecisionNode(1, 1, null, null, null, epochB, 
+        DecisionNode decisionB = new DecisionNode(1, 1, null, epochB, 
                                                   new PropoagatedEnvironment(targetsPropB, taskB), 
                                                   root.incrementIdCounter(), root.getDepth() + 1.0);
         chanceB.setChild(decisionB);
@@ -1870,7 +1861,7 @@ public class MultiObjectiveMctsTest {
         ChanceNode chanceBPrime = 
             new ChanceNode(null, 1, 1, track1, null, decisionB, root.incrementIdCounter(), 
                             decisionB.getDepth() + 0.5);
-        DecisionNode decisionBPrime = new DecisionNode(0, 1, null, null, null, epochBPrime, 
+        DecisionNode decisionBPrime = new DecisionNode(0, 1, null, epochBPrime, 
                                                        new PropoagatedEnvironment(targetsPropBPrime, taskB), 
                                                        root.incrementIdCounter(), decisionB.getDepth() + 1.0);
         DecisionNode.setParent(decisionBPrime, chanceBPrime);  
@@ -1893,7 +1884,7 @@ public class MultiObjectiveMctsTest {
         ChanceNode chanceC = 
             new ChanceNode(null, 1, 1, search1, null, decisionB, root.incrementIdCounter(), 
                             decisionB.getDepth() + 0.5);
-        DecisionNode decisionC = new DecisionNode(0, 1, null, null, null, epochC, 
+        DecisionNode decisionC = new DecisionNode(0, 1, null, epochC, 
                                                 new PropoagatedEnvironment(targetsInit, taskA),
                                                 root.incrementIdCounter(), decisionB.getDepth() + 1.0);
         chanceC.setChild(decisionC);
@@ -1908,7 +1899,7 @@ public class MultiObjectiveMctsTest {
         ChanceNode chanceCPrime = 
             new ChanceNode(null, 1, 1, track2, null, decisionC, root.incrementIdCounter(), 
                             decisionC.getDepth() + 0.5);
-        DecisionNode decisionCPrime = new DecisionNode(0, 1, null, null, null, epochCPrime, 
+        DecisionNode decisionCPrime = new DecisionNode(0, 1, null, epochCPrime, 
                                                    new PropoagatedEnvironment(targetsPropCPrime, taskA), 
                                                    root.incrementIdCounter(), decisionC.getDepth() + 1.0);
         DecisionNode.setParent(decisionCPrime, chanceCPrime);
@@ -1939,8 +1930,7 @@ public class MultiObjectiveMctsTest {
             new ChanceNode(null, 1, 1, search4, null, decisionAPrime, root.incrementIdCounter(), 
                             decisionAPrime.getDepth() + 0.5);
         DecisionNode decisionAPrimePrime = 
-            new DecisionNode(0, 1, null, null, null, 
-                            epochAPrimePrime, 
+            new DecisionNode(0, 1, null, epochAPrimePrime, 
                             new PropoagatedEnvironment(targetsPropA, taskAPrimePrime),
                             root.incrementIdCounter(), decisionAPrime.getDepth() + 1.0);
         DecisionNode.setParent(decisionAPrimePrime, chanceAPrimePrime);

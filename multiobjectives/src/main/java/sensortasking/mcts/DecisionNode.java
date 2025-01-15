@@ -13,14 +13,7 @@ public class DecisionNode extends Node{
     /** Sensor pointing location. */
     private AngularDirection sensorPointing;
 
-    /** Prioritisation weight vector. 1st entry refers to search, 2nd to tracking objective. */
-    double[] weights;
-
-    /** Time durations dedicated for each objective. 1st entry refers to search, 2nd to tracking 
-     * objective. */
-    double[] timeResources;
-
-    /** Propoagated environment under the influence of the last tracking action. */
+    /** Propagated environment under the influence of the last tracking action. */
     PropoagatedEnvironment environment;
 
     /** User-defined weights of searching tasks. First entry stripe scan, second bullseye scan. */
@@ -32,19 +25,17 @@ public class DecisionNode extends Node{
     /** Utility vectors of all existing leaf nodes.*/
     Map<Long, double[]> allUtilityVecs = new HashMap<Long, double[]>();
 
+    /** IDs of leafs that have been removed as they are not considered as optimal anymore. */
     List<Long> removedLeafs = new ArrayList<Long>();
 
     /** Node ID counter. */
     protected long idCounter = 0;
 
-    
-
-    public DecisionNode(double utility, int numVisits, AngularDirection pointing, double[] weights,
-                        double[] timeResources, AbsoluteDate epoch, PropoagatedEnvironment environment, long id, double depth) {
+    public DecisionNode(double utility, int numVisits, AngularDirection pointing, 
+                        AbsoluteDate epoch, PropoagatedEnvironment environment, long id, 
+                        double depth) {
 
         this.sensorPointing = pointing;
-        this.weights = weights;
-        this.timeResources = timeResources;
         super.utility = utility;
         super.numVisits = numVisits;
         this.environment = environment;
@@ -105,8 +96,6 @@ public class DecisionNode extends Node{
                                                 + "that shall get removed");
                 }
             }
-            
-            
         }
     }
 
@@ -126,11 +115,11 @@ public class DecisionNode extends Node{
         return this.environment;
     }
 
-    public double[] getWeights() {
+/*     public double[] getWeights() {
         return this.weights;
     }
 
     public double[] getTimeResources() {
         return this.timeResources;
-    }
+    } */
 }

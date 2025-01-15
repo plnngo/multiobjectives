@@ -409,10 +409,11 @@ public class MultiObjectiveMcts {
                     objective = new SearchObjective(completedSearchTasks, stationFrame, 
                                                     scanStripe, numExpo, sensor);
                     break;
-                } else if(!searchAlreadyPerformed && leaf.getTimeResources()[1] < TrackingObjective.allocation 
-                                                                                    + this.sensor.getSettlingT() 
-                                                                                    + TrackingObjective.preparation 
-                                                                                    + this.sensor.getExposureT()) {
+                } else if(!searchAlreadyPerformed 
+                            && endCampaign.durationFrom(leaf.getEpoch()) < TrackingObjective.allocation 
+                                                                            + this.sensor.getSettlingT() 
+                                                                            + TrackingObjective.preparation 
+                                                                            + this.sensor.getExposureT()) {
                     objective = new SearchObjective(completedSearchTasks, stationFrame, scanStripe, numExpo, sensor);
                     break;
                 } else {
@@ -491,7 +492,7 @@ public class MultiObjectiveMcts {
                                         0., 0, objective, pointing, leaf, 
                                         this.initial.incrementIdCounter(), leaf.getDepth() + 0.5);      
         // Update 
-        double[] priorTimeResources = leaf.getTimeResources();
+        /* double[] priorTimeResources = leaf.getTimeResources();
         double[] postTimeResources = new double[priorTimeResources.length];
         double[] postWeights = new double[leaf.getWeights().length];
 
@@ -499,45 +500,45 @@ public class MultiObjectiveMcts {
         double priorTobs = 0;
         for (int i=0; i<priorTimeResources.length; i++) {
             priorTobs += priorTimeResources[i];
-        }
+        } */
         AbsoluteDate[] obsTimeInterval = expandedChance.getExecutionDuration();
         double executionDuration = obsTimeInterval[1].durationFrom(obsTimeInterval[0]);
-        double postTobs = priorTobs - executionDuration;
+/*         double postTobs = priorTobs - executionDuration;
 
         // Update weights
         for (int i=0; i<postWeights.length; i++) {
             postWeights[i] = priorTimeResources[i]/postTobs;
-        }
+        }  */
 
         AngularDirection sensorPointing;
         String objectiveType = objective.getClass().getSimpleName();
         if (objectiveType.equals("SearchObjective")) {
-            // Update time resources
+            /* // Update time resources
             postTimeResources[0] = priorTimeResources[0] - executionDuration;
             postTimeResources[1] = priorTimeResources[1];
             
             // Correct weight update for given objective
-            postWeights[0] = postTimeResources[0]/postTobs;
+            postWeights[0] = postTimeResources[0]/postTobs; */
 
             // Assign sensor pointing location
             List<AngularDirection> tasks = ((SearchObjective)expandedChance.getMacro()).getScheduleTopocentric();
             sensorPointing = tasks.get(tasks.size()-1);
 
         } else if(objectiveType.equals("TrackingObjective")) {
-            // Update time resources
+            /* // Update time resources
             postTimeResources[1] = priorTimeResources[1] - executionDuration;
             postTimeResources[0] = priorTimeResources[0];
 
             // Correct weight update for given objective
             postWeights[1] = postTimeResources[1]/postTobs;
-
+ */
             // Assign sensor pointing location
             sensorPointing = expandedChance.getMicro();
         }else {
             throw new IllegalAccessError("Unknown objective.");
         }
-        // TODO: Try MCTS handling weight 
-        postWeights = new double[]{0.5, 0.5};
+        /* // TODO: Try MCTS handling weight 
+        postWeights = new double[]{0.5, 0.5}; */
 
         AbsoluteDate propEpoch = leaf.getEpoch().shiftedBy(executionDuration);
 
@@ -570,8 +571,7 @@ public class MultiObjectiveMcts {
             PropoagatedEnvironment environment = 
                 new PropoagatedEnvironment(propEnviroment, 
                                            leaf.getEnvironment().stateSearching);
-            expandedDecision = new DecisionNode(0., 0, sensorPointing, postWeights, 
-                                                postTimeResources, propEpoch, environment,
+            expandedDecision = new DecisionNode(0., 0, sensorPointing, propEpoch, environment,
                                                 this.initial.incrementIdCounter(), leaf.getDepth() + 1.0);  
         } else if (objective instanceof SearchObjective) {
             // searching objective has been selected TODO: hard copy of propagatedOutcome might be necessary
@@ -581,8 +581,7 @@ public class MultiObjectiveMcts {
             PropoagatedEnvironment environment = 
                 new PropoagatedEnvironment(leaf.getEnvironment().getStateTracking(), 
                                            propEnviroment);
-            expandedDecision = new DecisionNode(0., 0, sensorPointing, postWeights, 
-                                                postTimeResources, propEpoch, environment,
+            expandedDecision = new DecisionNode(0., 0, sensorPointing, propEpoch, environment,
                                                 this.initial.incrementIdCounter(), leaf.getDepth() + 1.0);
 
         } else {
@@ -655,8 +654,7 @@ public class MultiObjectiveMcts {
         if (Objects.isNull(last)) {
             //No simulation was performed
             DecisionNode fakeRoot = 
-                new DecisionNode(0., 0, null, null, 
-                                 ((DecisionNode)leaf.getParent().getParent()).getTimeResources(), 
+                new DecisionNode(0., 0, null,
                                  leaf.getParent().getParent().getEpoch(), null,
                                  this.initial.incrementIdCounter(), 0.);
             lastChance = 
@@ -666,7 +664,6 @@ public class MultiObjectiveMcts {
                                 this.initial.incrementIdCounter(), fakeRoot.getDepth() + 0.5);
             lastDecision = 
                 new DecisionNode(leaf.getUtility(), leaf.getNumVisits(), ((DecisionNode)leaf).getSensorPointing(), 
-                                ((DecisionNode)leaf).getWeights(), ((DecisionNode)leaf).getTimeResources(), 
                                 leaf.getEpoch(), ((DecisionNode)leaf).getEnvironment(),
                                 this.initial.incrementIdCounter(), fakeRoot.getDepth() + 1.0);
             Node.setParent(lastDecision, lastChance);
@@ -709,19 +706,19 @@ public class MultiObjectiveMcts {
         // add new utility vector to list of utilities
         this.initial.addUtilityVec(leaf.getId(), utilityVec);
         
-        double[] spentResources = new double[lastDecision.getTimeResources().length];
+        /* double[] spentResources = new double[lastDecision.getTimeResources().length];
         double[] initWeights = ((DecisionNode)this.initial).getWeights();
         double obsCampaignDuration = endCampaign.durationFrom(startCampaign);
         double timeSpentObserving = obsCampaignDuration;
         for(int i=0; i<lastDecision.getTimeResources().length; i++) {
             timeSpentObserving -= lastDecision.getTimeResources()[i];
-        }
+        } */
         double[] lastUtility = new double[2];
         double totalUtility = 0.;
 
-        if(timeSpentObserving>obsCampaignDuration) {
+        /* if(timeSpentObserving>obsCampaignDuration) {
             timeSpentObserving = obsCampaignDuration;
-        }
+        } */
        
         // How much time has been spent on each objective up until end of observation campaign
         while(parent.getEpoch().durationFrom(endCampaign) > 0.) {
@@ -741,12 +738,12 @@ public class MultiObjectiveMcts {
         
         for(int i=0; i<lastUtility.length; i++) {
                    
-            spentResources[i] = ((DecisionNode)this.initial).getTimeResources()[i] - grandParent.getTimeResources()[i];
+           /*  spentResources[i] = ((DecisionNode)this.initial).getTimeResources()[i] - grandParent.getTimeResources()[i];
             if(i==0) {
                 spentResources[i] += untilEnd;
             }
 
-            lastUtility[i] = FastMath.abs((spentResources[i]/timeSpentObserving) - initWeights[i]);
+            lastUtility[i] = FastMath.abs((spentResources[i]/timeSpentObserving) - initWeights[i]); */
             totalUtility += lastUtility[i];
         }
         totalUtility = 1 - totalUtility;
@@ -795,8 +792,7 @@ public class MultiObjectiveMcts {
             }
 
             DecisionNode fakeRoot = 
-                new DecisionNode(0., 0, null, null, 
-                                 ((DecisionNode)leaf.getParent().getParent()).getTimeResources(), 
+                new DecisionNode(0., 0, null,  
                                  leaf.getParent().getParent().getEpoch(), 
                                  new PropoagatedEnvironment(fakeObjs, fakeSearchTask),
                                  this.initial.incrementIdCounter(), 0.);
@@ -806,8 +802,7 @@ public class MultiObjectiveMcts {
                                 ((ChanceNode)leaf.getParent()).getMicro(), fakeRoot,
                                 this.initial.incrementIdCounter(), fakeRoot.getDepth() + 0.5);
             lastDecision = 
-                new DecisionNode(leaf.getUtility(), leaf.getNumVisits(), ((DecisionNode)leaf).getSensorPointing(), 
-                                ((DecisionNode)leaf).getWeights(), ((DecisionNode)leaf).getTimeResources(), 
+                new DecisionNode(leaf.getUtility(), leaf.getNumVisits(), ((DecisionNode)leaf).getSensorPointing(),  
                                 leaf.getEpoch(), ((DecisionNode)leaf).getEnvironment(),
                                 this.initial.incrementIdCounter(), fakeRoot.getDepth() + 1.0);
             Node.setParent(lastDecision, lastChance);
