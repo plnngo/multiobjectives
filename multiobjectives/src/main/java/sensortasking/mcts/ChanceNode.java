@@ -17,7 +17,7 @@ public class ChanceNode extends Node{
     private AbsoluteDate[] executionDuration;
 
     public ChanceNode(AbsoluteDate[] obsTimeInterval, double utility, int numVisits, Objective objective, 
-    AngularDirection pointing, Node parent, long id) {
+    AngularDirection pointing, Node parent, long id, double depth) {
 
         parent.setChild(this);
         this.micro = pointing;
@@ -36,5 +36,6 @@ public class ChanceNode extends Node{
             numObj = numObj + ((DecisionNode) parent).getEnvironment().getStateTracking().size();
         }
         super.setUtilityVec(new double[numObj]);
+        super.setDepth(depth);
     }
 }

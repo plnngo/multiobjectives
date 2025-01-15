@@ -38,7 +38,7 @@ public class MultiObjectiveMcts {
     final AbsoluteDate endCampaign;
 
     /** Tuning parameter fur UCB. */
-    final static double C = 1000000.;
+    static double C = 1.e6;
 
     /** Topocentric horizon frame. */
     final TopocentricFrame stationFrame;
@@ -47,7 +47,7 @@ public class MultiObjectiveMcts {
     final Frame j2000 = FramesFactory.getEME2000();
 
     /** Tuning parameter (0;1) for progressive widening */
-    final static double alpha = 1.;
+    double[] alphaDepth = new double[]{17./134., 6096./44899, 24./151., 1.};
 
     /** Stripe for searching objective. */
     final Stripe scanStripe; 
@@ -57,6 +57,9 @@ public class MultiObjectiveMcts {
 
     /** Observation station (TODO: implement sensor for tracking objective). */
     final Sensor sensor;
+
+    /** Maximum depth of decision in theory. */
+    final double dmax;
 
     /** Basic constructor.
      * 
@@ -86,6 +89,12 @@ public class MultiObjectiveMcts {
         this.stationFrame = new TopocentricFrame(earth, sensor.getPosition(), stationName);
         this.sensor = sensor;
         this.scanStripe = computeScanStripe();
+
+        double minTaskT = TrackingObjective.allocation + this.sensor.getSettlingT() 
+                            + TrackingObjective.preparation + this.sensor.getExposureT() 
+                            + this.sensor.getReadoutT();
+        double campaignT = endCampaign.durationFrom(startCampaign);
+        this.dmax = FastMath.ceil(campaignT/minTaskT) - 1;
     }
 
   
@@ -106,8 +115,9 @@ public class MultiObjectiveMcts {
         for(int i=0; i<iterations; i++) {  
             List<Node> outputRobustMaxRatio = new ArrayList<Node>();
 
-            if (i==2998) {
+            if (i==1998) {
                 continue;
+                //C = 1.e12;
             } 
             System.out.println("Iteration: " + i);
             selectNew(this.initial);
@@ -185,6 +195,7 @@ public class MultiObjectiveMcts {
         // check progressive widening condition
         if(current.getClass().getSimpleName().equals("DecisionNode")) {
             boolean expandable = true;
+            double alpha = 1.;
             while(children.size() <= FastMath.pow(current.getNumVisits(), alpha) && expandable) {
 
                 // allow expansion of new node
@@ -283,7 +294,12 @@ public class MultiObjectiveMcts {
         // check progressive widening condition
         if(current.getClass().getSimpleName().equals("DecisionNode")) {
             boolean expandable = true;
-            while(children.size() <= FastMath.pow(current.getNumVisits(), alpha) && expandable) {
+            //double alpha = alphaDepth[(int)current.getDepth()];
+            //alpha = 1./(10 * (dmax - current.getDepth()) - 3);
+            double alpha = 1.;
+            boolean progressiveWidening = children.size() <= FastMath.pow(current.getNumVisits(), alpha);
+            //boolean progressiveWidening = FastMath.floor(FastMath.pow(current.getNumVisits(), alpha)) > FastMath.floor(FastMath.pow(current.getNumVisits() - 1, alpha));
+            while(progressiveWidening && expandable) {
 
                 // allow expansion of new node
                 DecisionNode leaf = expand((DecisionNode) current, false);
@@ -473,7 +489,7 @@ public class MultiObjectiveMcts {
         }
         expandedChance = new ChanceNode(objective.getExecusionDuration(leaf.getEpoch()), 
                                         0., 0, objective, pointing, leaf, 
-                                        this.initial.incrementIdCounter());      
+                                        this.initial.incrementIdCounter(), leaf.getDepth() + 0.5);      
         // Update 
         double[] priorTimeResources = leaf.getTimeResources();
         double[] postTimeResources = new double[priorTimeResources.length];
@@ -556,7 +572,7 @@ public class MultiObjectiveMcts {
                                            leaf.getEnvironment().stateSearching);
             expandedDecision = new DecisionNode(0., 0, sensorPointing, postWeights, 
                                                 postTimeResources, propEpoch, environment,
-                                                this.initial.incrementIdCounter());  
+                                                this.initial.incrementIdCounter(), leaf.getDepth() + 1.0);  
         } else if (objective instanceof SearchObjective) {
             // searching objective has been selected TODO: hard copy of propagatedOutcome might be necessary
             // for now, only stripe scan is performed TODO: implement bullseye
@@ -567,7 +583,7 @@ public class MultiObjectiveMcts {
                                            propEnviroment);
             expandedDecision = new DecisionNode(0., 0, sensorPointing, postWeights, 
                                                 postTimeResources, propEpoch, environment,
-                                                this.initial.incrementIdCounter());
+                                                this.initial.incrementIdCounter(), leaf.getDepth() + 1.0);
 
         } else {
             // other objective was selected
@@ -642,17 +658,17 @@ public class MultiObjectiveMcts {
                 new DecisionNode(0., 0, null, null, 
                                  ((DecisionNode)leaf.getParent().getParent()).getTimeResources(), 
                                  leaf.getParent().getParent().getEpoch(), null,
-                                 this.initial.incrementIdCounter());
+                                 this.initial.incrementIdCounter(), 0.);
             lastChance = 
                 new ChanceNode(((ChanceNode)leaf.getParent()).getExecutionDuration(), leaf.getParent().getUtility(), 
                                 leaf.getParent().getNumVisits(), ((ChanceNode)leaf.getParent()).getMacro(), 
                                 ((ChanceNode)leaf.getParent()).getMicro(), fakeRoot,
-                                this.initial.incrementIdCounter());
+                                this.initial.incrementIdCounter(), fakeRoot.getDepth() + 0.5);
             lastDecision = 
                 new DecisionNode(leaf.getUtility(), leaf.getNumVisits(), ((DecisionNode)leaf).getSensorPointing(), 
                                 ((DecisionNode)leaf).getWeights(), ((DecisionNode)leaf).getTimeResources(), 
                                 leaf.getEpoch(), ((DecisionNode)leaf).getEnvironment(),
-                                this.initial.incrementIdCounter());
+                                this.initial.incrementIdCounter(), fakeRoot.getDepth() + 1.0);
             Node.setParent(lastDecision, lastChance);
             parent = leaf;
         } else {
@@ -783,17 +799,17 @@ public class MultiObjectiveMcts {
                                  ((DecisionNode)leaf.getParent().getParent()).getTimeResources(), 
                                  leaf.getParent().getParent().getEpoch(), 
                                  new PropoagatedEnvironment(fakeObjs, fakeSearchTask),
-                                 this.initial.incrementIdCounter());
+                                 this.initial.incrementIdCounter(), 0.);
             lastChance = 
                 new ChanceNode(((ChanceNode)leaf.getParent()).getExecutionDuration(), leaf.getParent().getUtility(), 
                                 leaf.getParent().getNumVisits(), ((ChanceNode)leaf.getParent()).getMacro(), 
                                 ((ChanceNode)leaf.getParent()).getMicro(), fakeRoot,
-                                this.initial.incrementIdCounter());
+                                this.initial.incrementIdCounter(), fakeRoot.getDepth() + 0.5);
             lastDecision = 
                 new DecisionNode(leaf.getUtility(), leaf.getNumVisits(), ((DecisionNode)leaf).getSensorPointing(), 
                                 ((DecisionNode)leaf).getWeights(), ((DecisionNode)leaf).getTimeResources(), 
                                 leaf.getEpoch(), ((DecisionNode)leaf).getEnvironment(),
-                                this.initial.incrementIdCounter());
+                                this.initial.incrementIdCounter(), fakeRoot.getDepth() + 1.0);
             Node.setParent(lastDecision, lastChance);
         } else {
             lastDecision = (DecisionNode) last;

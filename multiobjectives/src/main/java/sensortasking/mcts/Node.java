@@ -32,6 +32,9 @@ public class Node {
     /** Accumulated utility vector. */
     double[] utilityVec;
 
+    /** Node depth. */
+    double depth = 0;
+
     public void setChild(Node child) {
         children.add(child);
         child.parent = this;
@@ -77,5 +80,13 @@ public class Node {
 
     public void clearChildren() {
         this.children = new ArrayList<Node>();
+    }
+
+    public void setDepth(double d){
+        this.depth = d;
+    }
+
+    public double getDepth() {
+        return this.depth;
     }
 }

@@ -37,9 +37,10 @@ public class DecisionNode extends Node{
     /** Node ID counter. */
     protected long idCounter = 0;
 
+    
 
     public DecisionNode(double utility, int numVisits, AngularDirection pointing, double[] weights,
-                        double[] timeResources, AbsoluteDate epoch, PropoagatedEnvironment environment, long id) {
+                        double[] timeResources, AbsoluteDate epoch, PropoagatedEnvironment environment, long id, double depth) {
 
         this.sensorPointing = pointing;
         this.weights = weights;
@@ -57,6 +58,7 @@ public class DecisionNode extends Node{
             numObj = numObj + environment.getStateTracking().size();
         }
         super.setUtilityVec(new double[numObj]);
+        super.setDepth(depth);
     }
 
     public DecisionNode setWeightsSearchingTask(double[] weights) {

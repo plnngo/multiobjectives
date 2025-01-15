@@ -893,9 +893,6 @@ public class TrackingObjective implements Objective{
             }
         }
         
-        if (lastUpdateEpoch.durationFrom(new AbsoluteDate()) < 10) {
-            System.out.println("Buggy epoch: " + lastUpdateEpoch.toString());
-        }
         AbsoluteDate[] interval = 
             new AbsoluteDate[]{current, lastUpdateEpoch.shiftedBy(sensor.getExposureT()/2 
                                                                     + sensor.getReadoutT())};

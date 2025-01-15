@@ -14,7 +14,7 @@ public class CsvFileReader {
 
     public static void main(String[] args) throws FileNotFoundException, IOException {
         Map<String[], Integer> statistics = new LinkedHashMap<String[], Integer>();
-        try (CSVReader reader = new CSVReader(new FileReader("multiobjectives\\Strategy_4min_alpha1.csv"))) {
+        try (CSVReader reader = new CSVReader(new FileReader("multiobjectives\\Tuples_11.csv"))) {
             List<String[]> r = reader.readAll();
             for(String[] x : r) {
                 boolean solutionRegistered = false;
@@ -42,6 +42,5 @@ public class CsvFileReader {
             }
         }
         System.out.println("Number of unique solutions: " + statistics.size());
-    }
-    
+    }   
 }
