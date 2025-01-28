@@ -38,7 +38,7 @@ public class MultiObjectiveMcts {
     final AbsoluteDate endCampaign;
 
     /** Tuning parameter fur UCB. */
-    static double C = 1.e6;
+    static double C = 1.e12;
 
     /** Topocentric horizon frame. */
     final TopocentricFrame stationFrame;
@@ -107,7 +107,7 @@ public class MultiObjectiveMcts {
         return stripes[1];
     }
 
-    public List<Node> run(int iterations) {
+    public List<Node> run(int iterations, int mctsCall) {
 
         //List<Node> outputUCB = new ArrayList<Node>();
         //List<Node> outputRobustMax = new ArrayList<Node>();
@@ -115,11 +115,11 @@ public class MultiObjectiveMcts {
         for(int i=0; i<iterations; i++) {  
             List<Node> outputRobustMaxRatio = new ArrayList<Node>();
 
-            if (i==1998) {
+            if (i==10000) {
                 continue;
                 //C = 1.e12;
             } 
-            System.out.println("Iteration: " + i);
+            System.out.println("Iteration: " + i + " MCTS call: " + mctsCall);
             selectNew(this.initial);
             // Retrieve pointing strategy UCB
             Node current = initial;
@@ -129,9 +129,6 @@ public class MultiObjectiveMcts {
             // Travers decision until leaf node
             while(!Objects.isNull(current) && current.getChildren().size() !=0){
                 current = selectChildRobustMax(current);
-                //current = selectChildUCB(current);
-                //current = selectChildRobustMaxRatio(current);
-                //outputRobustMax.add(current);
                 outputRobustMaxRatio.add(current);
             }
             if(i==iterations-1) {
@@ -158,7 +155,6 @@ public class MultiObjectiveMcts {
         }
 
         return null;
-        //return outputRobustMax;
     }
 
     public Node selectChildRobustMaxRatio(Node current) {
@@ -537,8 +533,7 @@ public class MultiObjectiveMcts {
         }else {
             throw new IllegalAccessError("Unknown objective.");
         }
-        /* // TODO: Try MCTS handling weight 
-        postWeights = new double[]{0.5, 0.5}; */
+
 
         AbsoluteDate propEpoch = leaf.getEpoch().shiftedBy(executionDuration);
 
@@ -572,17 +567,22 @@ public class MultiObjectiveMcts {
                 new PropoagatedEnvironment(propEnviroment, 
                                            leaf.getEnvironment().stateSearching);
             expandedDecision = new DecisionNode(0., 0, sensorPointing, propEpoch, environment,
-                                                this.initial.incrementIdCounter(), leaf.getDepth() + 1.0);  
+                                                this.initial.incrementIdCounter(), 
+                                                leaf.getDepth() + 1.0, leaf.getTimeSpentStripe());
         } else if (objective instanceof SearchObjective) {
             // searching objective has been selected TODO: hard copy of propagatedOutcome might be necessary
             // for now, only stripe scan is performed TODO: implement bullseye
+            double taskT = expandedChance.getExecutionDuration()[1]
+                            .durationFrom(expandedChance.getExecutionDuration()[0]);
+            double updateTimeSpentSearch = leaf.getTimeSpentStripe() + taskT;
             List<Integer> propEnviroment = objective.propagateOutcome();
             //propEnviroment.set(0, (Integer)propEnviroment.get(0) + 1);
             PropoagatedEnvironment environment = 
                 new PropoagatedEnvironment(leaf.getEnvironment().getStateTracking(), 
                                            propEnviroment);
             expandedDecision = new DecisionNode(0., 0, sensorPointing, propEpoch, environment,
-                                                this.initial.incrementIdCounter(), leaf.getDepth() + 1.0);
+                                                this.initial.incrementIdCounter(), 
+                                                leaf.getDepth() + 1.0, updateTimeSpentSearch);
 
         } else {
             // other objective was selected
@@ -656,7 +656,7 @@ public class MultiObjectiveMcts {
             DecisionNode fakeRoot = 
                 new DecisionNode(0., 0, null,
                                  leaf.getParent().getParent().getEpoch(), null,
-                                 this.initial.incrementIdCounter(), 0.);
+                                 this.initial.incrementIdCounter(), 0., 0.);
             lastChance = 
                 new ChanceNode(((ChanceNode)leaf.getParent()).getExecutionDuration(), leaf.getParent().getUtility(), 
                                 leaf.getParent().getNumVisits(), ((ChanceNode)leaf.getParent()).getMacro(), 
@@ -665,7 +665,8 @@ public class MultiObjectiveMcts {
             lastDecision = 
                 new DecisionNode(leaf.getUtility(), leaf.getNumVisits(), ((DecisionNode)leaf).getSensorPointing(), 
                                 leaf.getEpoch(), ((DecisionNode)leaf).getEnvironment(),
-                                this.initial.incrementIdCounter(), fakeRoot.getDepth() + 1.0);
+                                this.initial.incrementIdCounter(), fakeRoot.getDepth() + 1.0, 
+                                ((DecisionNode)leaf).getTimeSpentStripe());
             Node.setParent(lastDecision, lastChance);
             parent = leaf;
         } else {
@@ -795,7 +796,7 @@ public class MultiObjectiveMcts {
                 new DecisionNode(0., 0, null,  
                                  leaf.getParent().getParent().getEpoch(), 
                                  new PropoagatedEnvironment(fakeObjs, fakeSearchTask),
-                                 this.initial.incrementIdCounter(), 0.);
+                                 this.initial.incrementIdCounter(), 0., 0.);
             lastChance = 
                 new ChanceNode(((ChanceNode)leaf.getParent()).getExecutionDuration(), leaf.getParent().getUtility(), 
                                 leaf.getParent().getNumVisits(), ((ChanceNode)leaf.getParent()).getMacro(), 
@@ -804,7 +805,8 @@ public class MultiObjectiveMcts {
             lastDecision = 
                 new DecisionNode(leaf.getUtility(), leaf.getNumVisits(), ((DecisionNode)leaf).getSensorPointing(),  
                                 leaf.getEpoch(), ((DecisionNode)leaf).getEnvironment(),
-                                this.initial.incrementIdCounter(), fakeRoot.getDepth() + 1.0);
+                                this.initial.incrementIdCounter(), fakeRoot.getDepth() + 1.0, 
+                                ((DecisionNode)leaf).getTimeSpentStripe());
             Node.setParent(lastDecision, lastChance);
         } else {
             lastDecision = (DecisionNode) last;
@@ -877,8 +879,11 @@ public class MultiObjectiveMcts {
         double[] trackReward = computeTrackReward(last);
         
         // Compute searching reward
-        //double searchReward = computeSearchReward(last, leaf); TODO: function errornous because rSearch sometimes not zero
-        double searchReward = 0.;
+        double searchReward = computeSearchReward(last, leaf); //TODO: function errornous because rSearch sometimes not zero
+        if(searchReward!=0.) {
+            System.out.println("Search reward erroneous");
+        }
+        //searchReward = 0.;
 
         double[] out = new double[trackReward.length + 1];
         out[0] = searchReward;
@@ -1041,23 +1046,6 @@ public class MultiObjectiveMcts {
             double[] removedUtility = utilityChildrenNorm.remove(0);
             double[] utilityWeight = new double[removedUtility.length -1];
             
-            // Compute UCB 
-            //double n = current.getChildren().get(i).getNumVisits();
-            //double[] utilityVec = current.getChildren().get(i).getUtilityVec();
-/*             double totalRewardNorm = 0.;
-
-            // Normalise utility vector by number of visits
-            double[] utilityNorm = new double[utilityVec.length * 2 -1];
-            for(int j=0; j<utilityNorm.length; j++) {
-                if(j<utilityVec.length) {
-                    utilityNorm[j] = utilityVec[j] / n;
-                    totalRewardNorm += utilityNorm[j];
-                } else {
-                    double rewardNorm = utilityNorm[j-utilityNorm.length+1];
-                    utilityNorm[j] = FastMath.abs((rewardNorm/totalRewardNorm) - weight);
-                }
-            } */
-
             OptimisingVector opt = new OptimisingVector(utilityChildrenNorm, removedUtility.length - 1);
             List<double[]> domVecs = 
                 opt.getDominatingVecs(removedUtility, 
@@ -1084,10 +1072,10 @@ public class MultiObjectiveMcts {
                 optimalId.add(current.getChildren().get(i).getId());
             } else if (utility==maxUtilityIndividualReward){
                 double totalRewardNorm = 0.;
-                for(int j=1; j<removedUtility.length; j++) {
+                for(int j=1; j<removedUtility.length-1; j++) {
                     totalRewardNorm += removedUtility[j];
                 }
-                for(int j=1; j<removedUtility.length; j++) {
+                for(int j=1; j<removedUtility.length-1; j++) {
                     utilityWeight[j-1] = FastMath.abs((removedUtility[j]/totalRewardNorm)- weight);
                 }
                 optimalIndividRtrackUtility.add(utilityWeight);
@@ -1186,36 +1174,6 @@ public class MultiObjectiveMcts {
             double n = current.getChildren().get(i).getNumVisits();
             ucb[i] = utilities[i] + C * FastMath.sqrt(FastMath.log(nP)/n);
         }
-/*             // TODO: retrieve child utility and add new utility (1) --> got filtered out
-            for(int i =0; i<current.getChildren().size(); i ++) {
-                for(long id : optimalId) {
-                    if(id == current.getChildren().get(i).getId()) {
-                        continue;
-                    } else {
-                        utilities[i] = - optimalWeightId.size();
-                    }
-                }
-            }   
-            
-            optimalIndividRtrackUtility.add(removedUtility);
-            optimalId.add(removedId); */
-        
-/*         for(long id : optimalWeightId) {
-            for(int i=0; i<current.getChildren().size(); i++){
-                // Calculate UCT (utility equal among all nodes in optimalWeightId)
-                if(current.getChildren().get(i).getId() == id) {
-                    double n = current.getChildren().get(i).getNumVisits();
-                    utilities[i] = current.getChildren().get(i).getUtility();
-                    current.getChildren().get(i).setUtility(utilities[i]);
-                    // TODO: retrieve child utility and add new utility (3) to it
-                    ucb[i] = utilities[i] + C * FastMath.sqrt(FastMath.log(nP)/n);
-                } else {
-                    double n = current.getChildren().get(i).getNumVisits();
-                    ucb[i] = utilities[i] + C * FastMath.sqrt(FastMath.log(nP)/n);
-                    current.getChildren().get(i).setUtility(utilities[i]);
-                }
-            }
-        } */
 
         // search for child that maximises ucb
         for(int i=0; i<ucb.length; i++) { 
@@ -1246,7 +1204,15 @@ public class MultiObjectiveMcts {
                     }    
                 } */
             }
-            utilityChildrenNorm.add(utilityNorm);
+           /*  if(child.getClass().getSimpleName().equals("ChanceNode")) {
+                utilityNorm[utilityNorm.length-1] = 
+                    ((DecisionNode)child.getChildren().get(0)).getTimeSpentStripe();
+            } else {
+                utilityNorm[utilityNorm.length-1] = 
+                    ((DecisionNode)child).getTimeSpentStripe();
+            }
+            */
+            utilityChildrenNorm.add(utilityNorm); 
         }
         return utilityChildrenNorm;
     }

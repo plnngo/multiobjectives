@@ -31,9 +31,12 @@ public class DecisionNode extends Node{
     /** Node ID counter. */
     protected long idCounter = 0;
 
+    /** Time spent on stripe scanning method. */
+    double timeStripes = 0.;
+
     public DecisionNode(double utility, int numVisits, AngularDirection pointing, 
                         AbsoluteDate epoch, PropoagatedEnvironment environment, long id, 
-                        double depth) {
+                        double depth, double timeStripes) {
 
         this.sensorPointing = pointing;
         super.utility = utility;
@@ -50,6 +53,7 @@ public class DecisionNode extends Node{
         }
         super.setUtilityVec(new double[numObj]);
         super.setDepth(depth);
+        this.timeStripes = timeStripes;
     }
 
     public DecisionNode setWeightsSearchingTask(double[] weights) {
@@ -113,6 +117,10 @@ public class DecisionNode extends Node{
 
     public PropoagatedEnvironment getEnvironment() {
         return this.environment;
+    }
+
+    public double getTimeSpentStripe() {
+        return this.timeStripes;
     }
 
 /*     public double[] getWeights() {

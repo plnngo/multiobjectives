@@ -296,11 +296,11 @@ public class MultiObjectiveMctsTest {
         double[] initTimeResources = 
             new double[]{initWeights[0] * endCampaign.durationFrom(current), 
                          initWeights[1] * endCampaign.durationFrom(current)}; */
-        Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0.);
+        Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0., 0.);
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", ooi, 
                                    new ArrayList<ObservedObject>(), sensor);
-        List<Node> strategy = mctsTracking.run(10);
+        List<Node> strategy = mctsTracking.run(10, 1);
         for(Node selected : strategy) {
             if(selected.getClass().getSimpleName().equals("ChanceNode")) {
 
@@ -384,12 +384,12 @@ public class MultiObjectiveMctsTest {
         double[] initTimeResources = 
             new double[]{initWeights[0] * endCampaign.durationFrom(current), 
                          initWeights[1] * endCampaign.durationFrom(current)}; */
-        Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0.)
+        Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0., 0.)
                         .setWeightsSearchingTask(new double[]{1.0, 0.});
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", ooi, 
                                    new ArrayList<ObservedObject>(), sensor);
-        List<Node> strategy = mctsTracking.run(70000000);
+        List<Node> strategy = mctsTracking.run(70000000, 1);
         
         //performIODsearch(strategy, current, fov, topohorizon, initialOoi);
 
@@ -884,7 +884,7 @@ public class MultiObjectiveMctsTest {
         double[] initTimeResources = 
             new double[]{initWeights[0] * endCampaign.durationFrom(current), 
                          initWeights[1] * endCampaign.durationFrom(current)}; */
-        Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0.);
+        Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0., 0.);
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", ooi, 
                                    new ArrayList<ObservedObject>(), sensor);
@@ -1074,7 +1074,7 @@ public class MultiObjectiveMctsTest {
         
         // Epoch
         AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60. * 4.);
+        AbsoluteDate endCampaign = current.shiftedBy(60. * 26.);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -1100,8 +1100,8 @@ public class MultiObjectiveMctsTest {
         CSVWriter writer = new CSVWriter(outputfile); 
         List<double[]> utilityStrategiesRatio = new ArrayList<double[]>();
 
-        int mctsCalls = 10;
-        int mctsIter = 1800;
+        int mctsCalls = 3;
+        int mctsIter = 600000;
         double weight = 1./3.;
 
         for (int i=0; i<mctsCalls; i++) {
@@ -1115,11 +1115,10 @@ public class MultiObjectiveMctsTest {
 
             final PropoagatedEnvironment enviro = new PropoagatedEnvironment(ooi, stripeBullseyeCompleted);
 
-            double[] initWeights = new double[]{0., 1.};
 
-            MultiObjectiveMcts mcts = setUpMcts(current, endCampaign, topohorizon, enviro, initWeights);
+            MultiObjectiveMcts mcts = setUpMcts(current, endCampaign, topohorizon, enviro);
 
-            List<Node> strategy = mcts.run(mctsIter);
+            List<Node> strategy = mcts.run(mctsIter, i);
             String[] selected = new String[(strategy.size()-1)/2 + 1 + ooi.size()];
             int j =0;
             for(Node currentNode : strategy) {
@@ -1240,9 +1239,7 @@ public class MultiObjectiveMctsTest {
 
         PropoagatedEnvironment enviro = new PropoagatedEnvironment(ooi, stripeBullseyeCompleted);
 
-        double[] initWeights = new double[]{1., 0.};
-
-        MultiObjectiveMcts mcts = setUpMcts(current, endCampaign, topohorizon, enviro, initWeights);
+        MultiObjectiveMcts mcts = setUpMcts(current, endCampaign, topohorizon, enviro);
 
         Node lastLeaf = mcts.select(mcts.getInitial());
 
@@ -1269,8 +1266,7 @@ public class MultiObjectiveMctsTest {
                 
     private MultiObjectiveMcts setUpMcts(AbsoluteDate current, AbsoluteDate endCampaign, 
                                          TopocentricFrame topohorizon, 
-                                         PropoagatedEnvironment enviro,
-                                         double[] initWeights) {
+                                         PropoagatedEnvironment enviro) {
         
         double readout = 7.;
         double exposure = 8.;
@@ -1294,7 +1290,7 @@ public class MultiObjectiveMctsTest {
         AngularDirection initPointing = 
             new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
 
-        Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0.);
+        Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0., 0.);
         MultiObjectiveMcts mcts = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", null, 
                                    new ArrayList<ObservedObject>(), sensor);
@@ -1510,7 +1506,8 @@ public class MultiObjectiveMctsTest {
         int numVisits = 1;
         AngularDirection initPointing = 
             new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
-        Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0.);
+        Node root = 
+            new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0., 0.);
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", ooi, 
                                    new ArrayList<ObservedObject>(), sensor);
@@ -1521,7 +1518,7 @@ public class MultiObjectiveMctsTest {
     @Test
     public void testComputeSearchReward() {
         // Build up test decision tree
-        DecisionNode root = new DecisionNode(1, 1, null, new AbsoluteDate(), null, 0, 0.);
+        DecisionNode root = new DecisionNode(1, 1, null, new AbsoluteDate(), null, 0, 0., 0.);
 
         // Stripe scan 70% and Bullseye scan 30%
         root.setWeightsSearchingTask(new double[]{0.7, 0.3});
@@ -1535,7 +1532,7 @@ public class MultiObjectiveMctsTest {
                                        root.getDepth() + 0.5);
         DecisionNode d1 = new DecisionNode(0, 1, null, null,  
                                            new PropoagatedEnvironment(null, task1),
-                                           root.incrementIdCounter(), root.getDepth() + 1.0);
+                                           root.incrementIdCounter(), root.getDepth() + 1.0, 0.);
         c1.setChild(d1);
 
         List<Integer> task2 = new ArrayList<>();
@@ -1546,7 +1543,7 @@ public class MultiObjectiveMctsTest {
                                        d1.getDepth() + 0.5);
         DecisionNode d2 = new DecisionNode(0, 1, null, null, 
                                            new PropoagatedEnvironment(null, task2),
-                                           root.incrementIdCounter(), d1.getDepth() + 1.0);
+                                           root.incrementIdCounter(), d1.getDepth() + 1.0, 0.);
         c2.setChild(d2);
 
         List<Integer> task31 = new ArrayList<>();
@@ -1557,7 +1554,7 @@ public class MultiObjectiveMctsTest {
                                         d2.getDepth() + 0.5);
         DecisionNode d31 = new DecisionNode(1, 1, null, null,  
                                             new PropoagatedEnvironment(null, task31),
-                                            root.incrementIdCounter(), d2.getDepth()+ 1.0);
+                                            root.incrementIdCounter(), d2.getDepth()+ 1.0, 0.);
         c31.setChild(d31);
 
         // Set up discrepancy vectors of leaf nodes
@@ -1687,7 +1684,7 @@ public class MultiObjectiveMctsTest {
         PropoagatedEnvironment env = 
             new PropoagatedEnvironment(targetsInit, new ArrayList<Integer>());
         DecisionNode root = 
-            new DecisionNode(1, 1, null, new AbsoluteDate(), env, 0, 0.);
+            new DecisionNode(1, 1, null, new AbsoluteDate(), env, 0, 0., 0.);
 
         List<ObservedObject> targetsUpdated = new ArrayList<ObservedObject>();
         targetsUpdated.add(objUpdatedA);
@@ -1781,7 +1778,7 @@ public class MultiObjectiveMctsTest {
         PropoagatedEnvironment env = 
             new PropoagatedEnvironment(targetsInit, new ArrayList<Integer>());
         DecisionNode root = 
-            new DecisionNode(1, 1, null, initDate, env, 0, 0.);
+            new DecisionNode(1, 1, null, initDate, env, 0, 0., 0.);
         // 70% on search capacity shall be spent on stripe, 30% on bullseye scan
         root.setWeightsSearchingTask(new double[]{0.7, 0.3});   
         
@@ -1796,7 +1793,7 @@ public class MultiObjectiveMctsTest {
                            root.getDepth() + 0.5);
         DecisionNode decisionA = new DecisionNode(0, 1, null, epochA, 
                                                 new PropoagatedEnvironment(targetsInit, taskA),
-                                                root.incrementIdCounter(), root.getDepth() + 1.0);
+                                                root.incrementIdCounter(), root.getDepth() + 1.0, 0.);
         chanceA.setChild(decisionA);
 
         AbsoluteDate epochAPrime = epochA.shiftedBy(2. * 60.);
@@ -1815,7 +1812,8 @@ public class MultiObjectiveMctsTest {
                             decisionA.getDepth() + 0.5);
         DecisionNode decisionAPrime = new DecisionNode(0, 1, null, epochAPrime, 
                                                        new PropoagatedEnvironment(targetsPropA, taskA), 
-                                                       root.incrementIdCounter(), decisionA.getDepth() + 1.0);
+                                                       root.incrementIdCounter(), 
+                                                       decisionA.getDepth() + 1.0, 0.);
         DecisionNode.setParent(decisionAPrime, chanceAPrime);
 
         // Set MCTS
@@ -1849,7 +1847,8 @@ public class MultiObjectiveMctsTest {
                             root.getDepth() + 0.5);
         DecisionNode decisionB = new DecisionNode(1, 1, null, epochB, 
                                                   new PropoagatedEnvironment(targetsPropB, taskB), 
-                                                  root.incrementIdCounter(), root.getDepth() + 1.0);
+                                                  root.incrementIdCounter(), 
+                                                  root.getDepth() + 1.0, 0.);
         chanceB.setChild(decisionB);
         AbsoluteDate epochBPrime = epochB.shiftedBy(2. * 60.);
         KeplerianPropagator kepPropo2 = new KeplerianPropagator(orbit2);
@@ -1863,7 +1862,8 @@ public class MultiObjectiveMctsTest {
                             decisionB.getDepth() + 0.5);
         DecisionNode decisionBPrime = new DecisionNode(0, 1, null, epochBPrime, 
                                                        new PropoagatedEnvironment(targetsPropBPrime, taskB), 
-                                                       root.incrementIdCounter(), decisionB.getDepth() + 1.0);
+                                                       root.incrementIdCounter(), 
+                                                       decisionB.getDepth() + 1.0, 0.);
         DecisionNode.setParent(decisionBPrime, chanceBPrime);  
         MultiObjectiveMcts mcts2 = 
             new MultiObjectiveMcts(root, objectives, initDate, epochAPrime, "TDRS Station", 
@@ -1886,7 +1886,8 @@ public class MultiObjectiveMctsTest {
                             decisionB.getDepth() + 0.5);
         DecisionNode decisionC = new DecisionNode(0, 1, null, epochC, 
                                                 new PropoagatedEnvironment(targetsInit, taskA),
-                                                root.incrementIdCounter(), decisionB.getDepth() + 1.0);
+                                                root.incrementIdCounter(), 
+                                                decisionB.getDepth() + 1.0, 0.);
         chanceC.setChild(decisionC);
         AbsoluteDate epochCPrime = epochC.shiftedBy(2. * 60.);
         KeplerianPropagator kepPropo3 = new KeplerianPropagator(orbit2);
@@ -1901,7 +1902,8 @@ public class MultiObjectiveMctsTest {
                             decisionC.getDepth() + 0.5);
         DecisionNode decisionCPrime = new DecisionNode(0, 1, null, epochCPrime, 
                                                    new PropoagatedEnvironment(targetsPropCPrime, taskA), 
-                                                   root.incrementIdCounter(), decisionC.getDepth() + 1.0);
+                                                   root.incrementIdCounter(), 
+                                                   decisionC.getDepth() + 1.0, 0.);
         DecisionNode.setParent(decisionCPrime, chanceCPrime);
         MultiObjectiveMcts mcts3 = 
             new MultiObjectiveMcts(root, objectives, initDate, epochCPrime, "TDRS Station", 
@@ -1932,7 +1934,7 @@ public class MultiObjectiveMctsTest {
         DecisionNode decisionAPrimePrime = 
             new DecisionNode(0, 1, null, epochAPrimePrime, 
                             new PropoagatedEnvironment(targetsPropA, taskAPrimePrime),
-                            root.incrementIdCounter(), decisionAPrime.getDepth() + 1.0);
+                            root.incrementIdCounter(), decisionAPrime.getDepth() + 1.0, 0.);
         DecisionNode.setParent(decisionAPrimePrime, chanceAPrimePrime);
         MultiObjectiveMcts mcts4 =
             new MultiObjectiveMcts(root, objectives, initDate, epochAPrimePrime, "TDRS Station", 
