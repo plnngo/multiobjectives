@@ -1074,7 +1074,7 @@ public class MultiObjectiveMctsTest {
         
         // Epoch
         AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60. * 26.);
+        AbsoluteDate endCampaign = current.shiftedBy(60. * 4.);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -1100,8 +1100,8 @@ public class MultiObjectiveMctsTest {
         CSVWriter writer = new CSVWriter(outputfile); 
         List<double[]> utilityStrategiesRatio = new ArrayList<double[]>();
 
-        int mctsCalls = 3;
-        int mctsIter = 600000;
+        int mctsCalls = 8;
+        int mctsIter = 5000;
         double weight = 1./3.;
 
         for (int i=0; i<mctsCalls; i++) {

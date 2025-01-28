@@ -1026,13 +1026,13 @@ public class MultiObjectiveMcts {
         double maxUcb = Double.NEGATIVE_INFINITY;
         Node potentiallySelected = null;
         double nP = current.getNumVisits();
-
+    
         int maxUtilityIndividualReward = Integer.MIN_VALUE;
         int maxUtilityWeightReward = Integer.MIN_VALUE;
         double maxUtilityTotalReward = Double.MIN_VALUE;
         List<double[]> optimalIndividRtrackUtility = new ArrayList<double[]>();
         List<Long> optimalId = new ArrayList<Long>();
-
+    
         double[] ucb = new double[current.getChildren().size()];
         double[] utilities = new double[current.getChildren().size()];
         
@@ -1045,7 +1045,7 @@ public class MultiObjectiveMcts {
         for (int i=0; i<current.getChildren().size(); i++){
             double[] removedUtility = utilityChildrenNorm.remove(0);
             double[] utilityWeight = new double[removedUtility.length -1];
-            
+    
             OptimisingVector opt = new OptimisingVector(utilityChildrenNorm, removedUtility.length - 1);
             List<double[]> domVecs = 
                 opt.getDominatingVecs(removedUtility, 
@@ -1072,10 +1072,10 @@ public class MultiObjectiveMcts {
                 optimalId.add(current.getChildren().get(i).getId());
             } else if (utility==maxUtilityIndividualReward){
                 double totalRewardNorm = 0.;
-                for(int j=1; j<removedUtility.length-1; j++) {
+                for(int j=1; j<removedUtility.length; j++) {
                     totalRewardNorm += removedUtility[j];
                 }
-                for(int j=1; j<removedUtility.length-1; j++) {
+                for(int j=1; j<removedUtility.length; j++) {
                     utilityWeight[j-1] = FastMath.abs((removedUtility[j]/totalRewardNorm)- weight);
                 }
                 optimalIndividRtrackUtility.add(utilityWeight);
@@ -1103,7 +1103,7 @@ public class MultiObjectiveMcts {
                 maxUtilityWeightReward = utility;
                 optimalWeightId.clear();
                 totalRewards.clear();
-
+    
                 for (Node child : current.getChildren()) {
                     if(child.getId() == removedId) {
                         double totalRewardNormed = 0.;
@@ -1164,7 +1164,7 @@ public class MultiObjectiveMcts {
                 }
             }
         }
-
+    
         // Compute ucb values
         for (int i=0; i<utilities.length; i++){
             if(utilities[i]>0.) {
@@ -1174,7 +1174,7 @@ public class MultiObjectiveMcts {
             double n = current.getChildren().get(i).getNumVisits();
             ucb[i] = utilities[i] + C * FastMath.sqrt(FastMath.log(nP)/n);
         }
-
+    
         // search for child that maximises ucb
         for(int i=0; i<ucb.length; i++) { 
             if(ucb[i]>maxUcb) {
