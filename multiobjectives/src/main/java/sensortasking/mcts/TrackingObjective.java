@@ -427,8 +427,6 @@ public class TrackingObjective implements Objective{
         // Retrieve covariances
         RealMatrix covP = p.getCovariance().getCovarianceMatrix();
         RealMatrix covQ = q.getCovariance().getCovarianceMatrix();
-/*         System.out.println("Predicted trace: " + covP.getTrace());
-        System.out.println("Final trace: " + covQ.getTrace()); */
 
         // Compute determinant
         LUDecomposition decomP = new LUDecomposition(covP);

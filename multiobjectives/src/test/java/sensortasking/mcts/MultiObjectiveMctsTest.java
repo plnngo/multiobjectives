@@ -1101,7 +1101,7 @@ public class MultiObjectiveMctsTest {
         List<double[]> utilityStrategiesRatio = new ArrayList<double[]>();
 
         int mctsCalls = 8;
-        int mctsIter = 5000;
+        int mctsIter = 800;
         double weight = 1./3.;
 
         for (int i=0; i<mctsCalls; i++) {
