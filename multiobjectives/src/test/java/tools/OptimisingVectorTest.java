@@ -94,4 +94,20 @@ public class OptimisingVectorTest {
             Assert.assertEquals(testVec.get(3)[i], out.get(0)[i], 1e-16);
         }        
     }
+
+    @Test
+    public void testGetDominatingVecs4() {
+        List<double[]> testVec = new ArrayList<double[]>();
+        testVec.add(new double[]{1266.911583, 0.0});
+        testVec.add(new double[]{605.641290, 1.511054});
+        testVec.add(new double[]{620.816478, 1.500571});
+
+        OptimisingVector test = new OptimisingVector(testVec, 0);
+        double[] toCompare = new double[]{615.89552, 1.411209};
+        List<double[]> out = test.getDominatingVecs(toCompare, new boolean[]{true, true}, 0);
+        Assert.assertEquals(1, out.size());
+        for(int i=0; i<out.get(0).length; i++) {
+            Assert.assertEquals(testVec.get(2)[i], out.get(0)[i], 1e-16);
+        }   
+    }
 }
