@@ -131,17 +131,10 @@ public class Sensor {
      */
     public double computeRepositionT(AngularDirection origin, AngularDirection dest, 
                                      boolean slewVelInclSensorSettle) {
-        //Frame topoFrame = getTopoInertialFrame(date);        
-        //Frame gcrf = FramesFactory.getGCRF();
-
-/*         if(origin.getFrame() !=  topoFrame || dest.getFrame() != topoFrame) {
-            originTopo = origin.transformRefernce(topoFrame, date, AngleType.RADEC);
-            destTopo = dest.transformRefernce(topoFrame, date, AngleType.RADEC);
-        } */
 
         if(origin.getFrame() != dest.getFrame()) {
             if(origin.getFrame().getName().equals(dest.getFrame().getName())) {
-                origin = origin.transformReference(dest.getFrame(), dest.getDate(), dest.getAngleType(), 1.);
+                origin = origin.transformReference(dest.getFrame(), dest.getDate(), dest.getAngleType());
             } else{
                 System.out.println(origin.getFrame().getName() + " vs " + dest.getFrame().getName());
                 throw new InputMismatchException("Pointing directions were not defined in the " 
@@ -221,8 +214,8 @@ public class Sensor {
 
         // Transform position from ECEF to ECI
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
-        Frame eci = FramesFactory.getGCRF();
-        //Frame eci = FramesFactory.getEME2000();
+        //Frame eci = FramesFactory.getGCRF();
+        Frame eci = FramesFactory.getEME2000();
         Transform ecef2eci = ecef.getTransformTo(eci, date);  
         return ecef2eci.transformPosition(posEcef);
     }
@@ -259,15 +252,17 @@ public class Sensor {
     public AngularDirection mapSpacecraftStateToFieldOfRegard(SpacecraftState state, AbsoluteDate epoch) {
         PVCoordinates pvTeme = state.getPVCoordinates();
         PVCoordinates pvTopoHorizon = state.getFrame()
-                                                .getTransformTo(this.topoHorizon, epoch)
-                                                .transformPVCoordinates(pvTeme);
+                                           .getTransformTo(this.topoHorizon, epoch)
+                                           .transformPVCoordinates(pvTeme);
 
         // Extract angular position of space object 
         double azimuth = pvTopoHorizon.getPosition().getAlpha();        // between -Pi and +Pi
         double elevation = pvTopoHorizon.getPosition().getDelta();      // between -Pi/2 and +Pi/2
+        double range = pvTopoHorizon.getPosition().getNorm();
         AngularDirection azEl = new AngularDirection(topoHorizon, 
-                                                        new double[]{azimuth, elevation}, 
-                                                        AngleType.AZEL);
+                                                     new double[]{azimuth, elevation}, 
+                                                     AngleType.AZEL,
+                                                     range);
         return azEl;
     }
 }
