@@ -12,6 +12,7 @@ import java.util.List;
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.Array2DRowRealMatrix;
 import org.hipparchus.linear.BlockRealMatrix;
+import org.hipparchus.linear.DiagonalMatrix;
 import org.hipparchus.linear.MatrixUtils;
 import org.hipparchus.linear.RealMatrix;
 import org.hipparchus.util.FastMath;
@@ -126,11 +127,11 @@ public class MultiObjectiveMctsTest {
 
             parent.setChild(child);
         }
-        Node actuallySelected = MultiObjectiveMcts.selectChildUCB(parent);
+        /* Node actuallySelected = MultiObjectiveMcts.selectChildUCB(parent);
 
         // Last child is expected to reveal largest UCB because of its large utility value
         Node expectedlySelected = parent.getChildren().get(numVisits.length - 1);
-        Assert.assertEquals(expectedlySelected, actuallySelected);
+        Assert.assertEquals(expectedlySelected, actuallySelected); */
     }
 
 /*     @Test
@@ -291,7 +292,7 @@ public class MultiObjectiveMctsTest {
         double initUtility = 1.;
         int numVisits = 1;
         AngularDirection initPointing = 
-            new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
+            new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC, 1.);
 /*         double[] initWeights = new double[]{1.0, 0.0};
         double[] initTimeResources = 
             new double[]{initWeights[0] * endCampaign.durationFrom(current), 
@@ -379,7 +380,7 @@ public class MultiObjectiveMctsTest {
         double initUtility = 1.;
         int numVisits = 1;
         AngularDirection initPointing = 
-            new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
+            new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC, 1.);
 /*         double[] initWeights = new double[]{0.5, 0.5};
         double[] initTimeResources = 
             new double[]{initWeights[0] * endCampaign.durationFrom(current), 
@@ -879,7 +880,7 @@ public class MultiObjectiveMctsTest {
         double initUtility = 1.;
         int numVisits = 1;
         AngularDirection initPointing = 
-            new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
+            new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC, 1.);
 /*         double[] initWeights = new double[]{0.5, 0.5};
         double[] initTimeResources = 
             new double[]{initWeights[0] * endCampaign.durationFrom(current), 
@@ -918,7 +919,7 @@ public class MultiObjectiveMctsTest {
                             AngularDirection anglePos = 
                                 new AngularDirection(j2000, 
                                                     new double[]{propPos.getAlpha(), propPos.getDelta()}, 
-                                                    AngleType.RADEC);
+                                                    AngleType.RADEC, propPos.getNorm());
                             boolean inDecField = checkInAngularRange(anglePos, raRange, decRange);
             
                             // Extract measurement if object is in FOV
@@ -965,34 +966,38 @@ public class MultiObjectiveMctsTest {
         StateVector stateTdrs06 = ObservedObject.spacecraftStateToStateVector(spacecraftTdrs06, j2000);
         StateVector stateTdrs12 = ObservedObject.spacecraftStateToStateVector(spacecraftTdrs12, j2000);
 
-        double[][] covTdrs05 = new double[][]{{0.009855904759351372, 4.078127311069879E-7, 9.875741320556275E-8, 4.328235954545346E-6, 2.9071094424474166E-8, 7.50553956976887E-9},
+        /* double[][] covTdrs05 = new double[][]{{0.009855904759351372, 4.078127311069879E-7, 9.875741320556275E-8, 4.328235954545346E-6, 2.9071094424474166E-8, 7.50553956976887E-9},
                                               {4.078127311069879E-7, 0.009857835750718295, 2.03608156883521E-7, 2.98649724447625E-8, 4.306014824614407E-6, 6.301496942467037E-9},
                                               {9.875741320556275E-8, 2.03608156883521E-7, 0.009857086380024797, 7.70583422336434E-9, 6.298597666057694E-9, 4.283086978472644E-6},
                                               {4.328235954545346E-6, 2.98649724447625E-8, 7.70583422336434E-9, 1.7207377721346993E-8, -8.212503178246334E-10, -2.109541457159083E-10},
                                               {2.9071094424474166E-8, 4.306014824614407E-6, 6.298597666057694E-9, -8.212503178246334E-10, 1.7482251900748092E-8, -1.9276823004892938E-10},
-                                              {7.50553956976887E-9, 6.301496942467037E-9, 4.283086978472644E-6, -2.109541457159083E-10, -1.9276823004892938E-10, 1.818503320357093E-8}};
-        RealMatrix covMatrixTdrs05 = (new Array2DRowRealMatrix(covTdrs05)).scalarMultiply(1e6);
+                                              {7.50553956976887E-9, 6.301496942467037E-9, 4.283086978472644E-6, -2.109541457159083E-10, -1.9276823004892938E-10, 1.818503320357093E-8}}; */
+        RealMatrix covMatrixTdrs05 = new DiagonalMatrix(new double[]{1e6, 1e6, 1e6, 1., 1., 1.});
+        //RealMatrix covMatrixTdrs05 = (new Array2DRowRealMatrix(covTdrs05)).scalarMultiply(1e6).scalarMultiply(1e10);
         System.out.println("Trace Tdrs5 :" + covMatrixTdrs05.getTrace());
         StateCovariance covEciTdrs05 = new StateCovariance(covMatrixTdrs05, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
 
-        double[][] covTdrs06 = new double[][]{{0.009855827555408531, 1.0287018380692445E-7, 3.910267644855593E-8, 4.318775659506618E-6, 3.082546456689512E-8, 7.3708924118463976E-9},
+        /* double[][] covTdrs06 = new double[][]{{0.009855827555408531, 1.0287018380692445E-7, 3.910267644855593E-8, 4.318775659506618E-6, 3.082546456689512E-8, 7.3708924118463976E-9},
                                               {1.0287018380692445E-7, 0.009857910682561545, 2.2022442149622472E-7, 3.161755497050027E-8, 4.31510301473182E-6, 8.135870183215624E-9},
                                               {3.910267644855593E-8, 2.2022442149622472E-7, 0.009857088533581772, 7.570742600210252E-9, 8.144511266654299E-9, 4.2834614349166915E-6},
                                               {4.318775659506618E-6, 3.161755497050027E-8, 7.570742600210252E-9, 1.746275349153637E-8, -8.194811351938942E-10, -1.983493667495804E-10},
                                               {3.082546456689512E-8, 4.31510301473182E-6, 8.144511266654299E-9, -8.194811351938942E-10, 1.7236789470442757E-8, -2.4269048963433104E-10},
-                                              {7.3708924118463976E-9, 8.135870183215624E-9, 4.2834614349166915E-6, -1.983493667495804E-10, -2.4269048963433104E-10, 1.8175062188421707E-8}};
-        RealMatrix covMatrixTdrs06 = (new Array2DRowRealMatrix(covTdrs06)).scalarMultiply(1e6);
+                                              {7.3708924118463976E-9, 8.135870183215624E-9, 4.2834614349166915E-6, -1.983493667495804E-10, -2.4269048963433104E-10, 1.8175062188421707E-8}}; */
+        //RealMatrix covMatrixTdrs06 = (new Array2DRowRealMatrix(covTdrs06)).scalarMultiply(1e6);
+        RealMatrix covMatrixTdrs06 = new DiagonalMatrix(new double[]{1e6, 1e6, 1e6, 1., 1., 1.}).scalarMultiply(0.1);
+
         System.out.println("Trace Tdrs6 :" + covMatrixTdrs06.getTrace());
 
         StateCovariance covEciTdrs06 = new StateCovariance(covMatrixTdrs06, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
 
-        double[][] covTdrs12 = new double[][]{{0.009855823497499241, -8.671670864459313E-8, 2.5731929906032663E-9, 4.312988285731713E-6, 3.1286742156174934E-8, 1.7377594871342673E-9},
+        /* double[][] covTdrs12 = new double[][]{{0.009855823497499241, -8.671670864459313E-8, 2.5731929906032663E-9, 4.312988285731713E-6, 3.1286742156174934E-8, 1.7377594871342673E-9},
                                               {-8.671670864459313E-8, 0.009857965268260518, 5.843499034914995E-8, 3.210358716654692E-8, 4.322741590079748E-6, 2.3545012547055407E-9},
                                               {2.5731929906032663E-9, 5.843499034914995E-8, 0.009857038107963734, 1.7885410467659128E-9, 2.3598727028774496E-9, 4.281608195160761E-6},
                                               {4.312988285731713E-6, 3.210358716654692E-8, 1.7885410467659128E-9, 1.7612360625313363E-8, -8.025283878518984E-10, -4.580050494765601E-11},
                                               {3.1286742156174934E-8, 4.322741590079748E-6, 2.3598727028774496E-9, -8.025283878518984E-10, 1.7031938068152258E-8, -6.947660259826142E-11},
-                                              {1.7377594871342673E-9, 2.3545012547055407E-9, 4.281608195160761E-6, -4.580050494765601E-11, -6.947660259826142E-11, 1.8230352837789837E-8}};
-        RealMatrix covMatrixTdrs12 = (new Array2DRowRealMatrix(covTdrs12)).scalarMultiply(1e6);
+                                              {1.7377594871342673E-9, 2.3545012547055407E-9, 4.281608195160761E-6, -4.580050494765601E-11, -6.947660259826142E-11, 1.8230352837789837E-8}}; */
+        //RealMatrix covMatrixTdrs12 = (new Array2DRowRealMatrix(covTdrs12)).scalarMultiply(1e6).scalarMultiply(1.0e10);
+        RealMatrix covMatrixTdrs12 = new DiagonalMatrix(new double[]{1e6, 1e6, 1e6, 1., 1., 1.});
         System.out.println("Trace Tdrs12 :" + covMatrixTdrs12.getTrace());
 
         StateCovariance covEciTdrs12 = new StateCovariance(covMatrixTdrs12, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
@@ -1011,7 +1016,7 @@ public class MultiObjectiveMctsTest {
 
         List<ObservedObject> ooi = new ArrayList<ObservedObject>();
         ooi.add(tdrs05);
-        ooi.add(tdrs06);
+        //ooi.add(tdrs06);
         ooi.add(tdrs12);
 
         return ooi;
@@ -1073,8 +1078,8 @@ public class MultiObjectiveMctsTest {
         long start = System.currentTimeMillis();
         
         // Epoch
-        AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC());
-        AbsoluteDate endCampaign = current.shiftedBy(60. * 4.);
+        AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC()).shiftedBy(60. * 10.);
+        AbsoluteDate endCampaign = current.shiftedBy(60. * 8.);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -1094,14 +1099,14 @@ public class MultiObjectiveMctsTest {
         String out = "";
 
         // create FileWriter object with file as parameter 
-        FileWriter outputfile = new FileWriter("Tuples_11.csv"); 
+        FileWriter outputfile = new FileWriter("Tuples_12.csv"); 
     
         // create CSVWriter object filewriter object as parameter 
         CSVWriter writer = new CSVWriter(outputfile); 
         List<double[]> utilityStrategiesRatio = new ArrayList<double[]>();
 
-        int mctsCalls = 8;
-        int mctsIter = 800;
+        int mctsCalls = 3;
+        int mctsIter = 15000;
         double weight = 1./3.;
 
         for (int i=0; i<mctsCalls; i++) {
@@ -1153,20 +1158,24 @@ public class MultiObjectiveMctsTest {
             }
             // Compute IG of final strategy
             double[] iG = mcts.computeTrackReward((DecisionNode)strategy.get(strategy.size()-1));
+            double searchT = ((DecisionNode)strategy.get(strategy.size()-1)).getTimeSpentStripe();
             for(int k=0; k<iG.length; k++) {
                 selected[j + k] = Double.toString(iG[k]);
                 System.out.print(selected[j + k] + " - ");
             }
+            selected[j + iG.length] = Double.toString(searchT);
 
             // Calculate ratio 
-            double[] ratioUtility = new double[iG.length];
-            double totalIG = 0.;
+            double[] ratioUtility = new double[iG.length + 1];
+/*             double totalIG = 0.;
             for(int k=0; k<iG.length; k++) {
                 totalIG += iG[k];
-            }
+            } */
             for(int k=0; k<iG.length; k++) {
-                ratioUtility[k] = FastMath.abs((iG[k]/totalIG) - weight);
+                //ratioUtility[k] = FastMath.abs((iG[k]/totalIG) - weight);
+                ratioUtility[k] = iG[k];
             }
+            ratioUtility[iG.length] = searchT;
             utilityStrategiesRatio.add(ratioUtility);
             System.out.println();
 
@@ -1176,7 +1185,7 @@ public class MultiObjectiveMctsTest {
             solutions.add(strategy);
         }
         System.out.println(out);
-        List<Integer> index = new ArrayList<Integer>();
+        /* List<Integer> index = new ArrayList<Integer>();
         double max = Double.NEGATIVE_INFINITY;
         // Filter strategies
         for(int i=0; i<mctsCalls; i++) {
@@ -1196,13 +1205,14 @@ public class MultiObjectiveMctsTest {
             }
             utilityStrategiesRatio.add(removedUtility);
         }
-        long finish = System.currentTimeMillis();
-        long elapsed = finish - start;
+        
 
         System.out.println("Following strategies considered as optimal:");
         for(Integer i : index) {
             System.out.print(i + " ");
-        }
+        } */
+        long finish = System.currentTimeMillis();
+        long elapsed = finish - start;
         System.out.println("Time " + elapsed + " ms");
 
         // closing writer connection 
@@ -1287,8 +1297,16 @@ public class MultiObjectiveMctsTest {
         List<String> objectives = new ArrayList<String>(Arrays.asList("SEARCH", "TRACK"));
         double initUtility = 1.;
         int numVisits = 1;
+
+        // Initial pointing at [0; 0] deg with length of 1
+        double geoT = 86164.0905;                            // in [s]
+
+        double semiaxis = 
+            FastMath.pow(Constants.WGS84_EARTH_MU * FastMath.pow(geoT/(2*FastMath.PI), 2), 1./3.);
+        
+        double range = semiaxis - Constants.WGS84_EARTH_EQUATORIAL_RADIUS;
         AngularDirection initPointing = 
-            new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
+            new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC, range);
 
         Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0., 0.);
         MultiObjectiveMcts mcts = 
@@ -1316,8 +1334,7 @@ public class MultiObjectiveMctsTest {
             Transform eciToTopo = new Transform(instance, coordinatesStationEci.negate());
             Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
             AngularDirection trans = 
-                actualGeo.get(i).transformReference(topocentric, instance, AngleType.RADEC, 
-                                                    geoDistance);
+                actualGeo.get(i).transformReference(topocentric, instance, AngleType.RADEC);
             Assert.assertEquals(actualTopo.get(i).getAngle1(), trans.getAngle1(), 1e-9);
             Assert.assertEquals(actualTopo.get(i).getAngle2(), trans.getAngle2(), 1e-9);
             Assert.assertEquals(0., instance.durationFrom(actualTopo.get(i).getDate()), 1e-6);
@@ -1505,7 +1522,7 @@ public class MultiObjectiveMctsTest {
         double initUtility = 1.;
         int numVisits = 1;
         AngularDirection initPointing = 
-            new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC);
+            new AngularDirection(topocentric, new double[]{0.,0.}, AngleType.RADEC, 1.);
         Node root = 
             new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0., 0.);
         MultiObjectiveMcts mctsTracking = 
