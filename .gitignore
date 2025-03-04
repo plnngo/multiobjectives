@@ -1,6 +1,6 @@
 # ignore .class files
-target/classes/sensortasking/mcts/
-target/test-classes/sensortasking/mcts/
+multiobjectives/target/classes/sensortasking/mcts/
+multiobjectives/target/test-classes/sensortasking/mcts/
 *.class
 *.m
 *.csv
