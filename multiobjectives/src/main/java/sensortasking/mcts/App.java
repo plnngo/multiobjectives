@@ -350,7 +350,7 @@ public class App {
             eciToTopo.transformPVCoordinates(new PVCoordinates(predictedPos, predictedVel));
         double ra = pvTopo.getPosition().getAlpha();
         double dec = pvTopo.getPosition().getDelta();
-        AngularDirection realRaDec = new AngularDirection(topoCentric, new double[]{ra, dec}, AngleType.RADEC);
+        AngularDirection realRaDec = new AngularDirection(topoCentric, new double[]{ra, dec}, AngleType.RADEC, 1.);
         RealMatrix R = 
             MatrixUtils.createRealDiagonalMatrix(new double[]{FastMath.pow(1./206265, 2), 
                                                               FastMath.pow(1./206265, 2)});
@@ -459,7 +459,7 @@ public class App {
         double ra = FastMath.atan2(posTopo.getY(), posTopo.getX());
         double dec = FastMath.asin(posTopo.getZ()/range);
 
-        AngularDirection raDec = new AngularDirection(frame, new double[]{ra, dec}, AngleType.RADEC);
+        AngularDirection raDec = new AngularDirection(frame, new double[]{ra, dec}, AngleType.RADEC, range);
         return raDec;
     }
 
