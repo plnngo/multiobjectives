@@ -2,6 +2,8 @@ package sensortasking.stripescanning;
 
 import org.hipparchus.util.FastMath;
 import org.orekit.frames.Frame;
+import org.orekit.frames.FramesFactory;
+import org.orekit.utils.Constants;
 
 import lombok.Getter;
 import sensortasking.mcts.AngleType;
@@ -24,9 +26,6 @@ public class Stripe {
     /** Observing sensor. */
     private Sensor sensor;
 
-    /** Field size in [rad, rad]. */
-    //private Fov fov;
-
     /** Pointing location of the first field. */
     private AngularDirection firstPosField;
 
@@ -39,6 +38,14 @@ public class Stripe {
 
     /** Repositioning time within stripe from one field to the next one. */
     private double reposInStripeT;
+
+    final double geoT = 86164.0905;                            // in [s]
+
+    final double semiaxis = 
+        FastMath.pow(Constants.WGS84_EARTH_MU * FastMath.pow(geoT/(2*FastMath.PI), 2), 1./3.);
+    
+    final double range = semiaxis - Constants.WGS84_EARTH_EQUATORIAL_RADIUS;
+    
 
     /**
      * Constructor. 
@@ -61,6 +68,10 @@ public class Stripe {
         this.sensor = sensor;
         this.firstPosField = firstPosField;
 
+        if(!firstPosField.getFrame().equals(FramesFactory.getEME2000())) {
+            throw new Error("firstPosField not defined in EME2000");
+        }
+
         if (StripeType.FIXED.equals(functionality)) {
             this.functionality = StripeType.FIXED;
             this.j = 0;
@@ -72,7 +83,7 @@ public class Stripe {
 
 
     /**
-     * Get pointing direction of the requested field.
+     * Get pointing direction of the requested field with respect to EME2000.
      * 
      * @param fieldNum              Requested field number.
      * 
@@ -84,8 +95,9 @@ public class Stripe {
             throw new IllegalArgumentException("Field does not exist in the given stripe.");
         } else {
             double dec = firstPosField.getAngle2() + fieldNum*sensor.getFov().getHeight();
+            //double range = rangeCenter/FastMath.cos(dec);
             return new AngularDirection(frame, new double[]{firstPosField.getAngle1(), dec}, 
-                                        AngleType.RADEC);
+                                        AngleType.RADEC, range);
         }
     }
 
@@ -129,14 +141,25 @@ public class Stripe {
      * @param numDecFields      Number of declination fields.
      * @param frame             Reference frame.
      * @param observer          Sensor.
-     * @param midStripePos      Angular position of mid stripe declination field.
+     * @param midStripePos      Angular position of mid stripe declination field in EME2000.
      * @param j                 
      * 
      * @return                  Fixed observation stripe.
      */
-    protected static Stripe setStripe(int numDecFields, Frame frame, Sensor observer, 
+    protected static Stripe setStripe(int numDecFields, Sensor observer, 
                                            AngularDirection midStripePos, int j) {
         
+        
+        if(!midStripePos.getFrame().equals(FramesFactory.getEME2000())) {
+            throw new Error("midStripePos not defined in EME2000");
+        }
+        final double geoT = 86164.0905;                            // in [s]
+
+        final double semiaxis = 
+            FastMath.pow(Constants.WGS84_EARTH_MU * FastMath.pow(geoT/(2*FastMath.PI), 2), 1./3.);
+        
+        final double range = semiaxis - Constants.WGS84_EARTH_EQUATORIAL_RADIUS;
+
         double heightFov = observer.getFov().getHeight();
 
         // Deal with smaller earth shadow boundary
@@ -144,12 +167,12 @@ public class Stripe {
         angles[0] = midStripePos.getAngle1();
         angles[1] = midStripePos.getAngle2() - (heightFov*FastMath.floor(numDecFields/2.));
         AngularDirection firstPos = 
-            new AngularDirection(frame, angles, AngleType.RADEC);
+            new AngularDirection(midStripePos.getFrame(), angles, AngleType.RADEC, range);
                  
         if(j!=0) {
-            return new Stripe(numDecFields, frame, observer, firstPos, StripeType.RE_OBS, j);
+            return new Stripe(numDecFields, midStripePos.getFrame(), observer, firstPos, StripeType.RE_OBS, j);
         } else {
-            return new Stripe(numDecFields, frame, observer, firstPos, StripeType.FIXED, 0);
+            return new Stripe(numDecFields, midStripePos.getFrame(), observer, firstPos, StripeType.FIXED, 0);
         }
     }
 }

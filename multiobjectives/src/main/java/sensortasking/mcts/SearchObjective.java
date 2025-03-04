@@ -65,7 +65,9 @@ public class SearchObjective implements Objective{
         // Re-compute allocation period to slew from current sensor position towards stripe position
         double geoDistance = Constants.WGS84_EARTH_EQUATORIAL_RADIUS + 35786 * 1e3;  // in m
         AngularDirection newSensorPointing = 
-            scan.getPosField(0).transformReference(sensorPointing.getFrame(), start, sensorPointing.getAngleType(), geoDistance);
+            scan.getPosField(0)
+                .transformReference(sensorPointing.getFrame(), start, 
+                                    sensorPointing.getAngleType());
         newSensorPointing.setDate(start);
         double actualSlewT = 
                 this.sensor.computeRepositionT(sensorPointing, newSensorPointing, true);
@@ -91,7 +93,7 @@ public class SearchObjective implements Objective{
                 Transform eciToTopo = new Transform(nextPointing, coordinatesStationEci.negate());
                 Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
                 AngularDirection decFieldTopo = 
-                    decField.transformReference(topocentric, nextPointing, AngleType.RADEC, geoDistance);
+                    decField.transformReference(topocentric, nextPointing, AngleType.RADEC);
                 decFieldTopo.setDate(nextPointing);
                 
                 // In same declination field 

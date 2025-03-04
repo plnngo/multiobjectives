@@ -47,9 +47,15 @@ public class AngularDirectionTest {
         Vector3D u = new Vector3D(5., -2., 3);
         Vector3D v = new Vector3D(-4, 5, 7);
         Vector3D w = u.negate();
-        AngularDirection uDir = new AngularDirection(eci, new double[]{u.getAlpha(), u.getDelta()}, AngleType.RADEC);
-        AngularDirection vDir = new AngularDirection(eci, new double[]{v.getAlpha(), v.getDelta()}, AngleType.RADEC);
-        AngularDirection wDir = new AngularDirection(eci, new double[]{w.getAlpha(), w.getDelta()}, AngleType.RADEC);
+        AngularDirection uDir = 
+            new AngularDirection(eci, new double[]{u.getAlpha(), u.getDelta()}, 
+                                 AngleType.RADEC, u.getNorm());
+        AngularDirection vDir = 
+            new AngularDirection(eci, new double[]{v.getAlpha(), v.getDelta()}, 
+                                 AngleType.RADEC, v.getNorm());
+        AngularDirection wDir = 
+            new AngularDirection(eci, new double[]{w.getAlpha(), w.getDelta()}, 
+                                 AngleType.RADEC, w.getNorm());
 
         // Results
         double actualUV = uDir.getEnclosedAngle(vDir);
@@ -83,20 +89,20 @@ public class AngularDirectionTest {
         Vector3D posEcef = new Vector3D(-1033.4793830*1e3, 7901.2952754*1e3, 6380.3565958*1e3);
         AngularDirection lonlat = 
             new AngularDirection(ecef, new double[]{posEcef.getAlpha(), posEcef.getDelta()}, 
-                                 AngleType.LONLAT);
+                                 AngleType.LONLAT, posEcef.getNorm());
         Vector3D posEci = new Vector3D(5102.5089530*1e3, 6123.0113955*1e3, 6378.1369371*1e3);
         AngularDirection radec = 
             new AngularDirection(eci, new double[]{posEci.getAlpha(), posEci.getDelta()}, 
-                                 AngleType.RADEC);
+                                 AngleType.RADEC, posEci.getNorm());
 
         // Transform
-        AngularDirection actual = radec.transformReference(ecef, date, AngleType.LONLAT, 1.);
+        AngularDirection actual = radec.transformReference(ecef, date, AngleType.LONLAT);
         Assert.assertEquals(lonlat.getFrame(), actual.getFrame());
         Assert.assertEquals(lonlat.getAngleType(), actual.getAngleType());
         Assert.assertEquals(lonlat.getAngle1(), actual.getAngle1(), 1e-7);
         Assert.assertEquals(lonlat.getAngle2(), actual.getAngle2(), 1e-7);
 
-        actual = lonlat.transformReference(eci, date, AngleType.RADEC, 1.);
+        actual = lonlat.transformReference(eci, date, AngleType.RADEC);
         Assert.assertEquals(radec.getFrame(), actual.getFrame());
         Assert.assertEquals(radec.getAngleType(), actual.getAngleType());
         Assert.assertEquals(radec.getAngle1(), actual.getAngle1(), 1e-7);
@@ -127,14 +133,15 @@ public class AngularDirectionTest {
             new AbsoluteDate(1994, 5, 14, 13, 11, 20.59856, TimeScalesFactory.getUTC());
         double[] radecAngles = 
             new double[]{FastMath.toRadians(294.9891458), FastMath.toRadians(-20.8234944)};
-        AngularDirection radec = new AngularDirection(eci, radecAngles, AngleType.RADEC);
+        double range = 4437725220.273 * 1e3;
+        AngularDirection radec = new AngularDirection(eci, radecAngles, AngleType.RADEC, range);
 
         // Expected data wrt Vallado's definition of topocentric horizon frame
         double[] expectedVallado = new double[]{FastMath.toRadians(210.8250667), 
                                                 FastMath.toRadians(23.8595052)};
         double[] expectedOrekit = new double[]{-(expectedVallado[0]-2*FastMath.PI) + FastMath.PI/2,
                                                expectedVallado[1]};
-        AngularDirection actualOrekit = radec.transformReference(topoHorizon, date, AngleType.AZEL, 1.);
+        AngularDirection actualOrekit = radec.transformReference(topoHorizon, date, AngleType.AZEL);
 
         // Compare
         double tolerance = 1e-5;
@@ -178,9 +185,11 @@ public class AngularDirectionTest {
 
         Vector3D posTopo = posGeoCentric.subtract(siteGeoCentric);
         AngularDirection dirGeoCentric = 
-            new AngularDirection(eci, new double[]{posGeoCentric.getAlpha(), posGeoCentric.getDelta()}, AngleType.RADEC);
-        System.out.println(posTopo.getAlpha());
-        AngularDirection dirTopoInertial = dirGeoCentric.transformReference(topoInertial, date, AngleType.RADEC, geoDist);
+            new AngularDirection(eci, 
+                                 new double[]{posGeoCentric.getAlpha(), posGeoCentric.getDelta()}, 
+                                 AngleType.RADEC, posGeoCentric.getNorm());
+        AngularDirection dirTopoInertial = 
+            dirGeoCentric.transformReference(topoInertial, date, AngleType.RADEC);
         Assert.assertEquals(posTopo.getAlpha(), dirTopoInertial.getAngle1(), 1e-16);
         Assert.assertEquals(posTopo.getDelta(), dirTopoInertial.getAngle2(), 1e-16);
     }
@@ -200,13 +209,14 @@ public class AngularDirectionTest {
         // Test 1
         double[] moonAngles = 
             new double[]{FastMath.toRadians(246.691103), FastMath.toRadians(-20.477702)};
-        AngularDirection pos = new AngularDirection(eci, moonAngles, AngleType.RADEC);
+        double moonRange = 362144.6075 * 1e3;
+        AngularDirection pos = new AngularDirection(eci, moonAngles, AngleType.RADEC, moonRange);
         double actual = AngularDirection.computeAngularDistMoon(date, eci, pos);
         Assert.assertEquals(0., FastMath.toDegrees(actual), 0.1);
 
         // Test 2
         moonAngles = new double[]{moonAngles[0] - FastMath.PI, -moonAngles[1]};
-        pos = new AngularDirection(eci, moonAngles, AngleType.RADEC);
+        pos = new AngularDirection(eci, moonAngles, AngleType.RADEC, moonRange);
         actual = AngularDirection.computeAngularDistMoon(date, eci, pos);
         Assert.assertEquals(180., FastMath.toDegrees(actual), 0.1);
     }

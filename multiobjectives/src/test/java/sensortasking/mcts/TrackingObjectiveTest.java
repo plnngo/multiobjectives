@@ -428,7 +428,7 @@ public class TrackingObjectiveTest {
         TrackingObjective track = new TrackingObjective(ooi, sensor, target);
 
         AngularDirection initPointing = 
-            new AngularDirection(topoCentric, new double[]{0.,0.}, AngleType.RADEC);
+            new AngularDirection(topoCentric, new double[]{0.,0.}, AngleType.RADEC, 1.);
         AngularDirection micro = track.setMicroAction(current, initPointing);
         Assert.assertEquals(AngleType.RADEC, micro.getAngleType());
         Assert.assertEquals(14.535587965895044, FastMath.toDegrees(micro.getAngle1()), 1e-12);
@@ -664,7 +664,8 @@ public class TrackingObjectiveTest {
 
         AngularDirection test = 
             new AngularDirection(topoHorizon, new double[]{FastMath.PI/2, FastMath.PI/2}, 
-                                 AngleType.AZEL);
+                                 AngleType.AZEL, 1.);
+        test.setDate(new AbsoluteDate());
         AngularAzEl orekitAzEl = TrackingObjective.transformAngularAzEl2OrekitMeasurements(test, this.topoHorizon);
         double[] actual = orekitAzEl.getObservedValue();
         Assert.assertEquals(test.getAngle1(), actual[0], 1e-16);
@@ -672,7 +673,8 @@ public class TrackingObjectiveTest {
 
         test = 
             new AngularDirection(topoHorizon, new double[]{0., FastMath.toRadians(78)}, 
-                                 AngleType.AZEL);
+                                 AngleType.AZEL, 1.);
+        test.setDate(new AbsoluteDate());
         orekitAzEl = TrackingObjective.transformAngularAzEl2OrekitMeasurements(test, this.topoHorizon);
         actual = orekitAzEl.getObservedValue();
         Assert.assertEquals(test.getAngle1(), actual[0], 1e-16);

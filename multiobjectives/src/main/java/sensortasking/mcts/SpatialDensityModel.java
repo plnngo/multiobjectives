@@ -177,14 +177,20 @@ public class SpatialDensityModel {
         // Get row and col position of Moon at the start of observation campaign
         double moonAzStart = moon.getPVCoordinates(startObs, topoHorizon).getPosition().getAlpha();
         double moonElStart = moon.getPVCoordinates(startObs, topoHorizon).getPosition().getDelta();
-        AngularDirection moonAzElStart = new AngularDirection(topoHorizon, new double[]{moonAzStart, moonElStart}, AngleType.AZEL);
+        double moonRangeStart = moon.getPVCoordinates(startObs, topoHorizon).getPosition().getNorm();
+        AngularDirection moonAzElStart = 
+            new AngularDirection(topoHorizon, new double[]{moonAzStart, moonElStart}, 
+                                 AngleType.AZEL, moonRangeStart);
         int[] moonRowColStart = angularDirectionToGridPosition(moonAzElStart);
         System.out.println(FastMath.toDegrees(moonAzStart));
 
         // Get row and col position of Moon at the end of observation campaign
         double moonAzEnd = moon.getPVCoordinates(endObs, topoHorizon).getPosition().getAlpha();
         double moonElEnd = moon.getPVCoordinates(endObs, topoHorizon).getPosition().getDelta();
-        AngularDirection moonAzElEnd = new AngularDirection(topoHorizon, new double[]{moonAzEnd, moonElEnd}, AngleType.AZEL);
+        double moonRangeEnd = moon.getPVCoordinates(endObs, topoHorizon).getPosition().getNorm();
+        AngularDirection moonAzElEnd = 
+            new AngularDirection(topoHorizon, new double[]{moonAzEnd, moonElEnd}, AngleType.AZEL, 
+                                 moonRangeEnd);
         int[] moonRowColEnd = angularDirectionToGridPosition(moonAzElEnd);
         System.out.println(FastMath.toDegrees(moonAzEnd));
 
@@ -255,6 +261,7 @@ public class SpatialDensityModel {
 
     /**
      * Retrieve position of the field whose angular position is the closest to {@code angles}.
+     * TODO: check with sclaing of angles.
      * 
      * @param angles            Angular position of the space object.
      * @return

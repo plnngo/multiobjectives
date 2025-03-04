@@ -191,7 +191,7 @@ public class SpatialDensityModelTest {
         double az = FastMath.toRadians(50.);
         double elev = FastMath.toRadians(75.);
         AngularDirection objectTopoHorizon = 
-            new AngularDirection(this.topoHorizon, new double[]{az, elev}, AngleType.AZEL);
+            new AngularDirection(this.topoHorizon, new double[]{az, elev}, AngleType.AZEL, 1.);
         SpatialDensityModel density = new SpatialDensityModel(sensor, new AbsoluteDate());
         
         int[] actual = density.angularDirectionToGridPosition(objectTopoHorizon);

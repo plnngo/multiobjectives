@@ -28,6 +28,9 @@ public class AngularDirection {
     /** Description of pointing direction. */
     private String name;
 
+    /** Scaling of angular direction. */
+    private double scale;
+
     /**
      * Simple constructor.
      * 
@@ -36,11 +39,13 @@ public class AngularDirection {
      *                              angle (on x-y plane, rotated around z-axis). The second angle
      *                              represents the inclination wrt the x-y plane.
      * @param type                  Angle type, either RADEC, AZEL or LONLAT.
+     * @param scale                 Scaling of angular direction.
      */
-    public AngularDirection(Frame frame, double[] angles, AngleType type) {
+    public AngularDirection(Frame frame, double[] angles, AngleType type, double scale) {
         this.frame = frame;
         this.angles = new double[]{angles[0], angles[1]};
         this.angleType = type;
+        this.scale = scale;
     }
 
     /** 
@@ -53,16 +58,16 @@ public class AngularDirection {
      * @return                      Angular direction with respect to the destination frame.
      */
     public AngularDirection transformReference(Frame dest, AbsoluteDate date, 
-                                               AngleType destAngleType, double scale) {
+                                               AngleType destAngleType) {
         Transform t = this.frame.getTransformTo(dest, date);
         Vector3D transformedDir = 
-            t.transformPosition(new Vector3D(scale, new Vector3D(angles[0], angles[1])));
+            t.transformPosition(new Vector3D(this.scale, new Vector3D(angles[0], angles[1])));
         double angle1 = transformedDir.getAlpha();
         if(angle1 < 0){
             angle1 += 2*FastMath.PI;
         }
         double[] transformedAngles = new double[] {angle1, transformedDir.getDelta()};
-        return new AngularDirection(dest, transformedAngles, destAngleType);
+        return new AngularDirection(dest, transformedAngles, destAngleType, transformedDir.getNorm());
     }
 
     /**
@@ -153,8 +158,12 @@ public class AngularDirection {
         double moonDec = moon.getPVCoordinates(date, frame)
                             .getPosition()
                             .getDelta();
+        double moonDist = moon.getPVCoordinates(date, frame)
+                             .getPosition()
+                             .getNorm();                 
+
         AngularDirection moonAngles = 
-            new AngularDirection(frame, new double[]{moonRa, moonDec}, AngleType.RADEC);
+            new AngularDirection(frame, new double[]{moonRa, moonDec}, AngleType.RADEC, moonDist);
         return pos.getEnclosedAngle(moonAngles);
     }
 
@@ -172,9 +181,22 @@ public class AngularDirection {
         if(!this.getFrame().equals(other.getFrame())) {
             throw new IllegalArgumentException("Different reference frames");
         }
+        // Substract positions and return anglular distance
+        Vector3D currentVec = new Vector3D(this.getAngle1(), this.getAngle2());
+        Vector3D otherVec = new Vector3D(other.getAngle1(), other.getAngle2());
+        Vector3D diffVec = currentVec.subtract(otherVec);
+        double angle1 = diffVec.getAlpha();
+        double angle2 = 0.;
+        double length = diffVec.getNorm();
+        if(length != 0.) {
+            angle2 = diffVec.getDelta();
+        }
+        return new AngularDirection(this.frame, new double[]{angle1, angle2}, this.getAngleType(), length);
+
+/*         // Only substract angles
         double angle1 = this.getAngle1() - other.getAngle1();
         double angle2 = this.getAngle2() - other.getAngle2();
 
-        return new AngularDirection(this.frame, new double[]{angle1, angle2}, this.getAngleType());
+        return new AngularDirection(this.frame, new double[]{angle1, angle2}, this.getAngleType()); */
     }
 }
