@@ -105,7 +105,7 @@ public class TrackingObjective implements Objective{
     static double preparation = 6.;
 
     /** Allocation time duration in [sec].  */
-    static double allocation = 5.;
+    static double allocation = 2.;
 
     /** Sun. */
     final static CelestialBody sun = CelestialBodyFactory.getSun();
@@ -434,6 +434,10 @@ public class TrackingObjective implements Objective{
         double detP = decomP.getDeterminant();
         double detQ = decomQ.getDeterminant();
 
+        // Compute traces
+        double traceP = covP.getTrace();
+        double traceQ = covQ.getTrace();
+
         double logDetCovQByDetCovP = FastMath.log(detQ/detP);
 
         // Compute inverse of covQ
@@ -474,6 +478,10 @@ public class TrackingObjective implements Objective{
         
         double dKL = 0.5 * (logDetCovQByDetCovP + traceInvCovQCovP 
                                 + meanTMultiplyInvCovQMultiplyMean - meanQMinusMeanP.length);
+            
+        if (Double.isNaN(dKL)) {
+            System.out.println("why nan");
+        }
         
         return dKL;
     }
@@ -654,12 +662,12 @@ public class TrackingObjective implements Objective{
         double sigmaDEC = FastMath.sqrt(covInMeasSpace.getEntry(1, 1));
         //System.out.println("Predicted uncertainty Dec: " + FastMath.toDegrees(sigmaDEC));
 
-/*         if (sigmaRA > FastMath.toRadians(1.)) {
-            System.out.println("Uncertainty exceeds FOV in right ascesion dir");    
+        if (sigmaRA > FastMath.toRadians(1.)) {
+            //System.out.println("Uncertainty exceeds FOV in right ascesion dir");    
         }
-        if (sigmaDEC > FastMath.toDegrees(1.)) {
-            System.out.println("Uncertainty exceeds FOV in declination dir");    
-        } */
+        if (sigmaDEC > FastMath.toRadians(1.)) {
+            //System.out.println("Uncertainty exceeds FOV in declination dir");    
+        }
         RealMatrix kalmanGain = predictedCov.multiplyTransposed(H)
                                             .multiply(MatrixUtils.inverse(covInMeasSpace.add(R)));
 
@@ -866,6 +874,7 @@ public class TrackingObjective implements Objective{
         TimeStampedPVCoordinates stateTopo = 
             toTopo.transformPVCoordinates(state.getPVCoordinates());
         Vector3D posTopo = stateTopo.getPosition();
+        double posRange = posTopo.getNorm();
         AngleType angleType;
         if(topo.getClass().isInstance(TopocentricFrame.class)) {
             angleType = AngleType.AZEL;
@@ -875,7 +884,7 @@ public class TrackingObjective implements Objective{
         AngularDirection dirTopo = 
             new AngularDirection(topo, 
                                  new double[]{posTopo.getAlpha(), posTopo.getDelta()}, 
-                                 angleType);
+                                 angleType, posRange);
         dirTopo.setDate(state.getDate());
         return dirTopo;
     }
@@ -974,12 +983,16 @@ public class TrackingObjective implements Objective{
                                         + TrackingObjective.preparation 
                                         + this.sensor.getExposureT()/2);
 
-        // Check in the upcoming time range between 5s and 400s when objects are trackable 
+        // Check in the upcoming time range between 2s and 400s when objects are trackable 
         double tShift = 2.; 
         for (int t=0; t<200; t++) {
             measEpoch = measEpoch.shiftedBy(tShift);
-            sensorPointing.setDate(measEpoch);      // Assume holding position of last task up until new task
+            //sensorPointing.setDate(measEpoch);      // Assume holding position of last task up until new task
+            //sensorPointing.transformReference(ecef, measEpoch, null, tShift)
             Frame topoInertial = this.sensor.getTopoInertialFrame(measEpoch);
+            AngularDirection sensorP = 
+                sensorPointing.transformReference(topoInertial, measEpoch, 
+                                                  sensorPointing.getAngleType());
   
             // Iterate through list of objects of interest
             ListIterator<ObservedObject> iterator = checkTrackable.listIterator();
@@ -1046,7 +1059,7 @@ public class TrackingObjective implements Objective{
                     continue;
                 }
                 double actualSlewT = 
-                    this.sensor.computeRepositionT(sensorPointing, raDecPointing, true);
+                    this.sensor.computeRepositionT(sensorP, raDecPointing, true);
                 double reloc = TrackingObjective.allocation + t*tShift;
                 if(actualSlewT > reloc) {
                     // not enough time to slew to target pointing direction
@@ -1064,7 +1077,7 @@ public class TrackingObjective implements Objective{
                 
                 // Check if predicted uncertainty fits into FOV
                 // Topocentric frame
-                Frame topocentric = sensor.getTopoInertialFrame(measEpoch);
+                Frame topocentric = sensor.getTopoInertialFrame(measEpoch); // same as topoInertial --> can be removed
                 RealMatrix covPredGeocentric = predAndCorr[0].getCovariance().getCovarianceMatrix();
                 PVCoordinates pvPred = 
                     new PVCoordinates(predAndCorr[0].getState().getPositionVector(),
@@ -1176,6 +1189,13 @@ public class TrackingObjective implements Objective{
         }
     }
 
+    @Deprecated
+    /**
+     * Do not use this function since scale is not justified!
+     * @param current
+     * @param sensorPointing
+     * @return
+     */
     public AngularDirection setMicroActionFixedAllocAngularDirection(AbsoluteDate current, AngularDirection sensorPointing) {
 
         Frame topoInertial = this.sensor.getTopoInertialFrame(current);
@@ -1183,7 +1203,7 @@ public class TrackingObjective implements Objective{
         // Output
         double maxIG = Double.NEGATIVE_INFINITY;
         AngularDirection pointing = new AngularDirection(topoInertial, new double[]{0., 0.},
-                                                            AngleType.RADEC);
+                                                            AngleType.RADEC, 1.);
         ObservedObject target = null;    
 
         AbsoluteDate targetDate = 
@@ -1309,7 +1329,10 @@ public class TrackingObjective implements Objective{
             eciToTopo.transformPVCoordinates(predState.getPVCoordinates());
         double angle1 = pvTopo.getPosition().getAlpha();
         double angle2 = pvTopo.getPosition().getDelta();
-        AngularDirection measurement = new AngularDirection(topoInertial, new double[]{angle1, angle2}, AngleType.RADEC);
+        double range = pvTopo.getPosition().getNorm();
+        AngularDirection measurement = 
+            new AngularDirection(topoInertial, new double[]{angle1, angle2}, 
+                                 AngleType.RADEC, range);
         return measurement;
     }
 }

@@ -43,7 +43,9 @@ public class SensorTest {
     public void init() {
 
         // Load orekit data
-        File orekitData = new File("C:/Users/plnngo/Documents/Programs/orekit/orekit-data");
+        String workingDir = System.getProperty("user.dir");
+        String orekitDataDir = "\\src\\test\\java\\resources\\orekit-data";
+        File orekitData = new File(workingDir + orekitDataDir);
         DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
         manager.addProvider(new DirectoryCrawler(orekitData));
 
@@ -126,8 +128,8 @@ public class SensorTest {
         double[] radecOrigin = new double[]{FastMath.toRadians(90.), FastMath.toRadians(60.)};
         double[] radecDest = new double[]{FastMath.toRadians(45.), FastMath.toRadians(15.)};
 
-        AngularDirection origin = new AngularDirection(gcrf, radecOrigin, AngleType.RADEC);
-        AngularDirection dest = new AngularDirection(gcrf, radecDest, AngleType.RADEC);
+        AngularDirection origin = new AngularDirection(gcrf, radecOrigin, AngleType.RADEC, 1.);
+        AngularDirection dest = new AngularDirection(gcrf, radecDest, AngleType.RADEC, 1.);
 
         double actual = 
             sensor.computeRepositionT(origin, dest, sensor.isSlewVelInclSensorSettle());
@@ -161,8 +163,8 @@ public class SensorTest {
         // Input
         double[] azelOrigin = new double[]{FastMath.toRadians(45.), FastMath.toRadians(15.)};
         double[] azelDest = new double[]{FastMath.toRadians(-160.), FastMath.toRadians(10.)};
-        AngularDirection origin = new AngularDirection(topoHorizon, azelOrigin, AngleType.AZEL);
-        AngularDirection dest = new AngularDirection(topoHorizon, azelDest, AngleType.AZEL);
+        AngularDirection origin = new AngularDirection(topoHorizon, azelOrigin, AngleType.AZEL, 1.);
+        AngularDirection dest = new AngularDirection(topoHorizon, azelDest, AngleType.AZEL, 1.);
         double actual = 
             sensor.computeRepositionT(origin, dest, sensor.isSlewVelInclSensorSettle());
 
@@ -190,8 +192,8 @@ public class SensorTest {
          // Input
         double[] latlonOrigin = new double[]{FastMath.toRadians(0.), FastMath.toRadians(5.)};
         double[] radecDest = new double[]{FastMath.toRadians(-180.), FastMath.toRadians(10.)};
-        AngularDirection origin = new AngularDirection(ecef, latlonOrigin, AngleType.LONLAT);
-        AngularDirection dest = new AngularDirection(eci, radecDest, AngleType.RADEC);
+        AngularDirection origin = new AngularDirection(ecef, latlonOrigin, AngleType.LONLAT, 1.);
+        AngularDirection dest = new AngularDirection(eci, radecDest, AngleType.RADEC, 1.);
 
         sensor.computeRepositionT(origin, dest, sensor.isSlewVelInclSensorSettle());
     }

@@ -90,6 +90,13 @@ public class Tasking {
     /** Sphere around Earth with radius same as of a GEO. */
     final OneAxisEllipsoid geoSphere = new OneAxisEllipsoid(geoRadius, 0., eci);
 
+    final double geoT = 86164.0905;                            // in [s]
+
+    final double semiaxis = 
+        FastMath.pow(Constants.WGS84_EARTH_MU * FastMath.pow(geoT/(2*FastMath.PI), 2), 1./3.);
+    
+    final double range = semiaxis - Constants.WGS84_EARTH_EQUATORIAL_RADIUS;
+
     double cycleT;
 
     /**
@@ -290,7 +297,7 @@ public class Tasking {
                 } */
                 
                 // Set up re-obs stripe
-                reObs[i] = Stripe.setStripe(numDecFields, eci, sensor, midStripePos, j-1);
+                reObs[i] = Stripe.setStripe(numDecFields, sensor, midStripePos, j-1);
             }
             // Reset for next re-obs stripe
             j = 1; 
@@ -347,7 +354,7 @@ public class Tasking {
                 //Plane laplace = new Plane(Vector3D.ZERO, Vector3D.PLUS_K, tolerance);
                 double[] midAngles = 
                     new double[]{reObsShift, fixedRa[i].getPosField(numDecFields/2).getAngle2()};
-                midStripePos = new AngularDirection(eci, midAngles, AngleType.RADEC);
+                midStripePos = new AngularDirection(eci, midAngles, AngleType.RADEC, range);
 
                 try {
                     visible = checkVisibility(reObsShift, stationEci, numDecFields, j, geoSphere, laplace, startReObs);
@@ -363,7 +370,7 @@ public class Tasking {
 
             if(visible){                
                 // Set up re-obs stripe
-                reObs[i] = Stripe.setStripe(numDecFields, eci, sensor, midStripePos, j-1);
+                reObs[i] = Stripe.setStripe(numDecFields, sensor, midStripePos, j-1);
             }
             // Reset for next re-obs stripe
             j = 1; 
@@ -394,7 +401,7 @@ public class Tasking {
         PVCoordinates shadow = sun.getPVCoordinates(date, eci).negate().normalize();
         double[] shadowAngles = 
             new double[]{shadow.getPosition().getAlpha(), shadow.getPosition().getDelta()};
-        AngularDirection shadowDir = new AngularDirection(eci, shadowAngles, AngleType.RADEC);
+        AngularDirection shadowDir = new AngularDirection(eci, shadowAngles, AngleType.RADEC, 1.);
 
         if(toCheck.getEnclosedAngle(shadowDir) < halfCone) {
             return true;
@@ -455,7 +462,7 @@ public class Tasking {
 
         AngularDirection midStripeSmall = setStripeMidPoint(fixedRaSmall, stationEci, 
                                                             geoSphere, laplace, this.start);
-        Stripe fixedSmallRa = Stripe.setStripe(numDecFields, eci, sensor, midStripeSmall, 0);
+        Stripe fixedSmallRa = Stripe.setStripe(numDecFields, sensor, midStripeSmall, 0);
 
         // Deal with larger earth shadow boundary
         visible = checkVisibility(fixedRaLarge, stationEci, numDecFields, j, geoSphere, laplace, this.start);    
@@ -472,7 +479,7 @@ public class Tasking {
         } 
         AngularDirection midStripeLarge = setStripeMidPoint(fixedRaLarge, stationEci, 
                                                             geoSphere, laplace, this.start);
-        Stripe fixedLargeRa = Stripe.setStripe(numDecFields, eci, sensor, midStripeLarge, j);
+        Stripe fixedLargeRa = Stripe.setStripe(numDecFields, sensor, midStripeLarge, j);
         System.out.println(FastMath.toDegrees(fixedLargeRa.getPosField(fixedLargeRa.getNumDecFields()-1).getAngle2()));
 
         // Set fixed observation stripes
@@ -517,7 +524,7 @@ public class Tasking {
         AngularDirection midStripe = 
             setStripeMidPoint(ra, stationEci, geoSphere, laplace, date);
 
-        Stripe stripe = Stripe.setStripe(numDecFields, eci, sensor, midStripe, j);
+        Stripe stripe = Stripe.setStripe(numDecFields, sensor, midStripe, j);
 
         // Distance to Moon
         double angularDistFirst =  AngularDirection.computeAngularDistMoon(date, eci, stripe.getFirstPosField());
@@ -580,14 +587,21 @@ public class Tasking {
         double heightFov = sensor.getFov().getHeight();
         double widthFov = sensor.getFov().getWidth();
 
+        // TODO: Compute distance from sensor to optimal GEO (range)
+
         // Compute leakproof stripe scanning duration
-        double rotRateGeo = 86400/(2*FastMath.PI);      // in [s/rad]
+        
+        //double rangeNextDec = range/FastMath.cos(heightFov);
+        double rotRateGeo = geoT/(2*FastMath.PI);      // in [s/rad]
         double leakproofStripeT = widthFov * rotRateGeo;
+        
 
         // Compute time to reposition after one declination field scan. Assume no overlap.
-        AngularDirection origin = new AngularDirection(eci, new double[]{0., 0.}, AngleType.RADEC);
+        AngularDirection origin = 
+            new AngularDirection(eci, new double[]{0., 0.}, AngleType.RADEC, range);
+        
         AngularDirection dest = 
-            new AngularDirection(eci, new double[]{0., heightFov}, AngleType.RADEC);
+            new AngularDirection(eci, new double[]{0., heightFov}, AngleType.RADEC, range);
         double reposT = 
             sensor.computeRepositionT(origin, dest, sensor.isSlewVelInclSensorSettle());
 
@@ -605,8 +619,10 @@ public class Tasking {
                 /(numExpos*sensor.getExposureT() + (numExpos -1)*sensor.getReadoutT() + t1));
 
         // Check if t2 is assigned to read out or repositioning time (depending which is longer)
+        //double rangeEndStripe = range/FastMath.cos(heightFov * ((double)numDecFields/2.));
         AngularDirection destEndStripe = 
-            new AngularDirection(eci, new double[]{0., heightFov * numDecFields}, AngleType.RADEC);
+            new AngularDirection(eci, new double[]{0., heightFov * ((double)numDecFields/2.)}, 
+                                 AngleType.RADEC, range);
         double reposTBeginEndStripe = 
             sensor.computeRepositionT(origin, destEndStripe, sensor.isSlewVelInclSensorSettle());
         if(t2<reposTBeginEndStripe) {
@@ -653,8 +669,6 @@ public class Tasking {
                                                         OneAxisEllipsoid geoSphere, Plane laplace,
                                                         AbsoluteDate date) {
 
-        //Frame eci = FramesFactory.getGCRF();
-
         // Shift ra to [-pi,pi] interval to be able to build up the plane
         if(ra>FastMath.PI) {
             ra -= 2*FastMath.PI;
@@ -675,7 +689,7 @@ public class Tasking {
 
         double[] angles = new double[]{midStripeGeoCart.getAlpha(), midStripeGeoCart.getDelta()};
                                         
-        return new AngularDirection(eci, angles, AngleType.RADEC);
+        return new AngularDirection(eci, angles, AngleType.RADEC, midStripeGeoCart.getNorm());
     }
 
     /**
@@ -765,7 +779,8 @@ public class Tasking {
 
             double[] angles = new double[]{boundaryInGeoEci.getAlpha(), 
                                            boundaryInGeoEci.getDelta()};
-            earthShadowBoundaries[i] = new AngularDirection(eci, angles, AngleType.RADEC);
+            earthShadowBoundaries[i] = 
+                new AngularDirection(eci, angles, AngleType.RADEC, boundaryInGeoEci.getNorm());
         }
         return earthShadowBoundaries;
     }
@@ -1027,7 +1042,7 @@ public class Tasking {
         AngularDirection posFirstField = stripe.getFirstPosField();
                 // TODO: check if conversion is true by using values in Vallado p.173
         AngularDirection lonlatFirstPos = 
-            posFirstField.transformReference(ecef, date, AngleType.LONLAT,1.);
+            posFirstField.transformReference(ecef, date, AngleType.LONLAT);
         double lonCurrent = lonlatFirstPos.getAngle1();
 
         Stripe[] scanPrev = prevNight.getScanStripes();
@@ -1041,7 +1056,7 @@ public class Tasking {
                     Stripe stripePrev = slot.getStripe();
                     AngularDirection lonlatFirstPosPrev = 
                         stripePrev.getFirstPosField()
-                                  .transformReference(ecef, startPre, AngleType.LONLAT, 1.);
+                                  .transformReference(ecef, startPre, AngleType.LONLAT);
                     double lonPrev = lonlatFirstPosPrev.getAngle1();
 
                     //TODO: think of a way to define a threshold
@@ -1082,7 +1097,7 @@ public class Tasking {
 
         // Convert pointing direction of first stripe into az/el horizon topocentric frame
         AngularDirection posFirstFieldTopoHorizon = 
-            posFirstField.transformReference(topoHorizon, date, AngleType.AZEL, 1.);
+            posFirstField.transformReference(topoHorizon, date, AngleType.AZEL);
         //System.out.println("Stripe Topo 1st field: " + FastMath.toDegrees(posFirstFieldTopoHorizon.getAngle1()) + " and " + FastMath.toDegrees(posFirstFieldTopoHorizon.getAngle2()));
         
         // Compute time when end of stripe is reached (incl. exposure of last field, too)
@@ -1091,7 +1106,7 @@ public class Tasking {
 
         //TODO: date might needs to get shifted so that it corresponds to the epoch when the sensor reaches the last field
         AngularDirection posLastFieldTopoHorizon = 
-            posLastField.transformReference(topoHorizon, endOfStripe, AngleType.AZEL, 1.);
+            posLastField.transformReference(topoHorizon, endOfStripe, AngleType.AZEL);
         if(posFirstFieldTopoHorizon.getAngle2() < sensor.getElevCutOff()) {
 
             return false;
@@ -1128,16 +1143,17 @@ public class Tasking {
         // Convert Sun's position
         CelestialBody sun = CelestialBodyFactory.getSun();
         Vector3D sunPos = sun.getPVCoordinates(date, frame).getPosition();
+        double range = sunPos.getNorm();
         double alpha = sunPos.getAlpha();     // between (-PI; PI)
         double delta = sunPos.getDelta();     // between (-PI/2; PI/2)
 
         // Output
         if(frame.isPseudoInertial()) {
-            return new AngularDirection(frame, new double[]{alpha, delta}, AngleType.RADEC);
+            return new AngularDirection(frame, new double[]{alpha, delta}, AngleType.RADEC, range);
         } else if(frame instanceof TopocentricFrame){
-            return new AngularDirection(frame, new double[]{alpha, delta}, AngleType.AZEL);
+            return new AngularDirection(frame, new double[]{alpha, delta}, AngleType.AZEL, range);
         } else if(frame.equals(FramesFactory.getITRF(IERSConventions.IERS_2010, true))){
-            return new AngularDirection(frame, new double[]{alpha, delta}, AngleType.LONLAT);
+            return new AngularDirection(frame, new double[]{alpha, delta}, AngleType.LONLAT, range);
         } else {
             throw new InputMismatchException("Not clear in which frame sun direction is computed");
         } 
