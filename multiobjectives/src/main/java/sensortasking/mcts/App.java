@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import org.hipparchus.analysis.solvers.LaguerreSolver;
+import org.hipparchus.complex.Complex;
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.Array2DRowRealMatrix;
 import org.hipparchus.linear.DiagonalMatrix;
@@ -84,9 +86,22 @@ public class App {
         //App.propagateKeplerianDynamics();
         //App.propagateCovarianceOrekitExample();
         //App.compareNormalPropWithKalmanPrediction();
-        App.setUpOwnKalmanFilter();
+        //App.setUpOwnKalmanFilter();
         //App.compareCovTdrs();
         //App.computeKLTest();
+        App.testPolynomialFunction();
+    }
+
+    public static void testPolynomialFunction() {
+        double[] c = { 0, 0, 15, -13, -3, 1 };
+
+        LaguerreSolver solver = new LaguerreSolver();
+        Complex[] sol = solver.solveAllComplex(c, 0.);
+        for(Complex s : sol) {
+            if(s.getImaginaryPart()==0.) {
+                System.out.println(s.getRealPart());
+            }
+        }
     }
 
     public static void computeKLTest(){
