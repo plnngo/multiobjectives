@@ -1,19 +1,32 @@
 package sensortasking.mcts;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.stream.DoubleStream;
 
 import org.hipparchus.analysis.solvers.LaguerreSolver;
 import org.hipparchus.complex.Complex;
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
+import org.hipparchus.linear.Array2DRowRealMatrix;
+import org.hipparchus.linear.ArrayRealVector;
+import org.hipparchus.linear.CholeskyDecomposition;
+import org.hipparchus.linear.DiagonalMatrix;
+import org.hipparchus.linear.MatrixUtils;
+import org.hipparchus.linear.RealMatrix;
+import org.hipparchus.linear.RealVector;
+import org.hipparchus.special.Gamma;
 import org.hipparchus.util.FastMath;
 import org.orekit.time.AbsoluteDate;
-import org.orekit.utils.Constants;
+
+import tools.GaussianMixtureModel;
+import tools.MatrixTools;
 
 
 @SuppressWarnings("rawtypes")
@@ -39,7 +52,26 @@ public class IodObjective implements Objective{
     double e_min = 0.;
 
     /** Earth gravitational constant. */
-    double mu = Constants.WGS84_EARTH_MU;
+    double mu = 398600441500000.0;
+
+    /** Measurement noise. */
+    double[] measNoise;
+
+    /** Earth radius in m. */
+    final double Re = 6378.1370*1000.;            // m
+
+    /** Inertial position of sensor. */
+    Vector3D q = new Vector3D(FastMath.cos(FastMath.toRadians(30.)), 
+                                FastMath.toRadians(0.), 
+                                FastMath.sin(FastMath.toRadians(30.)))
+                                .scalarMultiply(Re);
+
+    /** Earth angular velocity. */
+    Vector3D omega = new Vector3D(0., 0., 7.2921158553e-5);
+    //Vector3D omega = new Vector3D(0., 0., Constants.WGS84_EARTH_ANGULAR_VELOCITY);
+
+    /** Inertial velocity of sensor. */
+    Vector3D dq = omega.crossProduct(q);
 
     /** Look up table of solution of standard deviation. Reference to DeMars Table 1.*/
     final double[] lookUp = new double[]{Double.NaN, 
@@ -60,8 +92,10 @@ public class IodObjective implements Objective{
                                         0.0456};
 
 
-    public IodObjective(double[] tracklet, Sensor sensor, double a_max, double a_min, double e_max){
+    public IodObjective(double[] tracklet, Sensor sensor, double a_max, double a_min, 
+                        double e_max, double[] meas_noise){
         this.tracklet = tracklet;
+        this.measNoise = meas_noise;
         this.sensor = sensor;
 
         // Constraining AR by semi-major axis and eccentricity
@@ -75,7 +109,7 @@ public class IodObjective implements Objective{
      * measurement set, containing angles and angle-rates, in particular topocentric right  
      * ascension and declination. The method is based on DeMars and Jah (2013).
      */
-    public Map<Double, double[]> car_drho_limits(AbsoluteDate epoch, double[] rho_vect) {
+    public Map<Double, double[]> car_drho_limits(AbsoluteDate epoch, double[] rho_vect, boolean print) {
 
         // Extract angles and derivatives from tracklet
         double ra = tracklet[0];
@@ -84,9 +118,8 @@ public class IodObjective implements Objective{
         double ddec = tracklet[3];
 
         //Inertial position and velocity of sensor
-        Vector3D q = this.sensor.getSensorPosEci(epoch);
-        Vector3D omega = new Vector3D(0., 0., Constants.WGS84_EARTH_ANGULAR_VELOCITY);
-        Vector3D dq = omega.crossProduct(q);
+        //Vector3D q = this.sensor.getSensorPosEci(epoch);
+        
 
         // Unit vectors (DeMars between Eq 1-2)
         Vector3D u_rho = new Vector3D(FastMath.cos(ra) * FastMath.cos(dec), 
@@ -142,7 +175,7 @@ public class IodObjective implements Objective{
         List<Double> rho_e_all = new ArrayList<Double>();
         List<Double> drho_a_all = new ArrayList<Double>();
         List<Double> drho_e_all = new ArrayList<Double>();
-        Map<Double, double[]> drho_dict = new HashMap<Double, double[]>();
+        Map<Double, double[]> drho_dict = new LinkedHashMap<Double, double[]>();
 
         for (int ii= 0; ii<rho_vect.length; ii++) {
 
@@ -193,11 +226,18 @@ public class IodObjective implements Objective{
             double[] coef = new double[]{a0_max, a1, a2, a3, a4};
 
             // Initial guess as the median drho_a for solver
-            double guess = (drho_a.get(0) + drho_a.get(1)) / 2.;
+            double guess = 0.;
+            if (drho_a.size() != 0) {
+                guess = (drho_a.get(0) + drho_a.get(1)) / 2.;
+            }
 
             // Solve quadric function over drho to constrain AR by eccentricity (DeMars Eq 8)
             LaguerreSolver solver = new LaguerreSolver();
             Complex[] r = solver.solveAllComplex(coef, guess);
+            if (ii==7311) {
+                System.out.println("Guess for quadric solver set to zero");
+                System.out.println("Size solutions: " + r.length);
+            }
             List<Double> drho_ecc = new ArrayList<Double>();
 
             for (Complex sol : r) {
@@ -354,9 +394,42 @@ public class IodObjective implements Objective{
                 }
             }
         }
+        if (print) {
+            write_arhoAall_drhoAall_rhoEall_drhoEall("arhoAall_drhoAall_rhoEall_drhoEall", 
+                                                     rho_a_all, drho_a_all, rho_e_all, drho_e_all); 
+        }
+
         return drho_dict;
     }
-
+    
+    private void write_arhoAall_drhoAall_rhoEall_drhoEall(String filename, List<Double> rho_a_all,
+        List<Double> drho_a_all, List<Double> rho_e_all, List<Double> drho_e_all) {
+        try (FileWriter writer = new FileWriter(filename)) {
+            // Write header
+            writer.append("rho_a_all,drho_a_all,rho_e_all,drho_e_all\n");
+            
+            // Determine max length for iteration
+            int maxLength = Math.max(rho_a_all.size(), Math.max(drho_a_all.size(), Math.max(rho_e_all.size(), drho_e_all.size())));
+            
+            // Write data row by row
+            for (int i = 0; i < maxLength; i++) {
+                writer.append(i < rho_a_all.size() ? String.valueOf(rho_a_all.get(i)) : "");
+                System.out.println(String.valueOf(rho_a_all.get(i)));
+                writer.append(",");
+                writer.append(i < drho_a_all.size() ? String.valueOf(drho_a_all.get(i)) : "");
+                writer.append(",");
+                writer.append(i < rho_e_all.size() ? String.valueOf(rho_e_all.get(i)) : "");
+                writer.append(",");
+                writer.append(i < drho_e_all.size() ? String.valueOf(drho_e_all.get(i)) : "");
+                writer.append("\n");
+            }
+            
+            System.out.println("CSV file saved successfully: " + filename);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    
     /**
      * This function computes a Gaussian Mixture Model (GMM) to approximate a 
      * uniform distribution representing the Constrained Admissible Region (CAR)
@@ -368,10 +441,12 @@ public class IodObjective implements Objective{
      * @param epoch
      * @param rho_vect
      */
-    public void optical_car_gmm(AbsoluteDate epoch, double[] rho_vect, double sigma_rho_desired){
+    public GaussianMixtureModel optical_car_gmm(AbsoluteDate epoch, double[] rho_vect, 
+                                                double sigma_rho_desired, 
+                                                double sigma_drho_desired){
 
         // Compute CAR boundary
-        Map<Double, double[]> drho_dict = car_drho_limits(epoch, rho_vect);
+        Map<Double, double[]> drho_dict = car_drho_limits(epoch, rho_vect, true);
         List<Map.Entry<Double, double[]>> drho_dict_list = new ArrayList<>(drho_dict.entrySet());
 
         // Compute range marginal PDF quantities
@@ -386,27 +461,313 @@ public class IodObjective implements Objective{
             m_rho[i] = a_rho + (b_rho - a_rho)/(L_rho+1.)*(i+1.);
         }
 
+        double P_rho = LandSigmaOut[1] * LandSigmaOut[1];
+
         // Compute weights of GMM components (DeMars Eq 23)
         // Evaluate range marginal PDF at each range value
         Object[] rho_uniqueO = drho_dict.keySet().toArray();
         double[] rho_unique = new double[rho_uniqueO.length];
         double[] p_vect = new double[rho_uniqueO.length];
+        double delta_rho = 
+            ((Double)rho_uniqueO[1]).doubleValue() - ((Double)rho_uniqueO[0]).doubleValue();
         for (int i=0; i<rho_unique.length; i++) {
             rho_unique[i] = ((Double)rho_uniqueO[i]).doubleValue();
             Map.Entry<Double, double[]> drho_dict_entry = drho_dict_list.get(i);
-                double[] drho_vect = drho_dict_entry.getValue();
-                double a_drho = Arrays.stream(drho_vect).min().orElseThrow(null);
-                double b_drho = Arrays.stream(drho_vect).max().orElseThrow(null);
-            if (i>0) {
-                double delta_rho = rho_unique[i] - rho_unique[i-1];
-                p_vect[i] = (b_drho - a_drho)*delta_rho;
-            }
+            double[] drho_vect = drho_dict_entry.getValue();
+            double a_drho = Arrays.stream(drho_vect).min().orElseThrow(null);
+            double b_drho = Arrays.stream(drho_vect).max().orElseThrow(null);               
+            p_vect[i] = (b_drho - a_drho)*delta_rho;            // aprox. marginal PDF of rho
+        }
 
+        // Normalise marginal PDF using total probability mass of rho_unique
+        double[] p_vect_normed = computeMarginalPDF(p_vect, rho_unique);
+
+        // Compute H-matrix
+        int M = p_vect_normed.length;
+        double[][] Hmatrix = new double[M][L_rho];
+        double sigj = FastMath.sqrt(P_rho);
+        for (int i=0; i<M; i++) {
+            for (int j=0; j<L_rho; j++) {
+                double rhoi = rho_unique[i];
+                double mj = m_rho[j];
+                Hmatrix[i][j] = (1./(FastMath.sqrt(2.*FastMath.PI)*sigj)) 
+                            * FastMath.exp(-(rhoi-mj) * (rhoi-mj)/(2*P_rho));       // Gausian PDF
+            }
+        }
+        RealMatrix H = new Array2DRowRealMatrix(Hmatrix);
+
+        // Set up Moore-Penrose Pseudoinverse --> normal equation solution matrix
+        RealMatrix LSprojection = 
+            MatrixUtils.inverse(H.transpose().multiply(H)).multiplyTransposed(H);
+
+        // Project p_vect to best-fit solutions for the Gaussian weights
+        double[] w_rho = LSprojection.operate(p_vect_normed);
+
+        // Check normalisation
+        double sum = Arrays.stream(w_rho).sum();
+        if (FastMath.abs(sum - 1.) > 0.1) {
+            throw new IllegalStateException("Error: CAR GMM range weights not normalised!" 
+                                                + " Sum: " + sum);
+        }
+
+        // Compute PDF sum
+        double[] g_approx = new double[M];
+        for (int i=0; i<M; i++) {
+            double gi = 0.;
+            double rhoi = rho_unique[i];
+            for (int j=0; j<L_rho; j++) {
+                double wj = w_rho[j];
+                double mj = m_rho[j];
+                gi += wj * (1./FastMath.sqrt(2.*FastMath.PI*P_rho)) 
+                         * FastMath.exp(-(rhoi-mj) * (rhoi-mj)/(2*P_rho));            
+            }
+            g_approx[i] = gi;
+        }
+
+        write_RhoUnique_pVect_gApprox_toCsV("RhoUnique_pVect_gApprox", 
+                                            rho_unique, 
+                                            p_vect_normed,
+                                            g_approx);
+
+        // Compute range-rate marginal PDF quantities and store in GMM
+        // Get drho limits for m_rho
+        Map<Double, double[]> drho_dict2 = car_drho_limits(epoch, m_rho, false);
+        List<Map.Entry<Double, double[]>> drho_dict2_list = new ArrayList<>(drho_dict2.entrySet());
+        double sig_drho_max = 0.;
+
+        List<Double> w = new ArrayList<Double>();
+        List<double[]> m = new ArrayList<double[]>();
+        List<double[][]> P = new ArrayList<double[][]>();
+
+        for (int i =0; i<L_rho; i++) {
+
+            // Get values from range PDF
+            double wi = w_rho[i];
+            double mi = m_rho[i];
+            
+            // Get values from Range-Rate PDF
+            Map.Entry<Double, double[]> drho_dict2_entry = drho_dict2_list.get(i);
+            double[] drho_vect = drho_dict2_entry.getValue();
+
+            for (int k=0; k<(int)drho_vect.length/2; k++) {
+                double[] drho_k = new double[]{drho_vect[2*k], drho_vect[2*k+2-1]};
+                double a_drho = Arrays.stream(drho_k).min().orElseThrow(null);
+                double b_drho = Arrays.stream(drho_k).max().orElseThrow(null);   
+                double[] LDrhoandSigmaOutDrho = 
+                    car_sigma_library(a_drho, b_drho, sigma_drho_desired);
+                int L_drho = (int)LDrhoandSigmaOutDrho[0];
+                double sig_drho = LDrhoandSigmaOutDrho[1];
+
+                if (sig_drho > sig_drho_max) {
+                    sig_drho_max = sig_drho;
+                }
+
+                // Weights, means, covar for this rho
+                double wj = 1./L_drho;
+                double Pj = sig_drho * sig_drho;
+
+                for (int j=0; j<L_drho; j++) {
+                    double mj = a_drho + (b_drho-a_drho)/(L_drho + 1.) * (j+1.);
+                    w.add(wi*wj);
+                    m.add(new double[]{mi, mj});
+                    double[][] P_entry = new double[2][2];
+                    P_entry[0] = new double[]{P_rho, 0.};
+                    P_entry[1] = new double[]{0., Pj};
+                    P.add(P_entry);
+                }
+            }
+        }
+
+        // Turn w into a one-dim array
+        double[] w_array = w.stream().mapToDouble(Double::doubleValue).toArray();
+
+        // Turn m into a multidimensional array
+        double[][] m_array = new double[m.size()][];
+        for (int i = 0; i < m.size(); i++) {
+            m_array[i] = m.get(i);
         }
         
-
+        return new GaussianMixtureModel(w_array, m_array, P);
     }
 
+    public GaussianMixtureModel car_gmm_to_eci(GaussianMixtureModel gmm, double[] meas_noise) {
+
+        // Break out GM
+        double[][] m0 = gmm.getMeans();
+        List<double[][]> P0 = gmm.getP();
+
+        // Get sigmas for meas_types
+        double[] var_vect = new double[meas_noise.length];
+        for (int i=0; i<var_vect.length; i++) {
+            var_vect[i] = meas_noise[i] * meas_noise[i];
+        }
+
+        // For each GM component use unscented transform to put in ECI
+        int L = gmm.getWeights().length;
+        for (int j=0; j<L; j++) {
+            double[] mj = 
+                DoubleStream.concat(Arrays.stream(m0[j]), Arrays.stream(tracklet)).toArray();
+            double[] diagonal = new double[P0.get(j).length];
+
+            for (int i=0; i<diagonal.length; i++) {
+                diagonal[i] = P0.get(j)[i][i];  // Extract diagonal element
+            }
+            double[] concartPj = 
+                DoubleStream.concat(Arrays.stream(diagonal), Arrays.stream(var_vect)).toArray();
+            RealMatrix Pj = new DiagonalMatrix(concartPj);
+            Map.Entry<RealVector, RealMatrix> mP = unscented_transform(mj, Pj);
+            m0[j] = mP.getKey().toArray();
+            P0.add(mP.getValue().getData());
+        }
+        GaussianMixtureModel gmmEci = new GaussianMixtureModel(gmm.getWeights(), m0, P0);
+    
+        return gmmEci;
+    }
+            
+        private Map.Entry<RealVector, RealMatrix> unscented_transform(double[] mj, RealMatrix pj) {
+
+            // Number of states
+            int L = mj.length;
+
+            // Value of p-norm distribution
+            double pnorm = 2.;
+
+            // Sigma point distribution parameter
+            double alpha = 1.;
+
+            // Prior information about the distribution
+            double kurt = Gamma.gamma(5./pnorm) * Gamma.gamma(1./pnorm) 
+                            / FastMath.pow(Gamma.gamma(3./pnorm), 2);
+            double beta = kurt - 1.;
+            double kappa = kurt - (double)L;
+
+            // Compute sigma point weights
+            double lam = alpha * alpha * (L+kappa) - L;
+            double gam = FastMath.sqrt(L + lam);
+            RealVector ones = new ArrayRealVector(new double[2*L]);
+            ones.set(1.);
+            RealVector Wm =  ones.mapMultiply(1./(2. * (L + lam)));
+            RealVector Wc = Wm.copy();
+            double firstWm = lam/(L + lam);
+            RealVector Wm_append = new ArrayRealVector(new double[]{firstWm}).append(Wm);
+            RealVector Wc_append = 
+                new ArrayRealVector(new double[]{firstWm + (1 - alpha * alpha + beta)}).append(Wc);
+            RealMatrix diagWc = new DiagonalMatrix(Wc_append.toArray());
+
+            //Compute chi - baseline sigma points
+            RealMatrix sqP = new CholeskyDecomposition(pj).getL();
+            double[][] Xrep = new double[mj.length][L];
+            for (int i=0; i<L; i++) {
+                Arrays.fill(Xrep[i], mj[i]);
+            }
+            // Positive and negative deviations
+            RealMatrix posDev = new Array2DRowRealMatrix(Xrep).add(sqP.scalarMultiply(gam));
+            RealMatrix negDev = new Array2DRowRealMatrix(Xrep).subtract(sqP.scalarMultiply(gam));
+
+            // Transform mj into a column vector
+            double[][] m1 = new Array2DRowRealMatrix(mj).getData();
+            double[][] sigmaPoints = 
+                MatrixTools.concatenateColumns(posDev.getData(), negDev.getData());
+            double[][] chi = MatrixTools.concatenateColumns(m1,sigmaPoints);
+            double[][] chi_diff_matrix = MatrixTools.subtractEachColumnByVec(chi, mj);
+            RealMatrix chi_diff = new Array2DRowRealMatrix(chi_diff_matrix);
+
+            // Compute sigma points
+            double[][] Y_matrix = ut_car_to_eci(chi);
+            RealMatrix Y = new Array2DRowRealMatrix(Y_matrix);
+
+            // Compute mean and covar
+            RealVector m2 = Y.operate(Wm_append);
+            double[][] Y_diff_matrix = MatrixTools.subtractEachColumnByVec(Y_matrix, m2.toArray());
+            RealMatrix Y_diff = new Array2DRowRealMatrix(Y_diff_matrix);
+            RealMatrix diagWc_YdiffT = diagWc.multiply(Y_diff.transpose());
+            RealMatrix P2 = Y_diff.multiply(diagWc_YdiffT);
+            RealMatrix Pcross = chi_diff.multiply(diagWc_YdiffT);
+            
+            return new AbstractMap.SimpleEntry<>(m2, P2);                
+        }
+        
+        /**
+         * Function for use with unscented_transform.
+         * Converts sigma point matrix from inertial cartesian coordinates to
+         * keplerian elements.
+
+         * @param chi
+         */
+        private double[][] ut_car_to_eci(double[][] chi) {
+            int L = chi[0].length;
+            double[][] Y = new double[chi.length][L];
+
+            for (int ind=0; ind<L; ind++) {
+
+                // Break out chi
+                double rho = chi[0][ind];
+                double drho = chi[1][ind];
+                double ra = chi[2][ind];
+                double dec = chi[3][ind];
+                double dra = chi[4][ind];
+                double ddec = chi[5][ind];
+
+                // Unit vectors
+                double[] u_rho = new double[]{FastMath.cos(ra) * FastMath.cos(dec), 
+                                              FastMath.sin(ra) * FastMath.cos(dec), 
+                                              FastMath.sin(dec)};
+                RealVector u_rho_vect = new ArrayRealVector(u_rho);
+
+                double[] u_ra = new double[]{-FastMath.sin(ra) * FastMath.cos(dec),
+                                             FastMath.cos(ra) * FastMath.cos(dec),
+                                             0.};
+                RealVector u_ra_vect = new ArrayRealVector(u_ra);
+
+                double[] u_dec = new double[]{-FastMath.cos(ra) * FastMath.sin(dec),
+                                              -FastMath.sin(ra) * FastMath.sin(dec),
+                                              FastMath.cos(dec)};
+                RealVector u_dec_vect = new ArrayRealVector(u_dec);
+
+                // Range and Range-Rate vectors
+                RealVector rho_vect = u_rho_vect.mapMultiply(rho);
+                RealVector drho_vect = u_rho_vect.mapMultiply(drho)
+                                        .add(u_ra_vect.mapMultiply(rho * dra))
+                                        .add(u_dec_vect.mapMultiply(rho * ddec));
+        
+                // Compute pos/vel in ECI and add to output
+                RealVector r_vect = new ArrayRealVector(q.toArray()).add(rho_vect);
+                RealVector v_vect = new ArrayRealVector(dq.toArray()).add(drho_vect);
+                for (int i=0; i<r_vect.getDimension(); i++) {
+                    Y[i][ind] = r_vect.getEntry(i);
+                    Y[i+r_vect.getDimension()][ind] = v_vect.getEntry(i);
+                }                                      
+            }
+            return Y;
+        }
+            
+        private void write_RhoUnique_pVect_gApprox_toCsV(String filename, double[] rho_unique, 
+                                            double[] p_vect, double[] g_approx) {
+                                                        
+        try (FileWriter writer = new FileWriter(filename)) {
+            // Write header
+            writer.append("rho_unique,p_vect,g_approx\n");
+            
+            // Determine max length for iteration
+            int maxLength = Math.max(rho_unique.length, Math.max(p_vect.length, g_approx.length));
+            
+            // Write data row by row
+            for (int i = 0; i < maxLength; i++) {
+                writer.append(i < rho_unique.length ? String.valueOf(rho_unique[i]) : "");
+                writer.append(",");
+                writer.append(i < p_vect.length ? String.valueOf(p_vect[i]) : "");
+                writer.append(",");
+                writer.append(i < g_approx.length ? String.valueOf(g_approx[i]) : "");
+                writer.append("\n");
+            }
+            
+            System.out.println("CSV file saved successfully: " + filename);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        
+    }
+        
     /**
      * This function returns the sigma value required to approximate a uniform
      * distribution with a GMM with "L" homoscedastic, evenly spaced, and
@@ -425,13 +786,64 @@ public class IodObjective implements Objective{
         double[] LandSigmaOut = new double[2];
         for (int L=1; L<this.lookUp.length; L++) {
             double sigma_out = (b-a) * lookUp[L];
+            LandSigmaOut[0] = L;
+            LandSigmaOut[1] = sigma_out;
             if (sigma_out < sigma_rho_desired) {
-                LandSigmaOut[0] = L;
-                LandSigmaOut[1] = sigma_out;
                 break;
             }
         }
         return LandSigmaOut;
+    }
+
+    /**
+     * Normalises the unnormalised approximated marginal PDF by the total probability mass of rho_unique.
+     * This is necessary so that the integral of the marginal PDF is 1.
+     * 
+     * @param p_vect            Approximation of the marginal probability mass for each rho_unique
+     * @param rho_unique        Random variable
+     * @return                  Normalised PDF of rho_unique.
+     */
+    public static double[] computeMarginalPDF(double[] p_vect, double[] rho_unique) {
+        double norm_fact = trapezoidalIntegration(p_vect, rho_unique);
+        
+        double[] p_marginal_rho = new double[p_vect.length];
+        for (int i = 0; i < p_vect.length; i++) {
+            p_marginal_rho[i] = p_vect[i] / norm_fact;  // Normalize to get the PDF
+        }
+        
+        return p_marginal_rho;
+    }
+
+    /**
+     * Computes the numerical integral of a function using the trapezoidal rule.
+     * This method approximates the integral of the given function values over
+     * a set of discrete points.
+     *
+     * <p>The trapezoidal rule estimates the integral by dividing the area under
+     * the curve into trapezoids and summing their areas. It is commonly used for
+     * numerical integration when the function is only known at discrete points.
+     * 
+     * @param y                 The function values at each discrete point (corresponding to f(x)).
+     * @param x                 The discrete points (must be sorted in ascending order).
+     * @return                  The approximate integral of the function over the given range.
+     * 
+     * @throws IllegalArgumentException if the input arrays have different lengths
+     *                                  or contain fewer than two points.
+     */
+    public static double trapezoidalIntegration(double[] y, double[] x) {
+        if (y.length != x.length || y.length < 2) {
+            throw new IllegalArgumentException("Arrays must have the same length" 
+                                                + " and contain at least two points.");
+        }
+    
+        double integral = 0.0;
+        for (int i = 0; i < y.length - 1; i++) {
+            double dx = x[i + 1] - x[i];                    // Non-uniform spacing between x values
+            double avgHeight = (y[i + 1] + y[i]) / 2.0;     // Trapezoidal rule
+            integral += dx * avgHeight;                     // Area of the trapezoid
+        }
+    
+        return integral;
     }
 
     @Override
