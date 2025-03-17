@@ -600,7 +600,14 @@ public class IodObjective implements Objective{
         double[] var_vect = new double[meas_noise.length];
         for (int i=0; i<var_vect.length; i++) {
             var_vect[i] = meas_noise[i] * meas_noise[i];
+            if (var_vect[i]< 1.e-10) {
+                var_vect[i] = 1.e-9;
+            }
         }
+
+        // Output 
+        double[][] m_list = new double[m0.length][m0[0].length];
+        List<double[][]> P_list = new ArrayList<double[][]>();
 
         // For each GM component use unscented transform to put in ECI
         int L = gmm.getWeights().length;
@@ -616,10 +623,10 @@ public class IodObjective implements Objective{
                 DoubleStream.concat(Arrays.stream(diagonal), Arrays.stream(var_vect)).toArray();
             RealMatrix Pj = new DiagonalMatrix(concartPj);
             Map.Entry<RealVector, RealMatrix> mP = unscented_transform(mj, Pj);
-            m0[j] = mP.getKey().toArray();
-            P0.add(mP.getValue().getData());
+            m_list[j] = mP.getKey().toArray();
+            P_list.add(mP.getValue().getData());
         }
-        GaussianMixtureModel gmmEci = new GaussianMixtureModel(gmm.getWeights(), m0, P0);
+        GaussianMixtureModel gmmEci = new GaussianMixtureModel(gmm.getWeights(), m_list, P_list);
     
         return gmmEci;
     }
