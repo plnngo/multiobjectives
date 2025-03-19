@@ -630,126 +630,132 @@ public class IodObjective implements Objective{
     
         return gmmEci;
     }
-            
-        private Map.Entry<RealVector, RealMatrix> unscented_transform(double[] mj, RealMatrix pj) {
+    
+    /**
+     * Transformation from range/range rate space to ECI.
+     * 
+     * @param mj
+     * @param pj
+     * @return
+     */
+    private Map.Entry<RealVector, RealMatrix> unscented_transform(double[] mj, RealMatrix pj) {
 
-            // Number of states
-            int L = mj.length;
+        // Number of states
+        int L = mj.length;
 
-            // Value of p-norm distribution
-            double pnorm = 2.;
+        // Value of p-norm distribution
+        double pnorm = 2.;
 
-            // Sigma point distribution parameter
-            double alpha = 1.;
+        // Sigma point distribution parameter
+        double alpha = 1.;
 
-            // Prior information about the distribution
-            double kurt = Gamma.gamma(5./pnorm) * Gamma.gamma(1./pnorm) 
-                            / FastMath.pow(Gamma.gamma(3./pnorm), 2);
-            double beta = kurt - 1.;
-            double kappa = kurt - (double)L;
+        // Prior information about the distribution
+        double kurt = Gamma.gamma(5./pnorm) * Gamma.gamma(1./pnorm) 
+                        / FastMath.pow(Gamma.gamma(3./pnorm), 2);
+        double beta = kurt - 1.;
+        double kappa = kurt - (double)L;
 
-            // Compute sigma point weights
-            double lam = alpha * alpha * (L+kappa) - L;
-            double gam = FastMath.sqrt(L + lam);
-            RealVector ones = new ArrayRealVector(new double[2*L]);
-            ones.set(1.);
-            RealVector Wm =  ones.mapMultiply(1./(2. * (L + lam)));
-            RealVector Wc = Wm.copy();
-            double firstWm = lam/(L + lam);
-            RealVector Wm_append = new ArrayRealVector(new double[]{firstWm}).append(Wm);
-            RealVector Wc_append = 
-                new ArrayRealVector(new double[]{firstWm + (1 - alpha * alpha + beta)}).append(Wc);
-            RealMatrix diagWc = new DiagonalMatrix(Wc_append.toArray());
+        // Compute sigma point weights
+        double lam = alpha * alpha * (L+kappa) - L;
+        double gam = FastMath.sqrt(L + lam);
+        RealVector ones = new ArrayRealVector(new double[2*L]);
+        ones.set(1.);
+        RealVector Wm =  ones.mapMultiply(1./(2. * (L + lam)));
+        RealVector Wc = Wm.copy();
+        double firstWm = lam/(L + lam);
+        RealVector Wm_append = new ArrayRealVector(new double[]{firstWm}).append(Wm);
+        RealVector Wc_append = 
+            new ArrayRealVector(new double[]{firstWm + (1 - alpha * alpha + beta)}).append(Wc);
+        RealMatrix diagWc = new DiagonalMatrix(Wc_append.toArray());
 
-            //Compute chi - baseline sigma points
-            RealMatrix sqP = new CholeskyDecomposition(pj).getL();
-            double[][] Xrep = new double[mj.length][L];
-            for (int i=0; i<L; i++) {
-                Arrays.fill(Xrep[i], mj[i]);
-            }
-            // Positive and negative deviations
-            RealMatrix posDev = new Array2DRowRealMatrix(Xrep).add(sqP.scalarMultiply(gam));
-            RealMatrix negDev = new Array2DRowRealMatrix(Xrep).subtract(sqP.scalarMultiply(gam));
-
-            // Transform mj into a column vector
-            double[][] m1 = new Array2DRowRealMatrix(mj).getData();
-            double[][] sigmaPoints = 
-                MatrixTools.concatenateColumns(posDev.getData(), negDev.getData());
-            double[][] chi = MatrixTools.concatenateColumns(m1,sigmaPoints);
-            double[][] chi_diff_matrix = MatrixTools.subtractEachColumnByVec(chi, mj);
-            RealMatrix chi_diff = new Array2DRowRealMatrix(chi_diff_matrix);
-
-            // Compute sigma points
-            double[][] Y_matrix = ut_car_to_eci(chi);
-            RealMatrix Y = new Array2DRowRealMatrix(Y_matrix);
-
-            // Compute mean and covar
-            RealVector m2 = Y.operate(Wm_append);
-            double[][] Y_diff_matrix = MatrixTools.subtractEachColumnByVec(Y_matrix, m2.toArray());
-            RealMatrix Y_diff = new Array2DRowRealMatrix(Y_diff_matrix);
-            RealMatrix diagWc_YdiffT = diagWc.multiply(Y_diff.transpose());
-            RealMatrix P2 = Y_diff.multiply(diagWc_YdiffT);
-            RealMatrix Pcross = chi_diff.multiply(diagWc_YdiffT);
-            
-            return new AbstractMap.SimpleEntry<>(m2, P2);                
+        //Compute chi - baseline sigma points
+        RealMatrix sqP = new CholeskyDecomposition(pj).getL();
+        double[][] Xrep = new double[mj.length][L];
+        for (int i=0; i<L; i++) {
+            Arrays.fill(Xrep[i], mj[i]);
         }
+        // Positive and negative deviations
+        RealMatrix posDev = new Array2DRowRealMatrix(Xrep).add(sqP.scalarMultiply(gam));
+        RealMatrix negDev = new Array2DRowRealMatrix(Xrep).subtract(sqP.scalarMultiply(gam));
+
+        // Transform mj into a column vector
+        double[][] m1 = new Array2DRowRealMatrix(mj).getData();
+        double[][] sigmaPoints = 
+            MatrixTools.concatenateColumns(posDev.getData(), negDev.getData());
+        double[][] chi = MatrixTools.concatenateColumns(m1,sigmaPoints);
+        double[][] chi_diff_matrix = MatrixTools.subtractEachColumnByVec(chi, mj);
+        RealMatrix chi_diff = new Array2DRowRealMatrix(chi_diff_matrix);
+
+        // Compute sigma points
+        double[][] Y_matrix = ut_car_to_eci(chi);
+        RealMatrix Y = new Array2DRowRealMatrix(Y_matrix);
+
+        // Compute mean and covar
+        RealVector m2 = Y.operate(Wm_append);
+        double[][] Y_diff_matrix = MatrixTools.subtractEachColumnByVec(Y_matrix, m2.toArray());
+        RealMatrix Y_diff = new Array2DRowRealMatrix(Y_diff_matrix);
+        RealMatrix diagWc_YdiffT = diagWc.multiply(Y_diff.transpose());
+        RealMatrix P2 = Y_diff.multiply(diagWc_YdiffT);
+        RealMatrix Pcross = chi_diff.multiply(diagWc_YdiffT);
         
-        /**
-         * Function for use with unscented_transform.
-         * Converts sigma point matrix from inertial cartesian coordinates to
-         * keplerian elements.
+        return new AbstractMap.SimpleEntry<>(m2, P2);                
+    }
+    
+    /**
+     * Function for use with unscented_transform.
+     * Converts sigma point matrix to inertial cartesian coordinates
+     * 
+     * @param chi
+     */
+    private double[][] ut_car_to_eci(double[][] chi) {
+        int L = chi[0].length;
+        double[][] Y = new double[chi.length][L];
 
-         * @param chi
-         */
-        private double[][] ut_car_to_eci(double[][] chi) {
-            int L = chi[0].length;
-            double[][] Y = new double[chi.length][L];
+        for (int ind=0; ind<L; ind++) {
 
-            for (int ind=0; ind<L; ind++) {
+            // Break out chi
+            double rho = chi[0][ind];
+            double drho = chi[1][ind];
+            double ra = chi[2][ind];
+            double dec = chi[3][ind];
+            double dra = chi[4][ind];
+            double ddec = chi[5][ind];
 
-                // Break out chi
-                double rho = chi[0][ind];
-                double drho = chi[1][ind];
-                double ra = chi[2][ind];
-                double dec = chi[3][ind];
-                double dra = chi[4][ind];
-                double ddec = chi[5][ind];
+            // Unit vectors
+            double[] u_rho = new double[]{FastMath.cos(ra) * FastMath.cos(dec), 
+                                            FastMath.sin(ra) * FastMath.cos(dec), 
+                                            FastMath.sin(dec)};
+            RealVector u_rho_vect = new ArrayRealVector(u_rho);
 
-                // Unit vectors
-                double[] u_rho = new double[]{FastMath.cos(ra) * FastMath.cos(dec), 
-                                              FastMath.sin(ra) * FastMath.cos(dec), 
-                                              FastMath.sin(dec)};
-                RealVector u_rho_vect = new ArrayRealVector(u_rho);
+            double[] u_ra = new double[]{-FastMath.sin(ra) * FastMath.cos(dec),
+                                            FastMath.cos(ra) * FastMath.cos(dec),
+                                            0.};
+            RealVector u_ra_vect = new ArrayRealVector(u_ra);
 
-                double[] u_ra = new double[]{-FastMath.sin(ra) * FastMath.cos(dec),
-                                             FastMath.cos(ra) * FastMath.cos(dec),
-                                             0.};
-                RealVector u_ra_vect = new ArrayRealVector(u_ra);
+            double[] u_dec = new double[]{-FastMath.cos(ra) * FastMath.sin(dec),
+                                            -FastMath.sin(ra) * FastMath.sin(dec),
+                                            FastMath.cos(dec)};
+            RealVector u_dec_vect = new ArrayRealVector(u_dec);
 
-                double[] u_dec = new double[]{-FastMath.cos(ra) * FastMath.sin(dec),
-                                              -FastMath.sin(ra) * FastMath.sin(dec),
-                                              FastMath.cos(dec)};
-                RealVector u_dec_vect = new ArrayRealVector(u_dec);
-
-                // Range and Range-Rate vectors
-                RealVector rho_vect = u_rho_vect.mapMultiply(rho);
-                RealVector drho_vect = u_rho_vect.mapMultiply(drho)
-                                        .add(u_ra_vect.mapMultiply(rho * dra))
-                                        .add(u_dec_vect.mapMultiply(rho * ddec));
-        
-                // Compute pos/vel in ECI and add to output
-                RealVector r_vect = new ArrayRealVector(q.toArray()).add(rho_vect);
-                RealVector v_vect = new ArrayRealVector(dq.toArray()).add(drho_vect);
-                for (int i=0; i<r_vect.getDimension(); i++) {
-                    Y[i][ind] = r_vect.getEntry(i);
-                    Y[i+r_vect.getDimension()][ind] = v_vect.getEntry(i);
-                }                                      
-            }
-            return Y;
+            // Range and Range-Rate vectors
+            RealVector rho_vect = u_rho_vect.mapMultiply(rho);
+            RealVector drho_vect = u_rho_vect.mapMultiply(drho)
+                                    .add(u_ra_vect.mapMultiply(rho * dra))
+                                    .add(u_dec_vect.mapMultiply(rho * ddec));
+    
+            // Compute pos/vel in ECI and add to output
+            RealVector r_vect = new ArrayRealVector(q.toArray()).add(rho_vect);
+            RealVector v_vect = new ArrayRealVector(dq.toArray()).add(drho_vect);
+            for (int i=0; i<r_vect.getDimension(); i++) {
+                Y[i][ind] = r_vect.getEntry(i);
+                Y[i+r_vect.getDimension()][ind] = v_vect.getEntry(i);
+            }                                      
         }
+        return Y;
+    }
             
-        private void write_RhoUnique_pVect_gApprox_toCsV(String filename, double[] rho_unique, 
-                                            double[] p_vect, double[] g_approx) {
+    private void write_RhoUnique_pVect_gApprox_toCsV(String filename, double[] rho_unique, 
+                                        double[] p_vect, double[] g_approx) {
                                                         
         try (FileWriter writer = new FileWriter(filename)) {
             // Write header

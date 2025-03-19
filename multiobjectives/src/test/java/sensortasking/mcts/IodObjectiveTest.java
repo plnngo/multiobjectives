@@ -1,8 +1,6 @@
 package sensortasking.mcts;
 
 import java.io.File;
-
-import org.hipparchus.filtering.kalman.Measurement;
 import org.hipparchus.util.FastMath;
 import org.junit.Test;
 import org.orekit.data.DataContext;
