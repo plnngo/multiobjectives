@@ -953,6 +953,7 @@ public class TrackingObjective implements Objective{
         return out;
     }
     /**
+     * 
      * @param current           Epoch of the last decision node
      * @param sensorPointing    Pointing location of the sensor at the current epoch
      * 
@@ -981,10 +982,10 @@ public class TrackingObjective implements Objective{
                                         + TrackingObjective.preparation 
                                         + this.sensor.getExposureT()/2);
 
-        // Check in the upcoming time range between 2s and 400s when objects are trackable 
-        double tShift = 2.; 
+        // Check in the upcoming time range between 1s and 200s when objects are trackable 
+        double tStep = 1.; 
         for (int t=0; t<200; t++) {
-            measEpoch = measEpoch.shiftedBy(tShift);
+            measEpoch = measEpoch.shiftedBy(tStep);
             //sensorPointing.setDate(measEpoch);      // Assume holding position of last task up until new task
             //sensorPointing.transformReference(ecef, measEpoch, null, tShift)
             Frame topoInertial = this.sensor.getTopoInertialFrame(measEpoch);
@@ -1058,7 +1059,7 @@ public class TrackingObjective implements Objective{
                 }
                 double actualSlewT = 
                     this.sensor.computeRepositionT(sensorP, raDecPointing, true);
-                double reloc = TrackingObjective.allocation + t*tShift;
+                double reloc = TrackingObjective.allocation + t*tStep;
                 if(actualSlewT > reloc) {
                     // not enough time to slew to target pointing direction
                     continue;
