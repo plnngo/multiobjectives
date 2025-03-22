@@ -2,7 +2,11 @@ package tools;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.Array2DRowRealMatrix;
@@ -71,6 +75,129 @@ public class GaussianMixtureModel {
             }
             this.P.add(Pi);
         }
+    }
+
+    /**
+     * This function examines a GMM containing multiple components. It removes
+     * components with weights below a given threshold, and merges components that
+     * are close together (small NL2 distance).
+
+     * @param gmm0
+     * @return
+     */
+    public static GaussianMixtureModel mergeAndPrune(GaussianMixtureModel gmm0) {
+
+        // Merge and pruning parameters
+        final double prune_T = 1e-3;
+        final double merge_U = 1.e6;
+
+        // Number of states
+        int nstates = gmm0.getMeans()[0].length;
+
+        // Number of GMM components
+        int L = gmm0.getWeights().length;
+
+        // Only keep GM components whose weight is above the threshold   
+        // This applies DeMars threshold instead of Vo which just uses T
+        double wmax = Arrays.stream(gmm0.getWeights()).max().orElse(Double.NaN);
+        List<Double> wPruned = new ArrayList<Double>();
+        List<double[]> meansPruned = new ArrayList<double[]>();
+        List<double[][]> PPruned = new ArrayList<double[][]>();
+        for (int ii=0; ii<L; ii++) {
+            if (gmm0.getWeights()[ii] > prune_T*wmax) {
+                wPruned.add(gmm0.getWeights()[ii]);
+                meansPruned.add(gmm0.getMeans()[ii]);
+                PPruned.add(gmm0.getP().get(ii));
+            }
+        }
+
+        // Normalise weights
+        double sumW = wPruned.stream().mapToDouble(Double::doubleValue).sum();
+        double sumW0 = Arrays.stream(gmm0.getWeights()).sum();
+        double[] w = new double[wPruned.size()];
+        for (int i=0; i<w.length; i++) {
+            w[i] = sumW0 * wPruned.get(i)/sumW;             
+        }
+
+        // Output: final GMM
+        List<Double> wf = new ArrayList<Double>();
+        List<double[]> mf = new ArrayList<double[]>();
+        List<double[][]> Pf = new ArrayList<double[][]>();
+
+        // Loop to merge components that are close
+        Set<Integer> I = IntStream.rangeClosed(0, w.length)     
+                                  .boxed()                    // Convert to Integer (unboxing)
+                                  .collect(Collectors.toSet()); 
+
+        while (!I.isEmpty()) {                              
+            // Loop over components to see if they are close to j
+            // Note, at least one will be when i == j  
+            
+            double wsum = 0.;
+            double[] msum_array = new double[nstates];
+            RealVector msum = new ArrayRealVector(msum_array);
+
+            // Find index of maximum in w
+            int jj = 0;                             
+            for (int i = 1; i < w.length; i++) {
+                if (w[i] > w[jj]) {
+                    jj = i;
+                }
+            }
+
+            // merge into new L components
+            List<Integer> Lnew = new ArrayList<Integer>();
+
+            for (int ii=0; ii<w.length; ii++) {
+                double[][] Pii = PPruned.get(ii);
+                RealMatrix invP = MatrixUtils.inverse(new Array2DRowRealMatrix(Pii));
+                RealVector mii = new ArrayRealVector(meansPruned.get(ii));
+                RealVector diff = mii.subtract(new ArrayRealVector(meansPruned.get(jj)));
+                // Compute Mahalanobis distance
+                double prod = diff.dotProduct(invP.operate(diff));          
+                if (prod <= merge_U) {
+                    Lnew.add(ii);
+                    wsum += w[ii];
+                    msum = msum.add(mii.mapMultiply(w[ii]));
+                }
+            }
+
+            // Compute final w,m,P
+            wf.add(wsum);
+            RealVector mf_bar = msum.mapMultiply(1./wsum);
+            mf.add(mf_bar.toArray());
+
+            double[][] Psum_array = new double[nstates][nstates];
+            RealMatrix Psum = new Array2DRowRealMatrix(Psum_array);
+            for (int ii=0; ii<Lnew.size(); ii++) {
+                RealMatrix PLii = new Array2DRowRealMatrix(PPruned.get(Lnew.get(ii)));
+                RealVector diff = 
+                    mf_bar.subtract(new ArrayRealVector(meansPruned.get(Lnew.get(ii))));
+                RealMatrix updateP = 
+                    PLii.add(diff.outerProduct(diff)).scalarMultiply(w[Lnew.get(ii)]);
+                Psum = Psum.add(updateP);
+            }
+            RealMatrix Pf_bar = Psum.scalarMultiply(1./wsum);
+            Pf.add(Pf_bar.getData());
+
+            Set<Integer> setL = new HashSet<>(Lnew);
+            I.removeAll(setL);            
+        } 
+
+        // Normalise weights
+        double[] wf_norm = new double[wf.size()];
+        double sumWf = wf.stream().mapToDouble(Double::doubleValue).sum();
+        for (int i=0; i<wf_norm.length; i++) {
+            wf_norm[i] = sumW0 * wf.get(i)/sumWf;
+        }
+
+        // Turn mf into a multidimensional array
+        double[][] m_array = new double[mf.size()][];
+        for (int i = 0; i < mf.size(); i++) {
+            m_array[i] = mf.get(i);
+        }
+
+        return new GaussianMixtureModel(wf_norm, m_array, Pf);
     }
 
     /**
