@@ -22,6 +22,7 @@ import org.hipparchus.linear.MatrixUtils;
 import org.hipparchus.linear.RealMatrix;
 import org.hipparchus.linear.RealVector;
 import org.hipparchus.special.Gamma;
+import org.hipparchus.stat.regression.SimpleRegression;
 import org.hipparchus.util.FastMath;
 import org.orekit.time.AbsoluteDate;
 
@@ -857,6 +858,40 @@ public class IodObjective implements Objective{
         }
     
         return integral;
+    }
+
+    /**
+     * Compute attributable from list of optical measurements.
+     * 
+     * @param angles                Optical measurements.
+     * @return                      Array of angles, angle rates and time elapsed from epoch of 
+     *                              first measurements to mid position inside tracklet.
+     */
+    public double[] linearRegressionMeasurements(List<AngularDirection> angles) {
+
+        // Prepare linear regression
+        SimpleRegression regRa = new SimpleRegression();
+        SimpleRegression regDec = new SimpleRegression();
+
+        // Feed data
+        for (int i=0; i<angles.size(); i++) {
+            double elapsed = angles.get(i).getDate().durationFrom(angles.get(0).getDate());
+            regRa.addData(elapsed, angles.get(i).getAngle1());
+            regDec.addData(elapsed, angles.get(i).getAngle2());
+        }
+
+        // Retrieve slopes
+        double raDot = regRa.getSlope();
+        double decDot = regDec.getSlope();
+
+        // Interpolate mid angles
+        double timeMid = 
+            0.5 *angles.get(angles.size() - 1).getDate().durationFrom(angles.get(0).getDate());
+        double raMid = regRa.predict(timeMid);
+        double decMid = regDec.predict(timeMid);
+
+        // Return attributable
+        return new double[]{raMid, decMid, raDot, decDot, timeMid};
     }
 
     @Override
