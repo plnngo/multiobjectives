@@ -25,6 +25,7 @@ import org.hipparchus.special.Gamma;
 import org.hipparchus.stat.regression.SimpleRegression;
 import org.hipparchus.util.FastMath;
 import org.orekit.time.AbsoluteDate;
+import org.orekit.utils.Constants;
 
 import tools.GaussianMixtureModel;
 import tools.MatrixTools;
@@ -62,17 +63,18 @@ public class IodObjective implements Objective{
     final double Re = 6378.1370*1000.;            // m
 
     /** Inertial position of sensor. */
-    Vector3D q = new Vector3D(FastMath.cos(FastMath.toRadians(30.)), 
+    Vector3D q;
+    /* Vector3D q = new Vector3D(FastMath.cos(FastMath.toRadians(30.)), 
                                 FastMath.toRadians(0.), 
                                 FastMath.sin(FastMath.toRadians(30.)))
-                                .scalarMultiply(Re);
-
+                                .scalarMultiply(Re); */
+    
     /** Earth angular velocity. */
-    Vector3D omega = new Vector3D(0., 0., 7.2921158553e-5);
-    //Vector3D omega = new Vector3D(0., 0., Constants.WGS84_EARTH_ANGULAR_VELOCITY);
+    //Vector3D omega = new Vector3D(0., 0., 7.2921158553e-5);
+    Vector3D omega = new Vector3D(0., 0., Constants.WGS84_EARTH_ANGULAR_VELOCITY);
 
     /** Inertial velocity of sensor. */
-    Vector3D dq = omega.crossProduct(q);
+    Vector3D dq;
 
     /** Look up table of solution of standard deviation. Reference to DeMars Table 1.*/
     final double[] lookUp = new double[]{Double.NaN, 
@@ -94,10 +96,12 @@ public class IodObjective implements Objective{
 
 
     public IodObjective(double[] tracklet, Sensor sensor, double a_max, double a_min, 
-                        double e_max, double[] meas_noise){
+                        double e_max, double[] meas_noise, AbsoluteDate date){
         this.tracklet = tracklet;
         this.measNoise = meas_noise;
         this.sensor = sensor;
+        this.q = sensor.getSensorPosEci(date);
+        this.dq = omega.crossProduct(q);
 
         // Constraining AR by semi-major axis and eccentricity
         this.a_max = a_max;
@@ -235,10 +239,6 @@ public class IodObjective implements Objective{
             // Solve quadric function over drho to constrain AR by eccentricity (DeMars Eq 8)
             LaguerreSolver solver = new LaguerreSolver();
             Complex[] r = solver.solveAllComplex(coef, guess);
-            if (ii==7311) {
-                System.out.println("Guess for quadric solver set to zero");
-                System.out.println("Size solutions: " + r.length);
-            }
             List<Double> drho_ecc = new ArrayList<Double>();
 
             for (Complex sol : r) {
@@ -396,7 +396,7 @@ public class IodObjective implements Objective{
             }
         }
         if (print) {
-            write_arhoAall_drhoAall_rhoEall_drhoEall("arhoAall_drhoAall_rhoEall_drhoEall", 
+            write_arhoAall_drhoAall_rhoEall_drhoEall("arhoAall_drhoAall_rhoEall_drhoEall.csv", 
                                                      rho_a_all, drho_a_all, rho_e_all, drho_e_all); 
         }
 
@@ -415,7 +415,6 @@ public class IodObjective implements Objective{
             // Write data row by row
             for (int i = 0; i < maxLength; i++) {
                 writer.append(i < rho_a_all.size() ? String.valueOf(rho_a_all.get(i)) : "");
-                System.out.println(String.valueOf(rho_a_all.get(i)));
                 writer.append(",");
                 writer.append(i < drho_a_all.size() ? String.valueOf(drho_a_all.get(i)) : "");
                 writer.append(",");
@@ -525,7 +524,7 @@ public class IodObjective implements Objective{
             g_approx[i] = gi;
         }
 
-        write_RhoUnique_pVect_gApprox_toCsV("RhoUnique_pVect_gApprox", 
+        write_RhoUnique_pVect_gApprox_toCsV("RhoUnique_pVect_gApprox.csv", 
                                             rho_unique, 
                                             p_vect_normed,
                                             g_approx);
@@ -867,7 +866,7 @@ public class IodObjective implements Objective{
      * @return                      Array of angles, angle rates and time elapsed from epoch of 
      *                              first measurements to mid position inside tracklet.
      */
-    public double[] linearRegressionMeasurements(List<AngularDirection> angles) {
+    public static double[] linearRegressionMeasurements(List<AngularDirection> angles) {
 
         // Prepare linear regression
         SimpleRegression regRa = new SimpleRegression();
