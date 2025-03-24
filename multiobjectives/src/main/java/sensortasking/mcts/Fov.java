@@ -29,7 +29,7 @@ public class Fov {
     }
 
     /** Field of view type. */
-    enum Type {
+    public enum Type {
         /** Circular field of view. */
         CIRCULAR,
 
