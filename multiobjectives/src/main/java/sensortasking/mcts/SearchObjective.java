@@ -9,7 +9,6 @@ import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
 import org.orekit.time.AbsoluteDate;
-import org.orekit.utils.Constants;
 
 import lombok.Getter;
 import sensortasking.stripescanning.Stripe;
@@ -53,7 +52,7 @@ public class SearchObjective implements Objective{
     }
 
 
-    private List<AngularDirection> callStripeScanTopoFrame(AbsoluteDate start, AngularDirection sensorPointing) {
+    public List<AngularDirection> callStripeScanTopoFrame(AbsoluteDate start, AngularDirection sensorPointing) {
 
         // Inertial frame
         Frame j2000 = FramesFactory.getEME2000();
@@ -63,7 +62,7 @@ public class SearchObjective implements Objective{
         List<AngularDirection> scheduleGeo = new ArrayList<AngularDirection>();
 
         // Re-compute allocation period to slew from current sensor position towards stripe position
-        double geoDistance = Constants.WGS84_EARTH_EQUATORIAL_RADIUS + 35786 * 1e3;  // in m
+        //double geoDistance = Constants.WGS84_EARTH_EQUATORIAL_RADIUS + 35786 * 1e3;  // in m
         AngularDirection newSensorPointing = 
             scan.getPosField(0)
                 .transformReference(sensorPointing.getFrame(), start, 
