@@ -201,11 +201,11 @@ public class Sensor {
     }
 
     /**
-     * Transform sensor's geodetic position into Cartesian coordinates in inertial frame (GCRF).
+     * Transform sensor's geodetic position into Cartesian coordinates in inertial frame (J2000).
      * 
-     * @param date                  Date related to the frame transformation from ECEF to GCRF.
+     * @param date                  Date related to the frame transformation from ECEF to J2000.
      * 
-     * @return                      Cartesian position of sensor in GCRF.
+     * @return                      Cartesian position of sensor in J2000.
      */
     public Vector3D getSensorPosEci(AbsoluteDate date){
 
