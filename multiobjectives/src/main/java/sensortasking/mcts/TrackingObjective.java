@@ -70,6 +70,7 @@ import org.orekit.utils.TimeStampedPVCoordinates;
 
 import lombok.Getter;
 import sensortasking.stripescanning.Tasking;
+import tools.OptimisingVector;
 
 @SuppressWarnings("rawtypes")
 @Getter
@@ -587,9 +588,10 @@ public class TrackingObjective implements Objective{
    
 
     /**
+     * Implementation of extended Kalman Filter.
      * 
      * @param prop
-     * @param meas              RaDec measurement in topocentric inertial frame.
+     * @param epoch             Measurement epoch.
      * @param R
      * @param candidate
      * @param topoInertial
@@ -625,7 +627,6 @@ public class TrackingObjective implements Objective{
 
         // Process noise
         RealMatrix Q = 
-            //MatrixUtils.createRealDiagonalMatrix(new double[]{1e-15, 1e-15, 1e-15});
             MatrixUtils.createRealDiagonalMatrix(new double[]{0.,0.,0.});
 
         RealMatrix gamma = App.getGammaMatrix(candidate.getEpoch(), predicted.getDate());
@@ -976,6 +977,7 @@ public class TrackingObjective implements Objective{
             checkTrackable.add(copy);
         }
 
+        // Initialise target date
         AbsoluteDate measEpoch = 
                     current.shiftedBy(TrackingObjective.allocation 
                                         + this.sensor.getSettlingT() 
@@ -986,8 +988,8 @@ public class TrackingObjective implements Objective{
         double tStep = 1.; 
         for (int t=0; t<200; t++) {
             measEpoch = measEpoch.shiftedBy(tStep);
-            //sensorPointing.setDate(measEpoch);      // Assume holding position of last task up until new task
-            //sensorPointing.transformReference(ecef, measEpoch, null, tShift)
+
+            // Transform sensor pointing direction in new topocentric inertial frame
             Frame topoInertial = this.sensor.getTopoInertialFrame(measEpoch);
             AngularDirection sensorP = 
                 sensorPointing.transformReference(topoInertial, measEpoch, 
@@ -1075,8 +1077,6 @@ public class TrackingObjective implements Objective{
                     estimateStateWithOwnExtendedKalman(kepPropo, measEpoch, R, candidate, residuals, sensor);
                 
                 // Check if predicted uncertainty fits into FOV
-                // Topocentric frame
-                Frame topocentric = sensor.getTopoInertialFrame(measEpoch); // same as topoInertial --> can be removed
                 RealMatrix covPredGeocentric = predAndCorr[0].getCovariance().getCovarianceMatrix();
                 PVCoordinates pvPred = 
                     new PVCoordinates(predAndCorr[0].getState().getPositionVector(),
@@ -1087,7 +1087,7 @@ public class TrackingObjective implements Objective{
                     new StateCovariance(covPredGeocentric, measEpoch, predAndCorr[0].getFrame(), 
                                         OrbitType.CARTESIAN, PositionAngleType.MEAN);
                 StateCovariance stateCovTopo = 
-                    stateCov.changeCovarianceFrame(orbitPred, topocentric);
+                    stateCov.changeCovarianceFrame(orbitPred, topoInertial);
 
                 double iG = computeInformationGain(predAndCorr[0], predAndCorr[1]);
                 
@@ -1118,7 +1118,7 @@ public class TrackingObjective implements Objective{
             return trackable.keySet().iterator().next();
         } else {
             // select target based on optimisation: max IG, min 
-            /* List<double[]> toOpt = new ArrayList<double[]>(trackable.values());
+            List<double[]> toOpt = new ArrayList<double[]>(trackable.values());
 
             // Compute number of dominating solutions
             int[] numDominating = new int[trackable.size()];
@@ -1131,14 +1131,14 @@ public class TrackingObjective implements Objective{
                                     .getDominatingVecs(toCompare, new boolean[]{true, false}, 0)
                                     .size();
                 toOpt.add(toCompare);
-            } */
+            }
 
             // Find optimal solution(s) that minimises number of dominating solutions
             List<Integer> solutionIndexes = new ArrayList<>();
             for(int i=0; i<trackable.size(); i++) {
                 solutionIndexes.add(i);
             }
-            /* int min = Integer.MAX_VALUE;
+            int min = Integer.MAX_VALUE;
             for (int i=0; i<numDominating.length; i++) {
                 if(numDominating[i] < min) {
                     min = numDominating[i];
@@ -1147,7 +1147,7 @@ public class TrackingObjective implements Objective{
                 } else if (numDominating[i] == min) {
                     solutionIndexes.add(i);
                 }
-            }   */
+            }  
             for (int i=0; i<solutionIndexes.size(); i++) {
                 int checkWithinCampaign = targets.get(solutionIndexes.get(i))
                                                         .getEpoch()

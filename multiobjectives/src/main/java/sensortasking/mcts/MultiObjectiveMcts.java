@@ -118,10 +118,10 @@ public class MultiObjectiveMcts {
         for(int i=0; i<iterations; i++) {  
             List<Node> outputRobustMaxRatio = new ArrayList<Node>();
 
-            if (i==14998) {
+/*             if (i==14998) {
                 continue;
                 //C = 1.e12;
-            } 
+            }  */
             System.out.println("Iteration: " + i + " MCTS call: " + mctsCall);
             selectNew(this.initial);
             // Retrieve pointing strategy UCB
@@ -376,8 +376,8 @@ public class MultiObjectiveMcts {
         for (int i=0; i<weights.length; i++) {
             indexObjective[i] = i;
         }
-        int indexSelectedObjective = 
-            WeightedRandomNumberPicker.pickNumber(indexObjective, weights);
+        int indexSelectedObjective = 1;
+            //WeightedRandomNumberPicker.pickNumber(indexObjective, weights);
         Objective objective;
         AngularDirection pointing = null;
         switch (indexSelectedObjective) {

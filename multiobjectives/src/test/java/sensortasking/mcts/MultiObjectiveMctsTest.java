@@ -51,7 +51,6 @@ import org.orekit.utils.PVCoordinates;
 
 import com.opencsv.CSVWriter;
 
-import tools.OptimisingVector;
 
 public class MultiObjectiveMctsTest {
 
@@ -984,7 +983,7 @@ public class MultiObjectiveMctsTest {
                                               {3.082546456689512E-8, 4.31510301473182E-6, 8.144511266654299E-9, -8.194811351938942E-10, 1.7236789470442757E-8, -2.4269048963433104E-10},
                                               {7.3708924118463976E-9, 8.135870183215624E-9, 4.2834614349166915E-6, -1.983493667495804E-10, -2.4269048963433104E-10, 1.8175062188421707E-8}}; */
         //RealMatrix covMatrixTdrs06 = (new Array2DRowRealMatrix(covTdrs06)).scalarMultiply(1e6);
-        RealMatrix covMatrixTdrs06 = new DiagonalMatrix(new double[]{1e6, 1e6, 1e6, 1., 1., 1.}).scalarMultiply(0.1);
+        RealMatrix covMatrixTdrs06 = new DiagonalMatrix(new double[]{1e6, 1e6, 1e6, 1., 1., 1.})/*.scalarMultiply(0.1)*/;
 
         System.out.println("Trace Tdrs6 :" + covMatrixTdrs06.getTrace());
 
@@ -1016,8 +1015,8 @@ public class MultiObjectiveMctsTest {
 
         List<ObservedObject> ooi = new ArrayList<ObservedObject>();
         ooi.add(tdrs05);
-        //ooi.add(tdrs06);
-        ooi.add(tdrs12);
+        ooi.add(tdrs06);
+        //ooi.add(tdrs12);
 
         return ooi;
     }
@@ -1079,7 +1078,7 @@ public class MultiObjectiveMctsTest {
         
         // Epoch
         AbsoluteDate current = new AbsoluteDate(2024, 7, 30, 3, 24, 0., TimeScalesFactory.getUTC()).shiftedBy(60. * 10.);
-        AbsoluteDate endCampaign = current.shiftedBy(60. * 8.);
+        AbsoluteDate endCampaign = current.shiftedBy(60. * 4.);
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -1099,7 +1098,7 @@ public class MultiObjectiveMctsTest {
         String out = "";
 
         // create FileWriter object with file as parameter 
-        FileWriter outputfile = new FileWriter("Tuples_12.csv"); 
+        FileWriter outputfile = new FileWriter("Tuples_13.csv"); 
     
         // create CSVWriter object filewriter object as parameter 
         CSVWriter writer = new CSVWriter(outputfile); 
@@ -1274,24 +1273,24 @@ public class MultiObjectiveMctsTest {
 
     }
                 
-    private MultiObjectiveMcts setUpMcts(AbsoluteDate current, AbsoluteDate endCampaign, 
+    public static MultiObjectiveMcts setUpMcts(AbsoluteDate current, AbsoluteDate endCampaign, 
                                          TopocentricFrame topohorizon, 
                                          PropoagatedEnvironment enviro) {
         
         double readout = 7.;
         double exposure = 8.;
-        double settling = 30.;
+        double settling = 7.;
         double cutOff = FastMath.toRadians(5.);
-        double slewT = 0.2;
+        //double slewT = 0.2;
         Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(2.), FastMath.toRadians(2.));
-        double slewVel = fov.getHeight()/slewT;
+        double slewVel = FastMath.toRadians(1.)/1.;     // 1 deg per second
         Sensor sensor = new Sensor("TDRS Station", fov, topohorizon.getPoint(), exposure, readout, 
                                     slewVel, settling, cutOff);
 
-        Transform horizonToEci = topohorizon.getTransformTo(j2000, current);  // date has to be the measurement epoch
+        Transform horizonToEci = topohorizon.getTransformTo(FramesFactory.getEME2000(), current);  // date has to be the measurement epoch
         Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
         Transform eciToTopo = new Transform(current, coordinatesStationEci.negate());
-        Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
+        Frame topocentric = new Frame(FramesFactory.getEME2000(), eciToTopo, "Topocentric", true);
 
         // Initialise root node
         List<String> objectives = new ArrayList<String>(Arrays.asList("SEARCH", "TRACK"));
@@ -1313,7 +1312,7 @@ public class MultiObjectiveMctsTest {
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", null, 
                                    new ArrayList<ObservedObject>(), sensor);
         return mcts;
-        }
+    }
         
     private void checkSearchNode(ChanceNode search, AbsoluteDate current, 
                             TopocentricFrame topohorizon, double reloc) {

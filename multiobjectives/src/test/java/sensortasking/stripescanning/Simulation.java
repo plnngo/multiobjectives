@@ -197,7 +197,7 @@ public class Simulation {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-        List<AngularDirection> candidates = parseToAngularDirection(records);
+        List<AngularDirection> candidates = parseToAngularDirectionEme2000(records);
         List<List<AngularDirection>> registered = new ArrayList<List<AngularDirection>>();
 
         for(int decIndex=0; decIndex<schedule.size(); decIndex++) {
@@ -265,7 +265,7 @@ public class Simulation {
         return false;
     }
 
-    private static List<AngularDirection> parseToAngularDirection(List<List<String>> records) {
+    private static List<AngularDirection> parseToAngularDirectionEme2000(List<List<String>> records) {
 
         // Parse into angular directions
         List<AngularDirection> geo = new ArrayList<AngularDirection>();
