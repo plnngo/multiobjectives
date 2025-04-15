@@ -680,4 +680,52 @@ public class TrackingObjectiveTest {
         Assert.assertEquals(test.getAngle1(), actual[0], 1e-16);
         Assert.assertEquals(test.getAngle2(), actual[1], 1e-16);
     }
+
+    /**
+     * Test function to evaluate the performance of setMicroAction within the TrackingObjective 
+     * class. Test objects are the satellites TDRS (5, 6, 12). The sensor is artificial and was 
+     * placed in such a way that observability is granted for these satellites.
+     */
+    @Test
+    public void testTrackingCandidateSelection() {
+        // Date
+        AbsoluteDate date = new AbsoluteDate(2025, 3, 24, 22, 1, 2.62, TimeScalesFactory.getUTC());
+        AbsoluteDate end = date.shiftedBy(475.);
+
+        // Frame
+        Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
+
+        // Ground station
+        GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(6.),   // Geodetic latitude
+                                              FastMath.toRadians(-37.),   // Longitude
+                                              0.);              // in [m]
+        // Model Earth
+        BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                                               Constants.WGS84_EARTH_FLATTENING,
+                                               ecef);
+        TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "TDRS Station");
+
+        // MCTS monte carlo runs
+        int mctsCalls = 1;
+        int mctsIter = 2000;
+        for (int i=0; i<mctsCalls; i++) {
+
+            // Settings for searching objective
+            List<Integer> stripeBullseyeCompleted = new ArrayList<Integer>();
+            stripeBullseyeCompleted.add(0); // Stripe scan
+            stripeBullseyeCompleted.add(0); // Bullseye scan
+
+            // Generate list of condidates
+            List<ObservedObject> ooi = ESDConferenceTrackingTask.generateListOfCandidates(date);
+
+            final PropoagatedEnvironment enviro = 
+                new PropoagatedEnvironment(ooi, stripeBullseyeCompleted);
+
+            // Set up MCTS
+            MultiObjectiveMcts mcts = MultiObjectiveMctsTest.setUpMcts(date, end, topohorizon, enviro);
+            List<Node> strategy = mcts.run(mctsIter, i);
+            System.out.println(strategy.size());
+        }
+
+    }
 }
