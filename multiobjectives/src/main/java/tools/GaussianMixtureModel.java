@@ -396,7 +396,6 @@ public class GaussianMixtureModel {
                         / FastMath.pow(Gamma.gamma(3./pnorm), 2);
             double beta = kurt - 1.;
             double kappa = kurt - pv.length;
-            //double kappa = 0.;
             UnscentedTransformProvider prov = new MerweUnscentedTransform(n, alpha, beta, kappa);
 
             // Generate the current sigma points
@@ -411,13 +410,7 @@ public class GaussianMixtureModel {
             // Check if weights are normalised
             double sumWeights = 0.;
             double[] weights = wm.toArray();
-/*             for (int k=0; k<weights.length; k++) {
-                sumWeights = sumWeights + weights[k];
-            }
-            if (FastMath.abs(sumWeights - 1.) > 0.1) {
-                throw new Error("Weights in GmmECI are not normalised");
-            }
- */
+
             // Propagate sigma points and get predicted states
             List<SpacecraftState> states = predictStates(sigmaPoints, kepProp, meas.get(0));
 
@@ -437,10 +430,7 @@ public class GaussianMixtureModel {
 
 
                 // First, convert the predicted state to an array
-                //final double[] predictedArray = new double[sigmaPoints[j].getDimension()];
-                //OrbitType.CARTESIAN.mapOrbitToArray(predicted.getOrbit(), null, predictedArray, null);
                 predictedStates[j] = new ArrayRealVector(pvPred);
-                //predictedStates[j].setSubVector(0, new ArrayRealVector(predictedArray));
             }
             // Initialize the weighted mean parameter
             RealVector predictedState = new ArrayRealVector(n);
@@ -462,9 +452,6 @@ public class GaussianMixtureModel {
             }
             RealMatrix predictedCovariance = covarianceMatrix.add(orbitalQ);
 
-            // Generate sigma points derived from predicted state
-            //RealVector[] predictedSigmaPoints = prov.unscentedTransform(predictedState, predictedCovariance);
-
             // Predicted measurements 
             final RealVector[] predictedMeasurements = getPredictedMeasurement(predictedStates);
 
@@ -475,6 +462,9 @@ public class GaussianMixtureModel {
                 predictedMeasurement = 
                     predictedMeasurement.add(predictedMeasurements[j].mapMultiply(wm.getEntry(j)));
             }
+            for (int k=0; k<predictedMeasurement.getDimension(); k++) {
+                System.out.println(predictedMeasurement.getEntry(k));
+            }
 
             // Computation of the innovation covariance matrix
             RealMatrix innovMatrix = 
@@ -483,12 +473,16 @@ public class GaussianMixtureModel {
 
             for (int j = 0; j<=2*n; j++) {      // n=6
                 final RealVector diff = predictedMeasurements[j].subtract(predictedMeasurement);
+                for (int k=0; k<diff.getDimension(); k++) {
+                    System.out.println(diff.getEntry(k));
+                }
                 innovMatrix = innovMatrix.add(outer(diff, diff).scalarMultiply(wc.getEntry(j)));
             }
             // Add the measurement covariance
             double[] rVec = meas.get(0).getTheoreticalStandardDeviation();
             RealMatrix r = new DiagonalMatrix(rVec);
             RealMatrix Pyy = innovMatrix.add(r);
+            App.printCovariance(Pyy);
 
             // Compute cross correlation matrix
             RealMatrix   Pxy = computeCrossCovarianceMatrix(predictedStates, predictedState,
@@ -526,7 +520,7 @@ public class GaussianMixtureModel {
 
         double sumWeights = 0.;
         for (int i=0; i<L; i++) {
-            updated_alpha_list[i] = alpha_vect.getEntry(i) * alpha_vect.getEntry(i) / denominator;
+            updated_alpha_list[i] = beta_vect.getEntry(i) * alpha_vect.getEntry(i) / denominator;
             sumWeights = sumWeights + updated_alpha_list[i];
         }
 
@@ -679,6 +673,13 @@ public class GaussianMixtureModel {
         System.out.println(FastMath.pow(2 * FastMath.PI, -0.5*k));
         System.out.println(FastMath.sqrt(lud.getDeterminant()));
         System.out.println(FastMath.exp(exp));
+        for(int i=0; i<m.length; i++) {
+            System.out.println(m[i]);
+        }
+        App.printCovariance(pyy);
+
+        System.out.println(ybar.getEntry(0));
+        System.out.println(ybar.getEntry(1));
 
         double mgl = FastMath.pow(2 * FastMath.PI, -0.5*k) 
                         * 1./FastMath.sqrt(lud.getDeterminant())
