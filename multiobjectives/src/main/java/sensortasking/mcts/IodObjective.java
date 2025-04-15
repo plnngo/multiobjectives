@@ -24,8 +24,12 @@ import org.hipparchus.linear.RealVector;
 import org.hipparchus.special.Gamma;
 import org.hipparchus.stat.regression.SimpleRegression;
 import org.hipparchus.util.FastMath;
+import org.orekit.frames.Frame;
+import org.orekit.frames.FramesFactory;
+import org.orekit.frames.Transform;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.utils.Constants;
+import org.orekit.utils.PVCoordinates;
 
 import tools.GaussianMixtureModel;
 import tools.MatrixTools;
@@ -121,10 +125,6 @@ public class IodObjective implements Objective{
         double dec = tracklet[1];
         double dra = tracklet[2];
         double ddec = tracklet[3];
-
-        //Inertial position and velocity of sensor
-        //Vector3D q = this.sensor.getSensorPosEci(epoch);
-        
 
         // Unit vectors (DeMars between Eq 1-2)
         Vector3D u_rho = new Vector3D(FastMath.cos(ra) * FastMath.cos(dec), 
@@ -398,11 +398,34 @@ public class IodObjective implements Objective{
         if (print) {
             write_arhoAall_drhoAall_rhoEall_drhoEall("arhoAall_drhoAall_rhoEall_drhoEall.csv", 
                                                      rho_a_all, drho_a_all, rho_e_all, drho_e_all); 
+            write_rhoOutput_drhoOutput("rho_output_drho_output.csv", rho_output, drho_output);
         }
 
         return drho_dict;
     }
-    
+                
+    private void write_rhoOutput_drhoOutput(String filename, List<Double> rho_output, List<Double> drho_output) {
+        try (FileWriter writer = new FileWriter(filename)) {
+            // Write header
+            writer.append("rho_output,drho_output\n");
+            
+            // Determine max length for iteration
+            int maxLength = Math.max(rho_output.size(), drho_output.size());
+            
+            // Write data row by row
+            for (int i = 0; i < maxLength; i++) {
+                writer.append(i < rho_output.size() ? String.valueOf(rho_output.get(i)) : "");
+                writer.append(",");
+                writer.append(i < drho_output.size() ? String.valueOf(drho_output.get(i)) : "");
+                writer.append("\n");
+            }
+            
+            System.out.println("CSV file saved successfully: " + filename);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+            
     private void write_arhoAall_drhoAall_rhoEall_drhoEall(String filename, List<Double> rho_a_all,
         List<Double> drho_a_all, List<Double> rho_e_all, List<Double> drho_e_all) {
         try (FileWriter writer = new FileWriter(filename)) {
@@ -586,8 +609,39 @@ public class IodObjective implements Objective{
         for (int i = 0; i < m.size(); i++) {
             m_array[i] = m.get(i);
         }
+        writemrhoREmdrho("mrhoREmdrho.csv", m_array);
         
         return new GaussianMixtureModel(w_array, m_array, P);
+    }
+        
+    private void writemrhoREmdrho(String filename, double[][] m_array) {
+        // Extract rho and drho
+        double[] mrho_RE = new double[m_array.length];
+        double[] mdrho = new double[m_array.length];
+        for (int i=0; i<m_array.length; i++) {
+            mrho_RE[i] = m_array[i][0];
+            mdrho[i] = m_array[i][1];
+
+        }
+        try (FileWriter writer = new FileWriter(filename)) {
+            // Write header
+            writer.append("mrho_RE,mdrho\n");
+            
+            // Determine max length for iteration
+            int maxLength = m_array.length;
+            
+            // Write data row by row
+            for (int i = 0; i < maxLength; i++) {
+                writer.append(i < m_array.length ? String.valueOf(m_array[i][0]) : "");
+                writer.append(",");
+                writer.append(i < m_array.length ? String.valueOf(m_array[i][1]) : "");
+                writer.append("\n");
+            }
+            
+            System.out.println("CSV file saved successfully: " + filename);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public GaussianMixtureModel car_gmm_to_eci(GaussianMixtureModel gmm, double[] meas_noise) {
@@ -627,6 +681,16 @@ public class IodObjective implements Objective{
             P_list.add(mP.getValue().getData());
         }
         GaussianMixtureModel gmmEci = new GaussianMixtureModel(gmm.getWeights(), m_list, P_list);
+
+        // Check if weights are normalised
+        double sumWeights = 0.;
+        double[] weights = gmmEci.getWeights();
+        for (int i=0; i<weights.length; i++) {
+            sumWeights = sumWeights + weights[i];
+        }
+        if (FastMath.abs(sumWeights - 1.) > 0.1) {
+            throw new Error("Weights in GmmECI are not normalised");
+        }
     
         return gmmEci;
     }
@@ -863,8 +927,9 @@ public class IodObjective implements Objective{
      * Compute attributable from list of optical measurements.
      * 
      * @param angles                Optical measurements.
-     * @return                      Array of angles, angle rates and time elapsed from epoch of 
-     *                              first measurements to mid position inside tracklet.
+     * @return                      Array of angles (ra/dec), angle rates (raDot/decDot) and time  
+     *                              elapsed from epoch of first measurements to mid position 
+     *                              inside tracklet.
      */
     public static double[] linearRegressionMeasurements(List<AngularDirection> angles) {
 
@@ -909,6 +974,30 @@ public class IodObjective implements Objective{
     public List propagateOutcome() {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'propagateOutcome'");
+    }
+
+    public GaussianMixtureModel car_gmm_eci_to_topoInertial(GaussianMixtureModel gmmEci, 
+                                                            Frame topoInertial,
+                                                            AbsoluteDate date) {
+        // change means
+        double[][] mEci = gmmEci.getMeans();
+        double[][] mTopo = new double[mEci.length][mEci[0].length];
+
+        Transform t = FramesFactory.getEME2000().getTransformTo(topoInertial, date);
+        for (int i=0; i<mEci.length; i++) {
+            PVCoordinates pvEci = 
+                new PVCoordinates(new Vector3D(mEci[i][0], mEci[i][1], mEci[i][2]), 
+                                  new Vector3D(mEci[i][3], mEci[i][4], mEci[i][5]));
+            PVCoordinates pvTopo = t.transformPVCoordinates(pvEci);
+            mTopo[i] = new double[]{pvTopo.getPosition().getX(), 
+                                    pvTopo.getPosition().getY(), 
+                                    pvTopo.getPosition().getZ(),
+                                    pvTopo.getVelocity().getX(),
+                                    pvTopo.getVelocity().getY(),
+                                    pvTopo.getVelocity().getZ()};
+        }
+        // Frame transformation has no effect on weights and covariance
+        return new GaussianMixtureModel(gmmEci.getWeights(), mTopo, gmmEci.getP());
     }
     
 }
