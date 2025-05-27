@@ -611,7 +611,7 @@ public class IodObjective implements Objective{
         }
         writemrhoREmdrho("mrhoREmdrho.csv", m_array);
         
-        return new GaussianMixtureModel(w_array, m_array, P);
+        return new GaussianMixtureModel(epoch, w_array, m_array, P);
     }
         
     private void writemrhoREmdrho(String filename, double[][] m_array) {
@@ -680,7 +680,7 @@ public class IodObjective implements Objective{
             m_list[j] = mP.getKey().toArray();
             P_list.add(mP.getValue().getData());
         }
-        GaussianMixtureModel gmmEci = new GaussianMixtureModel(gmm.getWeights(), m_list, P_list);
+        GaussianMixtureModel gmmEci = new GaussianMixtureModel(gmm.getEpoch(), gmm.getWeights(), m_list, P_list);
 
         // Check if weights are normalised
         double sumWeights = 0.;
@@ -997,7 +997,9 @@ public class IodObjective implements Objective{
                                     pvTopo.getVelocity().getZ()};
         }
         // Frame transformation has no effect on weights and covariance
-        return new GaussianMixtureModel(gmmEci.getWeights(), mTopo, gmmEci.getP());
-    }
-    
+        return new GaussianMixtureModel(gmmEci.getEpoch(), 
+                                        gmmEci.getWeights(), 
+                                        mTopo, 
+                                        gmmEci.getP());
+    }   
 }

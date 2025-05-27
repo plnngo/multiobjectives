@@ -65,10 +65,6 @@ public class IodObjectiveTest {
 
         double[] trackletEci = new double[]{trackletTime[0], trackletTime[1], 
                                          trackletTime[2], trackletTime[3]};
-/*         for (int i=0;i<tracklet.length; i++) {
-            System.out.println("Deg: " + FastMath.toDegrees(tracklet[i]));
-            System.out.println("Rad: " + tracklet[i]);
-        } */
 
         // CAR limits
 /*         double a_max = 50000.*1000.;            // m
@@ -90,7 +86,6 @@ public class IodObjectiveTest {
         double sigma_rho_desired = 500.;       // m
         double sigma_drho_desired = 100.;       // m/s
         //double sigma_drho_desired = 10.;       // m/s
-
 
         // Measurement noise
         double arcsec2rad = 1./3600. * FastMath.PI/180.;
@@ -229,7 +224,15 @@ public class IodObjectiveTest {
         PVCoordinates pv = kepProp.propagate(date).getPVCoordinates(frame);
         return new double[]{pv.getPosition().getAlpha(), pv.getPosition().getDelta()};
     }
-        
+    
+    /**
+     * Test attribute derived from stripe scan search algorithm corresponding to object 22724.
+     * Attribute consits of ra, dec, raDot, decDot and the time elapsed from epoch of first 
+     * measurements to mid position inside tracklet.
+     * 
+     * @return              Attributable corresponding to object 22724 that was detected in 
+     *                      stripe scanning mode.
+     */
     public double[] generateTestAttribute() {
         Frame eci = FramesFactory.getEME2000();
         double geoDistance = Constants.WGS84_EARTH_EQUATORIAL_RADIUS + 35786 * 1e3;  // in m

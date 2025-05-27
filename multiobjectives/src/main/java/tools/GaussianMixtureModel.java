@@ -18,6 +18,10 @@ import org.hipparchus.linear.MatrixUtils;
 import org.hipparchus.linear.QRDecomposer;
 import org.hipparchus.linear.RealMatrix;
 import org.hipparchus.linear.RealVector;
+import org.hipparchus.random.CorrelatedRandomVectorGenerator;
+import org.hipparchus.random.GaussianRandomGenerator;
+import org.hipparchus.random.JDKRandomGenerator;
+import org.hipparchus.random.RandomGenerator;
 import org.hipparchus.special.Gamma;
 import org.hipparchus.util.FastMath;
 import org.hipparchus.util.MerweUnscentedTransform;
@@ -49,13 +53,15 @@ import sensortasking.mcts.App;
 @Getter
 public class GaussianMixtureModel {
 
+    AbsoluteDate epoch;
+
     double[] weights;
 
     double[][] means;
 
     List<double[][]> P;
 
-    public GaussianMixtureModel(double[] weights, double[][] means, List<double[][]> P) {
+    public GaussianMixtureModel(AbsoluteDate epoch, double[] weights, double[][] means, List<double[][]> P) {
 
         // Check dimensions
         int N = weights.length;
@@ -69,6 +75,9 @@ public class GaussianMixtureModel {
         this.weights = new double[weights.length];
         this.means = new double[means.length][means[0].length];
         this.P = new ArrayList<double[][]>();
+
+        // Assigne time stamp of GMM to input epoch
+        this.epoch = epoch;
 
         for (int i=0; i<N; i++) {
             this.weights[i] = weights[i];
@@ -215,7 +224,7 @@ public class GaussianMixtureModel {
             sum = sum + wf_norm[i];
         }
 
-        return new GaussianMixtureModel(wf_norm, m_array, Pf);
+        return new GaussianMixtureModel(gmm0.getEpoch(), wf_norm, m_array, Pf);
     }
 
     /**
@@ -273,7 +282,7 @@ public class GaussianMixtureModel {
             System.out.println(pvCoord.getPosition().getDelta());
             CartesianOrbit orbit = new CartesianOrbit(pvCoord, 
                                                       topoInertial,  // TODO: careful with frame
-                                                      epoch, 
+                                                      gmmTopoInertial.getEpoch(), 
                                                       Constants.WGS84_EARTH_MU);
             final KeplerianPropagatorBuilder kepProp = 
                 new KeplerianPropagatorBuilder(orbit, null, 1.);
@@ -337,17 +346,22 @@ public class GaussianMixtureModel {
 
         double sumWeights = 0.;
         for (int i=0; i<L; i++) {
-            updated_alpha_list[i] = alpha_vect.getEntry(i) * alpha_vect.getEntry(i) / denominator;
+            updated_alpha_list[i] = alpha_vect.getEntry(i) * beta_vect.getEntry(i) / denominator;
             sumWeights = sumWeights + updated_alpha_list[i];
         }
 
         // Updated GMM by a measurement
-        return new GaussianMixtureModel(updated_alpha_list, meansUpdated, PUpdated);
+        return new GaussianMixtureModel(meas.get(0).getDate(), 
+                                        updated_alpha_list, 
+                                        meansUpdated, 
+                                        PUpdated);
     }
 
     public static GaussianMixtureModel gmm_ukf_own(GaussianMixtureModel gmm,
                                                    Frame frame, 
                                                    List<ObservedMeasurement<?>> meas) {
+        // Target date to propogate to
+        AbsoluteDate epoch = meas.get(0).getDate();            
         
         // Number of GMM components
         int L = gmm.getWeights().length;
@@ -377,14 +391,13 @@ public class GaussianMixtureModel {
             //final CovarianceMatrixProvider provider = new ConstantProcessNoise(orbitalP, orbitalQ);
 
             // Initialise propagator
-            AbsoluteDate epoch = meas.get(0).getDate();            
             double[] pv = gmm.getMeans()[i];
             PVCoordinates pvCoord = new PVCoordinates(new Vector3D(pv[0], pv[1], pv[2]), 
                                                       new Vector3D(pv[3], pv[4], pv[5]));
 
             CartesianOrbit orbit = new CartesianOrbit(pvCoord, 
                                                       frame,  // TODO: careful with frame
-                                                      epoch, 
+                                                      gmm.getEpoch(), 
                                                       Constants.WGS84_EARTH_MU);
             final KeplerianPropagatorBuilder kepProp = 
                 new KeplerianPropagatorBuilder(orbit, null, 1.);
@@ -517,6 +530,7 @@ public class GaussianMixtureModel {
         double[] updated_alpha_list = new double[L];
         double[] alphaBetaProduct = alpha_vect.ebeMultiply(beta_vect).toArray();
         double denominator = Arrays.stream(alphaBetaProduct).sum();
+        System.out.println(denominator);
 
         double sumWeights = 0.;
         for (int i=0; i<L; i++) {
@@ -525,7 +539,62 @@ public class GaussianMixtureModel {
         }
 
         // Updated GMM by a measurement
-        return new GaussianMixtureModel(updated_alpha_list, meansUpdated, PUpdated);
+        return new GaussianMixtureModel(epoch, updated_alpha_list, meansUpdated, PUpdated);
+    }
+
+    public static GaussianMixtureModel gmm_particle_filter(GaussianMixtureModel gmm,
+                                                           Frame frame, 
+                                                           List<ObservedMeasurement<?>> meas) {
+        // Target date to propogate to
+        AbsoluteDate epoch = meas.get(0).getDate();            
+        
+        // Number of GMM components
+        int L = gmm.getWeights().length;
+
+        // Dimension of state
+        int n = gmm.getMeans()[0].length;
+        
+        // Sample from each GMM component
+        int totalSamples = 10000;
+
+
+        for(int i=0; i<L; i++) {
+            // Covariance of i GMM component
+            RealMatrix cov_i = new Array2DRowRealMatrix(gmm.getP().get(i));
+
+            RandomGenerator rg = new JDKRandomGenerator();
+            GaussianRandomGenerator rawGenerator = new GaussianRandomGenerator(rg);
+            CorrelatedRandomVectorGenerator generator_i = 
+                new CorrelatedRandomVectorGenerator(gmm.getMeans()[i], 
+                                                    cov_i, 
+                                                    1.0e-12 * cov_i.getFrobeniusNorm(), 
+                                                    rawGenerator);
+
+            // Compute number of samples for the given GMM component
+            int sample_i = (int) FastMath.floor(totalSamples * gmm.getWeights()[i]);
+            
+            // Sample from GMM component
+            RealVector[] particles = new RealVector[sample_i];
+            for (int k=0; k<sample_i; k++) {
+                particles[k] = new ArrayRealVector(generator_i.nextVector());
+                PVCoordinates pvCoord = 
+                    new PVCoordinates(new Vector3D(particles[k].getEntry(0),
+                                                   particles[k].getEntry(1), 
+                                                   particles[k].getEntry(2)), 
+                                      new Vector3D(particles[k].getEntry(3), 
+                                                   particles[k].getEntry(4), 
+                                                   particles[k].getEntry(5)));
+
+            CartesianOrbit orbit = new CartesianOrbit(pvCoord, 
+                                                      frame,  // TODO: careful with frame
+                                                      gmm.getEpoch(), 
+                                                      Constants.WGS84_EARTH_MU);
+            final KeplerianPropagatorBuilder kepProp = 
+                new KeplerianPropagatorBuilder(orbit, null, 1.);
+            }
+            predictStates(particles, null, null);
+        }
+        return null;
     }
 
     /**
