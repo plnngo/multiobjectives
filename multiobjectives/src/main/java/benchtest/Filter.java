@@ -2,9 +2,11 @@ package benchtest;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.hipparchus.linear.Array2DRowRealMatrix;
+import org.hipparchus.linear.ArrayRealVector;
 import org.hipparchus.linear.DiagonalMatrix;
 import org.hipparchus.linear.MatrixUtils;
 import org.hipparchus.linear.RealMatrix;
+import org.hipparchus.linear.RealVector;
 import org.hipparchus.ode.ExpandableODE;
 import org.hipparchus.ode.ODEIntegrator;
 import org.hipparchus.ode.ODEState;
@@ -14,11 +16,16 @@ import org.hipparchus.util.FastMath;
 
 import benchtest.LinearRangeMeasurementModel.MeasurementModel;
 
+
 public class Filter {
 
     double[] stateCorr;
 
     double[][] covCorr;
+
+    double[] statePred;
+
+    double[][] covPred;
 
     /** Process noise. */
     double Q = 1e-8;
@@ -61,6 +68,8 @@ public class Filter {
             // Extract state vector
             Xref[i] = y[i];
         }
+        RealVector Xref_vec = new ArrayRealVector(Xref);
+        this.statePred = Xref.clone();
 
         // Extract phi matrix from X (column-major to 2D array)
         double[][] Phik_arr = new double[4][4];
@@ -75,8 +84,12 @@ public class Filter {
 
         // Predicted correction 
         double[] xk_bar = Phik.operate(xhat_pre);
+        RealMatrix xk_bar_mat = new Array2DRowRealMatrix(xk_bar);
+
+        // Predicted covariance
         RealMatrix mappedUnmodelAcc =  Gamma.scalarMultiply(Q).multiply(Gamma.transpose());
         RealMatrix Pk_bar = Phik.multiply(P0).multiplyTransposed(Phik).add(mappedUnmodelAcc);
+        this.covPred = Pk_bar.getData();
 
         // Compute system noise mapping matrix
         MeasurementModel measModel = LinearRangeMeasurementModel.generateHk(Xref); 
@@ -87,6 +100,20 @@ public class Filter {
         // Kalman gain
         RealMatrix S = Hk_til.multiply(Pk_bar).multiplyTransposed(Hk_til).add(Rk_mat);
         RealMatrix Kk = Pk_bar.multiplyTransposed(Hk_til).multiply(MatrixUtils.inverse(S));
+
+        // Correction
+        double[] xhat = xk_bar_mat.add(Kk.scalarMultiply(innov - Hk_til.operate(xk_bar)[0]))
+                                  .getColumn(0);
+        RealVector xhat_vec = new ArrayRealVector(xhat);
+        RealVector Xref_out = Xref_vec.add(xhat_vec);
+        this.stateCorr = Xref_out.toArray();
+
+        // Joseph-form covariance update 
+        RealMatrix kalmanCorr = ones.subtract(Kk.multiply(Hk_til));
+        RealMatrix P_out = kalmanCorr.multiply(Pk_bar)
+                                     .multiplyTransposed(kalmanCorr)
+                                     .add(Kk.multiply(Rk_mat).multiplyTransposed(Kk));
+        this.covCorr = P_out.getData();
     }
 
     public static double[] flattenRowMajor(double[][] matrix) {
