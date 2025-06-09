@@ -4,11 +4,13 @@ import org.hipparchus.ode.OrdinaryDifferentialEquation;
 import org.orekit.frames.FramesFactory;
 import org.orekit.time.AbsoluteDate;
 
+import lombok.Getter;
 import sensortasking.mcts.ObservedObject;
 
+@Getter
 public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
 
-    private char id;
+    private char identifier;
     
     private double posX;
 
@@ -28,7 +30,7 @@ public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
 
     public Car(char id, double x, double y, double xdot, double ydot, double[][] cov, double t) {
         super(id, null, null, new AbsoluteDate().shiftedBy(t), FramesFactory.getEME2000());
-        this.id = id;
+        this.identifier = id;
         this.posX = x;
         this.posY = y;
         this.velX = xdot;
@@ -42,7 +44,7 @@ public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
 
     public Car(char id, double[] state, double[][] cov, double t) {
         super(id, null, null, new AbsoluteDate().shiftedBy(t), FramesFactory.getEME2000());
-        this.id = id;
+        this.identifier = id;
         this.posX = state[0];
         this.posY = state[1];
         this.velX = state[2];
