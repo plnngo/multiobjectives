@@ -1,8 +1,12 @@
 package benchtest;
 
 import org.hipparchus.ode.OrdinaryDifferentialEquation;
+import org.orekit.frames.FramesFactory;
+import org.orekit.time.AbsoluteDate;
 
-public class Car implements OrdinaryDifferentialEquation{
+import sensortasking.mcts.ObservedObject;
+
+public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
 
     private char id;
     
@@ -16,24 +20,38 @@ public class Car implements OrdinaryDifferentialEquation{
 
     private double time;
 
+    private double[][] cov;
+
     final int dim = 4;
 
-    public Car(char id, double x, double y, double xdot, double ydot, double t) {
+    AbsoluteDate origin = new AbsoluteDate();
+
+    public Car(char id, double x, double y, double xdot, double ydot, double[][] cov, double t) {
+        super(id, null, null, new AbsoluteDate().shiftedBy(t), FramesFactory.getEME2000());
         this.id = id;
         this.posX = x;
         this.posY = y;
         this.velX = xdot;
         this.velY = ydot;
         this.time = t;
+        this.cov = new double[cov.length][];
+        for (int i = 0; i < cov.length; i++) {
+            this.cov[i] = cov[i].clone();
+        }
     }
 
-    public Car(char id, double[] state, double t) {
+    public Car(char id, double[] state, double[][] cov, double t) {
+        super(id, null, null, new AbsoluteDate().shiftedBy(t), FramesFactory.getEME2000());
         this.id = id;
         this.posX = state[0];
         this.posY = state[1];
         this.velX = state[2];
         this.velY = state[3];
         this.time = t;
+        this.cov = new double[cov.length][];
+        for (int i = 0; i < cov.length; i++) {
+            this.cov[i] = cov[i].clone();
+        }
     }
 
     private static double[] int_constant_vel_stm(double[] X) {

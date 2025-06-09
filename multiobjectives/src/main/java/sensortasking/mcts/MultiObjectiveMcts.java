@@ -376,7 +376,7 @@ public class MultiObjectiveMcts {
         for (int i=0; i<weights.length; i++) {
             indexObjective[i] = i;
         }
-        int indexSelectedObjective = 1;
+        int indexSelectedObjective = 3;
             //WeightedRandomNumberPicker.pickNumber(indexObjective, weights);
         Objective objective;
         AngularDirection pointing = null;

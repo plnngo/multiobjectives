@@ -49,7 +49,7 @@ public class Filter {
         double[] ones_arr = flattenRowMajor(ones.getData());
         double[] Xref_Stm0 = ArrayUtils.addAll(X0_ref, ones_arr);
 
-        Car carA_0 = new Car('A', X0_ref, 0);
+        Car carA_0 = new Car('A', X0_ref, P_pre, 0);
         ExpandableODE expandable = new ExpandableODE(carA_0);
 
         ODEIntegrator integrator = new ClassicalRungeKuttaIntegrator(0.01);
