@@ -16,11 +16,12 @@ import org.orekit.time.AbsoluteDate;
 import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
 
+import benchtest.Car;
+import benchtest.CarTrackingObjective;
 import lombok.Getter;
 import sensortasking.stripescanning.Stripe;
 import sensortasking.stripescanning.Tasking;
 import tools.OptimisingVector;
-import tools.WeightedRandomNumberPicker;
 
 @Getter
 public class MultiObjectiveMcts {
@@ -361,10 +362,21 @@ public class MultiObjectiveMcts {
         DecisionNode expandedDecision = null;
         List<ObservedObject> restore = new ArrayList<>();
         for(ObservedObject target : leaf.getEnvironment().getStateTracking()) {
-            ObservedObject copy = new ObservedObject(target.getId(), target.getState(), 
+
+            if(target.getClass().getSimpleName().equals("Car")) {
+                Car targetCar = (Car) target;
+                ObservedObject copy = 
+                    new Car(targetCar.getIdentifier(), targetCar.getPosX(), targetCar.getPosY(), 
+                            targetCar.getVelX(), targetCar.getVelY(), targetCar.getCov(), 
+                            targetCar.getTime());
+                restore.add(copy);
+            } else {
+                ObservedObject copy = new ObservedObject(target.getId(), target.getState(), 
                                                      target.getCovariance(), target.getEpoch(), 
                                                      target.getFrame());
-            restore.add(copy);
+                restore.add(copy);
+            }
+            
         }
 
         // Expand by Chance node first
@@ -473,6 +485,9 @@ public class MultiObjectiveMcts {
                 }
 
             default:
+                // Macro action = track cars
+                List<ObservedObject> ooiCar = new ArrayList<>(restore);
+                objective = new CarTrackingObjective(ooiCar, this.startCampaign, this.endCampaign);
 
                 throw new IllegalAccessError("Unknown objective.");
         }
