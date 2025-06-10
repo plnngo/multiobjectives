@@ -488,8 +488,9 @@ public class MultiObjectiveMcts {
                 // Macro action = track cars
                 List<ObservedObject> ooiCar = new ArrayList<>(restore);
                 objective = new CarTrackingObjective(ooiCar, this.startCampaign, this.endCampaign);
+                pointing = objective.setMicroAction(leaf.getEpoch(), leaf.getSensorPointing());
 
-                throw new IllegalAccessError("Unknown objective.");
+                //throw new IllegalAccessError("Unknown objective.");
         }
 
 

@@ -40,12 +40,17 @@ public class CarTrackingObjective implements Objective{
 
     @Override
     public AngularDirection setMicroAction(AbsoluteDate current, AngularDirection sensorPointing) {
+
+        double time = current.durationFrom(this.start);
+        if (time<0.1) {
+            // shift time stamp by one second since at t=0, we are not taking measurements
+            time += 1.;         
+        }
         // List of candidates that might be trackable
         Map<Car, Double> checkTrackable = new HashMap<Car, Double>();        
         for (Car obj : updatedTargets) {
             double[] state = new double[]{obj.getPosX(), obj.getPosY(), obj.getVelX(), obj.getVelY()};
             Car copy = new Car(obj.getIdentifier(), state, obj.getCov(), obj.getTime());
-            double time = current.durationFrom(this.start);
 
             // Simulate measuremement
             double simMeas = generateMeasurement(time, state);
@@ -61,7 +66,7 @@ public class CarTrackingObjective implements Objective{
         }
 
         // Compare IG
-        Car selected = new Car('f', null, null, 0);
+        Car selected = new Car('f', new double[]{0.,0.,0.,0.}, new double[4][4], time);
         Double iGmax = Double.MIN_VALUE;
         
         for (Entry<Car, Double> entry : checkTrackable.entrySet()) {
@@ -107,7 +112,7 @@ public class CarTrackingObjective implements Objective{
         double traceInvCovQCovP = invCovQ.multiply(covP).getTrace();
 
         // Substract means of probability distributions
-        double[] meanQMinusMeanP = new double[6];
+        double[] meanQMinusMeanP = new double[statePrior.length];
         
         for (int i=0; i<meanQMinusMeanP.length; i++) {
             meanQMinusMeanP[i] = statePost[i] - statePrior[i];

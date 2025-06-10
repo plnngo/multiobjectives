@@ -3,7 +3,6 @@ package benchtest;
 import org.apache.commons.lang3.ArrayUtils;
 import org.hipparchus.linear.Array2DRowRealMatrix;
 import org.hipparchus.linear.ArrayRealVector;
-import org.hipparchus.linear.DiagonalMatrix;
 import org.hipparchus.linear.MatrixUtils;
 import org.hipparchus.linear.RealMatrix;
 import org.hipparchus.linear.RealVector;
@@ -15,6 +14,7 @@ import org.hipparchus.ode.nonstiff.ClassicalRungeKuttaIntegrator;
 import org.hipparchus.util.FastMath;
 
 import benchtest.LinearRangeMeasurementModel.MeasurementModel;
+import sensortasking.mcts.App;
 
 
 public class Filter {
@@ -45,7 +45,18 @@ public class Filter {
         double[] xhat_pre = new double[n];
 
         // Combine initial state and STM (identity matrix)
-        RealMatrix ones = new DiagonalMatrix(new double[]{1., 1., 1., 1.});
+        double[][] identity = new double[n][n];
+        for (int col=0; col<n; col++) {
+            for (int row=0; row<n; row++) {
+                if(row==col) {
+                    identity[row][col] = 1.;
+                } else {
+                    identity[row][col] = 0;
+                }
+            }
+        }
+        RealMatrix ones = new Array2DRowRealMatrix(identity);
+        App.printCovariance(ones);
         double[] ones_arr = flattenRowMajor(ones.getData());
         double[] Xref_Stm0 = ArrayUtils.addAll(X0_ref, ones_arr);
 
@@ -78,7 +89,7 @@ public class Filter {
                 Phik_arr[row][col] = y[n + col * n + row];
             }
         }
-        RealMatrix Phik = new Array2DRowRealMatrix(Phik_arr);
+        RealMatrix Phik = new Array2DRowRealMatrix(Phik_arr).transpose();
         double[][] gamma = computeGamma(0, t_obs);
         RealMatrix Gamma = new Array2DRowRealMatrix(gamma);
 
@@ -87,8 +98,9 @@ public class Filter {
         RealMatrix xk_bar_mat = new Array2DRowRealMatrix(xk_bar);
 
         // Predicted covariance
-        RealMatrix mappedUnmodelAcc =  Gamma.scalarMultiply(Q).multiply(Gamma.transpose());
+        RealMatrix mappedUnmodelAcc =  Gamma.scalarMultiply(Q).multiplyTransposed(Gamma);
         RealMatrix Pk_bar = Phik.multiply(P0).multiplyTransposed(Phik).add(mappedUnmodelAcc);
+        App.printCovariance(Pk_bar);
         this.covPred = Pk_bar.getData();
 
         // Compute system noise mapping matrix
@@ -100,6 +112,7 @@ public class Filter {
         // Kalman gain
         RealMatrix S = Hk_til.multiply(Pk_bar).multiplyTransposed(Hk_til).add(Rk_mat);
         RealMatrix Kk = Pk_bar.multiplyTransposed(Hk_til).multiply(MatrixUtils.inverse(S));
+        //App.printCovariance(Kk);
 
         // Correction
         double[] xhat = xk_bar_mat.add(Kk.scalarMultiply(innov - Hk_til.operate(xk_bar)[0]))
@@ -109,7 +122,11 @@ public class Filter {
         this.stateCorr = Xref_out.toArray();
 
         // Joseph-form covariance update 
+        App.printCovariance(Kk.multiply(Hk_til));
+        //RealMatrix kalmanCorr = ones.add(Kk.multiply(Hk_til).scalarMultiply(-1));
+
         RealMatrix kalmanCorr = ones.subtract(Kk.multiply(Hk_til));
+        App.printCovariance(kalmanCorr);
         RealMatrix P_out = kalmanCorr.multiply(Pk_bar)
                                      .multiplyTransposed(kalmanCorr)
                                      .add(Kk.multiply(Rk_mat).multiplyTransposed(Kk));
