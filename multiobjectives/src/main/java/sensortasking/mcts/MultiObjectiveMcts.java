@@ -65,6 +65,8 @@ public class MultiObjectiveMcts {
     /** Minimal time duration requested by user that should be spent on time. */
     final double userSearchTrequested = 0.1;
 
+    final boolean orbitMode = false;        // else car mode
+
     /** Basic constructor.
      * 
      * @param descisionTree
@@ -487,9 +489,27 @@ public class MultiObjectiveMcts {
             default:
                 // Macro action = track cars
                 List<ObservedObject> ooiCar = new ArrayList<>(restore);
+
+                for(Node sibling : leaf.getChildren()) {
+                    ChanceNode chance = (ChanceNode)sibling;
+                    if (chance.getMacro().getClass().getSimpleName().equals("CarTrackingObjective")) {
+                        CarTrackingObjective track = (CarTrackingObjective)chance.getMacro();
+                        char idAlreadyTracked = track.getLastUpdated();
+                        int index = -1;
+                        for(int i=0; i<ooiCar.size(); i++) {
+                            if (ooiCar.get(i).getId() == idAlreadyTracked) {
+                                index = i;
+                                break;
+                            }
+                        }
+                        if(index!=-1) {
+                            ooiCar.remove(index);
+                        }
+                    }
+                }
                 objective = new CarTrackingObjective(ooiCar, this.startCampaign, this.endCampaign);
                 pointing = objective.setMicroAction(leaf.getEpoch(), leaf.getSensorPointing());
-
+                
                 //throw new IllegalAccessError("Unknown objective.");
         }
 
@@ -521,7 +541,11 @@ public class MultiObjectiveMcts {
 
             // Assign sensor pointing location
             sensorPointing = expandedChance.getMicro();
-        }else {
+        } else if(objectiveType.equals("CarTrackingObjective")) {
+
+            // Assign sensor pointing location
+            sensorPointing = expandedChance.getMicro();
+        } else {
             throw new IllegalAccessError("Unknown objective.");
         }
 
@@ -575,8 +599,40 @@ public class MultiObjectiveMcts {
                                                 this.initial.incrementIdCounter(), 
                                                 leaf.getDepth() + 1.0, updateTimeSpentSearch);
 
+        } else if(objective instanceof CarTrackingObjective){
+            List<ObservedObject> propEnviroment = new ArrayList<ObservedObject>();
+            for(Car obj: (List<Car>)objective.propagateOutcome()) {
+                Car copy = new Car(obj.getIdentifier(), obj.getPosX(), obj.getPosY(), 
+                                   obj.getVelX(), obj.getVelY(), obj.getCov(), obj.getTime());
+                propEnviroment.add(copy);
+            }
+            for(int parent=0; parent<leaf.getEnvironment().getStateTracking().size(); parent++) {
+                char idParent = ((Car)leaf.getEnvironment().getStateTracking().get(parent)).getIdentifier();
+                boolean found = false;
+                for(int child=0; child<propEnviroment.size(); child++) {
+                    if (idParent == ((Car)propEnviroment.get(child)).getIdentifier()) {
+                        found = true;
+                    }
+                }
+                if(!found) {
+                    Car notTargeted = new Car(idParent, ((Car)leaf.getEnvironment().getStateTracking().get(parent)).getPosX(),
+                                        ((Car)leaf.getEnvironment().getStateTracking().get(parent)).getPosY(), 
+                                        ((Car)leaf.getEnvironment().getStateTracking().get(parent)).getVelX(), 
+                                        ((Car)leaf.getEnvironment().getStateTracking().get(parent)).getVelY(),
+                                        ((Car)leaf.getEnvironment().getStateTracking().get(parent)).getCov(),
+                                        ((Car)leaf.getEnvironment().getStateTracking().get(parent)).getTime());
+                    propEnviroment.add(notTargeted);
+                }
+            }
+            PropoagatedEnvironment environment = 
+                new PropoagatedEnvironment(propEnviroment, 
+                                           leaf.getEnvironment().stateSearching);
+            expandedDecision = new DecisionNode(0., 0, sensorPointing, propEpoch, environment,
+                                                this.initial.incrementIdCounter(), 
+                                                leaf.getDepth() + 1.0, leaf.getTimeSpentStripe());
         } else {
             // other objective was selected
+
         }
 
         expandedChance.setChild(expandedDecision); 
@@ -599,12 +655,23 @@ public class MultiObjectiveMcts {
 
         //List<ObservedObject> restore = leaf.getEnvironment().getStateTracking();
         List<ObservedObject> restore = new ArrayList<>();
-        for(ObservedObject target : leaf.getEnvironment().getStateTracking()) {
-            ObservedObject copy = new ObservedObject(target.getId(), target.getState(), 
-                                                     target.getCovariance(), target.getEpoch(), 
-                                                     target.getFrame());
-            restore.add(copy);
+
+        // restore environment
+        if (orbitMode) {
+            for(ObservedObject target : leaf.getEnvironment().getStateTracking()) {
+                ObservedObject copy = new ObservedObject(target.getId(), target.getState(), 
+                                                        target.getCovariance(), target.getEpoch(), 
+                                                        target.getFrame());
+                restore.add(copy);
+            }
+        } else {
+            for(ObservedObject target : leaf.getEnvironment().getStateTracking()) {
+                Car copy = new Car(((Car)target).getIdentifier(), ((Car)target).getStateArray(), 
+                                   ((Car)target).getCov(), ((Car)target).getTime());
+                restore.add(copy);
+            }
         }
+        
         // Declare output
         List<Node> episode = new ArrayList<Node>(); // TODO: not necessary to store in an array because node holds all the descendants
         //episode.add(leaf);
@@ -753,12 +820,21 @@ public class MultiObjectiveMcts {
         if (Objects.isNull(last)) {
             //No simulation was performed
             List<ObservedObject> fakeObjs = new ArrayList<ObservedObject>();
-            for(ObservedObject obj : this.initial.getEnvironment().getStateTracking()) {
-                ObservedObject copy = new ObservedObject(obj.getId(), obj.getState(), 
-                                                         obj.getCovariance(), obj.getEpoch(), 
-                                                         obj.getFrame());
-                fakeObjs.add(copy);
+            if (orbitMode) {
+                for(ObservedObject obj : this.initial.getEnvironment().getStateTracking()) {
+                    ObservedObject copy = new ObservedObject(obj.getId(), obj.getState(), 
+                                                            obj.getCovariance(), obj.getEpoch(), 
+                                                            obj.getFrame());
+                    fakeObjs.add(copy);
+                }
+            } else {
+                for(ObservedObject obj : this.initial.getEnvironment().getStateTracking()) {
+                    Car copy = new Car(((Car)obj).getIdentifier(), ((Car)obj).getStateArray(), 
+                                       ((Car)obj).getCov(), ((Car)obj).getTime());
+                    fakeObjs.add(copy);
+                }
             }
+
             List<Integer> fakeSearchTask = new ArrayList<Integer>();
             for(Integer task : this.initial.getEnvironment().getStateSearching()) {
                 Integer copy = new Integer(task);
@@ -821,7 +897,12 @@ public class MultiObjectiveMcts {
     private double[] computeUtilityVector(DecisionNode last, DecisionNode leaf) {
 
         // Compute tracking reward
-        double[] trackReward = computeTrackReward(last);
+        double[] trackReward = null;
+        if (orbitMode) {
+            trackReward = computeTrackReward(last);
+        } else {
+            trackReward = CarTrackingObjective.computeTrackReward(last, this.endCampaign);
+        }
         
         // Compute searching reward
 /*         double searchReward = computeSearchReward(last, leaf); //TODO: function errornous because rSearch sometimes not zero

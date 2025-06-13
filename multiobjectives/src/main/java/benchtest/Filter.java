@@ -33,7 +33,7 @@ public class Filter {
     /** Measurement noise. */
     double Rk = 0.02;
 
-    public void run_ckf(double[] X0_ref, double[][] P_pre, double t_obs, double obs_data) {
+    public void run_ckf(double[] X0_ref, double[][] P_pre, double t0, double t_obs, double obs_data) {
 
         RealMatrix P0 = new Array2DRowRealMatrix(P_pre);
         RealMatrix Rk_mat = new Array2DRowRealMatrix(new double[]{Rk});
@@ -56,15 +56,14 @@ public class Filter {
             }
         }
         RealMatrix ones = new Array2DRowRealMatrix(identity);
-        App.printCovariance(ones);
         double[] ones_arr = flattenRowMajor(ones.getData());
         double[] Xref_Stm0 = ArrayUtils.addAll(X0_ref, ones_arr);
 
-        Car carA_0 = new Car('A', X0_ref, P_pre, 0);
+        Car carA_0 = new Car('f', X0_ref, P_pre, t0);
         ExpandableODE expandable = new ExpandableODE(carA_0);
 
         ODEIntegrator integrator = new ClassicalRungeKuttaIntegrator(0.01);
-        ODEState initialState = new ODEState(0., Xref_Stm0);
+        ODEState initialState = new ODEState(t0, Xref_Stm0);
         ODEStateAndDerivative finalState = integrator.integrate(expandable, initialState, t_obs);
         if (FastMath.abs(t_obs-finalState.getTime())>1e-2) {
             throw new IllegalArgumentException("Did not propagate the state to the observation" 
@@ -100,7 +99,7 @@ public class Filter {
         // Predicted covariance
         RealMatrix mappedUnmodelAcc =  Gamma.scalarMultiply(Q).multiplyTransposed(Gamma);
         RealMatrix Pk_bar = Phik.multiply(P0).multiplyTransposed(Phik).add(mappedUnmodelAcc);
-        App.printCovariance(Pk_bar);
+        //App.printCovariance(Pk_bar);
         this.covPred = Pk_bar.getData();
 
         // Compute system noise mapping matrix
@@ -122,11 +121,11 @@ public class Filter {
         this.stateCorr = Xref_out.toArray();
 
         // Joseph-form covariance update 
-        App.printCovariance(Kk.multiply(Hk_til));
+        //App.printCovariance(Kk.multiply(Hk_til));
         //RealMatrix kalmanCorr = ones.add(Kk.multiply(Hk_til).scalarMultiply(-1));
 
         RealMatrix kalmanCorr = ones.subtract(Kk.multiply(Hk_til));
-        App.printCovariance(kalmanCorr);
+        //App.printCovariance(kalmanCorr);
         RealMatrix P_out = kalmanCorr.multiply(Pk_bar)
                                      .multiplyTransposed(kalmanCorr)
                                      .add(Kk.multiply(Rk_mat).multiplyTransposed(Kk));

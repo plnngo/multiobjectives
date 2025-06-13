@@ -1,13 +1,26 @@
 package benchtest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang3.ArrayUtils;
+import org.hipparchus.linear.Array2DRowRealMatrix;
+import org.hipparchus.linear.RealMatrix;
+import org.hipparchus.ode.ExpandableODE;
+import org.hipparchus.ode.ODEIntegrator;
+import org.hipparchus.ode.ODEState;
+import org.hipparchus.ode.ODEStateAndDerivative;
 import org.hipparchus.ode.OrdinaryDifferentialEquation;
+import org.hipparchus.ode.nonstiff.ClassicalRungeKuttaIntegrator;
 import org.orekit.frames.FramesFactory;
 import org.orekit.time.AbsoluteDate;
 
 import lombok.Getter;
+import lombok.Setter;
 import sensortasking.mcts.ObservedObject;
 
 @Getter
+@Setter
 public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
 
     private char identifier;
@@ -24,9 +37,9 @@ public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
 
     private double[][] cov;
 
-    final int dim = 4;
+    static final int dim = 4;
 
-    AbsoluteDate origin = new AbsoluteDate();
+    static AbsoluteDate origin = new AbsoluteDate();
 
     public Car(char id, double x, double y, double xdot, double ydot, double[][] cov, double t) {
         super(id, null, null, new AbsoluteDate().shiftedBy(t), FramesFactory.getEME2000());
@@ -55,6 +68,16 @@ public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
             this.cov[i] = cov[i].clone();
         }
     }
+
+    public void setState(double posX, double posY, double velX, double velY){
+
+        this.posX = posX;
+        this.posY = posY;
+        this.velX = velX;
+        this.velY = velY;
+    }
+
+
 
     private static double[] int_constant_vel_stm(double[] X) {
 
@@ -116,5 +139,73 @@ public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
     @Override
     public int getDimension() {
         return dim + dim*dim;
+    }
+
+    public double[] getStateArray(){
+        return new double[]{this.posX, this.posY, this.velX, this.velY};
+    }
+
+    public static List<Car> propagateCars(List<Car> initial, AbsoluteDate end) {
+
+        // Simulation duration
+        double simDuration = end.durationFrom(Car.origin);
+
+        // Initialise output                                                    
+        List<Car> out = new ArrayList<Car>();
+
+        // Combine initial state and STM (identity matrix)
+        double[][] identity = new double[Car.dim][Car.dim];
+        for (int col=0; col<Car.dim; col++) {
+            for (int row=0; row<Car.dim; row++) {
+                if(row==col) {
+                    identity[row][col] = 1.;
+                } else {
+                    identity[row][col] = 0;
+                }
+            }
+        }
+        RealMatrix ones = new Array2DRowRealMatrix(identity);
+        double[] ones_arr = Filter.flattenRowMajor(ones.getData());
+        
+        for (Car car : initial) {
+
+            ExpandableODE expandable = new ExpandableODE(car);
+            double[] X0_ref = new double[]{car.getPosX(), car.posY, car.getVelX(), car.getVelY()};
+            double[] Xref_Stm0 = ArrayUtils.addAll(X0_ref, ones_arr);
+
+            ODEIntegrator integrator = new ClassicalRungeKuttaIntegrator(0.01);
+            ODEState initialState = new ODEState(0., Xref_Stm0);
+            ODEStateAndDerivative finalState = 
+                integrator.integrate(expandable, initialState, simDuration-car.getTime());
+
+            // Extract propagated state
+            double[] y = finalState.getPrimaryState();
+            double[] Xref = new double[Car.dim];
+            for (int i=0; i<Car.dim; i++) {
+
+                // Extract state vector
+                Xref[i] = y[i];
+            }
+            //RealVector Xref_vec = new ArrayRealVector(Xref);
+
+            // Extract phi matrix from X (column-major to 2D array)
+            double[][] Phik_arr = new double[4][4];
+            for (int col = 0; col < Car.dim; col++) {
+                for (int row = 0; row < Car.dim; row++) {
+                    Phik_arr[row][col] = y[Car.dim + col * Car.dim + row];
+                }
+            }
+            RealMatrix Phik = new Array2DRowRealMatrix(Phik_arr).transpose();
+
+
+            // Predicted covariance
+            RealMatrix P0 = new Array2DRowRealMatrix(car.getCov());
+            RealMatrix Pk_bar = Phik.multiply(P0).multiplyTransposed(Phik);
+
+            Car propCar = new Car(car.getIdentifier(), Xref, Pk_bar.getData(), simDuration);
+            out.add(propCar);
+        }
+        
+        return out;
     }
 }
