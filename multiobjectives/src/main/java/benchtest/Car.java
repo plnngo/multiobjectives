@@ -172,31 +172,38 @@ public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
             ExpandableODE expandable = new ExpandableODE(car);
             double[] X0_ref = new double[]{car.getPosX(), car.posY, car.getVelX(), car.getVelY()};
             double[] Xref_Stm0 = ArrayUtils.addAll(X0_ref, ones_arr);
-
-            ODEIntegrator integrator = new ClassicalRungeKuttaIntegrator(0.01);
-            ODEState initialState = new ODEState(0., Xref_Stm0);
-            ODEStateAndDerivative finalState = 
-                integrator.integrate(expandable, initialState, simDuration-car.getTime());
+            double step = 0.01;
 
             // Extract propagated state
-            double[] y = finalState.getPrimaryState();
             double[] Xref = new double[Car.dim];
-            for (int i=0; i<Car.dim; i++) {
-
-                // Extract state vector
-                Xref[i] = y[i];
-            }
-            //RealVector Xref_vec = new ArrayRealVector(Xref);
-
-            // Extract phi matrix from X (column-major to 2D array)
             double[][] Phik_arr = new double[4][4];
-            for (int col = 0; col < Car.dim; col++) {
-                for (int row = 0; row < Car.dim; row++) {
-                    Phik_arr[row][col] = y[Car.dim + col * Car.dim + row];
+
+            if (simDuration-car.getTime() < step) {
+
+                // prevent propagation to initial time stamp
+                Xref = X0_ref;
+                Phik_arr = identity;
+
+            } else {
+                ODEIntegrator integrator = new ClassicalRungeKuttaIntegrator(step);
+                ODEState initialState = new ODEState(0., Xref_Stm0);
+                ODEStateAndDerivative finalState = 
+                    integrator.integrate(expandable, initialState, simDuration-car.getTime());
+                double[] y = finalState.getPrimaryState();
+                for (int i=0; i<Car.dim; i++) {
+
+                    // Extract state vector
+                    Xref[i] = y[i];
+                }
+
+                // Extract phi matrix from X (column-major to 2D array)
+                for (int col = 0; col < Car.dim; col++) {
+                    for (int row = 0; row < Car.dim; row++) {
+                        Phik_arr[row][col] = y[Car.dim + col * Car.dim + row];
+                    }
                 }
             }
             RealMatrix Phik = new Array2DRowRealMatrix(Phik_arr).transpose();
-
 
             // Predicted covariance
             RealMatrix P0 = new Array2DRowRealMatrix(car.getCov());
