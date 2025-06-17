@@ -53,7 +53,7 @@ public class CarTrackingObjective implements Objective{
         if (this.updatedTargets.isEmpty()) {
             return null;
         }
-        
+
         // List of candidates that might be trackable
         Map<Car, Double> checkTrackable = new HashMap<Car, Double>();        
         for (Car obj : updatedTargets) {
@@ -66,6 +66,10 @@ public class CarTrackingObjective implements Objective{
             est.run_ckf(state, copy.getCov(), copy.getTime(), time, simMeas);
 
             // Compute information gain
+/*             System.out.println("predicted:");
+            App.printCovariance(new Array2DRowRealMatrix(est.covPred));
+            System.out.println("corrected:");
+            App.printCovariance(new Array2DRowRealMatrix(est.covCorr)); */
             double iG = 
                 computeKLDivergence(est.statePred, est.stateCorr, 
                                                  est.covPred, est.covCorr);
@@ -121,6 +125,10 @@ public class CarTrackingObjective implements Objective{
         // Retrieve covariances
         RealMatrix covP = new Array2DRowRealMatrix(covPrior);
         RealMatrix covQ = new Array2DRowRealMatrix(covPost);
+/*         System.out.println("Predicted:");
+        App.printCovariance(covP);
+        System.out.println("Corrected:");
+        App.printCovariance(covQ); */
 
         // Compute determinant
         LUDecomposition decomP = new LUDecomposition(covP);

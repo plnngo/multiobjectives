@@ -309,15 +309,22 @@ public class MultiObjectiveMcts {
                     // objects not observable 
                     //expandable = false; // TODO: still backpropagate!
                     do{
+                        // Travel down decision tree to search for expansion possibiliy
                         current = selectChildUCB(current);
                         children = current.getChildren();
                     } while (!current.getClass().getSimpleName().equals("DecisionNode"));
 
+                    // If leaf is termination node, don't expand tree
+                    if(current.getEpoch().compareTo(endCampaign) >= 0) {
+                        backpropagate(current, null);
+                        return false;
+                    }
                     continue;
 
                 } else if (leaf.getEpoch().compareTo(endCampaign) >= 0) {
-                    // already reached end of campaign
-                    if (((ChanceNode)leaf.getParent()).getMacro().getClass().getSimpleName().equals("TrackingObjective")) {     
+                    // already reached end of campaign and acidently extended the tree beyond termination condition
+                    if (((ChanceNode)leaf.getParent()).getMacro().getClass().getSimpleName().equals("TrackingObjective") || 
+                        ((ChanceNode)leaf.getParent()).getMacro().getClass().getSimpleName().equals("CarTrackingObjective")) {     
                         Node grand = leaf.getParent().getParent();   
                         grand.removeChild(leaf.getParent());
                         Node nextChild = grand;
@@ -332,7 +339,7 @@ public class MultiObjectiveMcts {
                             return false;
                         }
 
-                    }
+                    } 
                 }
                 expandable = true;
                 List<Node> simulated = simulate(leaf, endCampaign);
@@ -894,6 +901,14 @@ public class MultiObjectiveMcts {
         return this.initial;
     }
 
+    /**
+     * Return the utility vector. First entry contains search reward, the following all the rewards 
+     * resulting from the tracking objective.
+     * 
+     * @param last
+     * @param leaf
+     * @return
+     */
     private double[] computeUtilityVector(DecisionNode last, DecisionNode leaf) {
 
         // Compute tracking reward
@@ -1081,7 +1096,8 @@ public class MultiObjectiveMcts {
             for(int k=1; k<normedR.length; k++){
                 trackR = normedR[k] + trackR;
             }
-            totalRtrackTotalRsearch.add(new double[]{searchR, trackR});
+            //totalRtrackTotalRsearch.add(new double[]{searchR, trackR}); // scalarised tracking reward
+            totalRtrackTotalRsearch.add(normedR);
         }
 
         // Filter
@@ -1091,7 +1107,7 @@ public class MultiObjectiveMcts {
             OptimisingVector opt = new OptimisingVector(totalRtrackTotalRsearch, removedUtility.length - 1);
             List<double[]> domVecs = 
                 opt.getDominatingVecs(removedUtility, 
-                                      new boolean[]{false, true}, 
+                                      new boolean[]{false, true, true}, 
                                       0);
             int utility = - domVecs.size();
             if(utility>maxUtility) {
