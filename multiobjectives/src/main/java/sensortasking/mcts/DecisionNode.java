@@ -44,7 +44,7 @@ public class DecisionNode extends Node{
         this.environment = environment;
         super.setEpoch(epoch);
         super.setId(id);
-        int numObj = 0;
+        int numObj = 1;         // Search by default always activated
         if(!environment.getStateSearching().isEmpty()) {
             numObj++;
         }
