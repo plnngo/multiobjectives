@@ -34,6 +34,8 @@ public class CarTrackingObjective implements Objective{
 
     char lastUpdated = 'O';
 
+    double lastUpdatedIG = 0.;
+
     public CarTrackingObjective(List<ObservedObject> targets, AbsoluteDate startCampaign, AbsoluteDate endCampaign) {
 
         // Initialise list of targets
@@ -102,6 +104,7 @@ public class CarTrackingObjective implements Objective{
                 candidate.setTime(selected.getTime());
                 candidate.setEpoch(selected.getEpoch());
                 this.lastUpdated = selected.getIdentifier();
+                this.lastUpdatedIG = iGmax;
                 break;
             }
         }  
