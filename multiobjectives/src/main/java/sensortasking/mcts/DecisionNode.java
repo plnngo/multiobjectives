@@ -49,7 +49,8 @@ public class DecisionNode extends Node{
             numObj++;
         }
         if(!environment.getStateTracking().isEmpty()) {
-            numObj = numObj + environment.getStateTracking().size();
+            //numObj = numObj + environment.getStateTracking().size();
+            numObj++;
         }
         super.setUtilityVec(new double[numObj]);
         super.setDepth(depth);

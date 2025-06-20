@@ -33,7 +33,8 @@ public class ChanceNode extends Node{
             numObj++;
         }
         if (!((DecisionNode) parent).getEnvironment().getStateTracking().isEmpty()) {
-            numObj = numObj + ((DecisionNode) parent).getEnvironment().getStateTracking().size();
+            //numObj = numObj + ((DecisionNode) parent).getEnvironment().getStateTracking().size();
+            numObj++;
         }
         super.setUtilityVec(new double[numObj]);
         super.setDepth(depth);
