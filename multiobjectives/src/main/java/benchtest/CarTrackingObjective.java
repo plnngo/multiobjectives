@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Random;
 
 import org.hipparchus.linear.Array2DRowRealMatrix;
 import org.hipparchus.linear.LUDecomposition;
@@ -17,6 +18,7 @@ import org.orekit.time.AbsoluteDate;
 import lombok.Getter;
 import sensortasking.mcts.AngleType;
 import sensortasking.mcts.AngularDirection;
+import sensortasking.mcts.ChanceNode;
 import sensortasking.mcts.DecisionNode;
 import sensortasking.mcts.Node;
 import sensortasking.mcts.Objective;
@@ -79,30 +81,47 @@ public class CarTrackingObjective implements Objective{
             checkTrackable.put(copyUpdated, iG);
         }
 
-        // Compare IG
-        Car selected = new Car('f', new double[]{0.,0.,0.,0.}, new double[4][4], time);
-        Double iGmax = Double.MIN_VALUE;
-        
+        // Step 1: Find max IG
+        Random rand = new Random();
+        double iGmax = Double.MIN_VALUE;
         for (Entry<Car, Double> entry : checkTrackable.entrySet()) {
-
-            if(entry.getValue() > iGmax) {
+            if (entry.getValue() > iGmax) {
                 iGmax = entry.getValue();
-                double[] stateUpdated = 
-                    new double[]{entry.getKey().getPosX(), entry.getKey().getPosY(), 
-                                 entry.getKey().getVelX(), entry.getKey().getVelY()};
-                selected = new Car(entry.getKey().getIdentifier(), stateUpdated, 
-                                   entry.getKey().getCov(),time);
             }
         }
 
-        // Update targets
-        for(Car candidate : updatedTargets) {
-            if(candidate.getIdentifier() == selected.getIdentifier()) {
-                candidate.setState(selected.getPosX(), selected.getPosY(), 
-                                   selected.getVelX(), selected.getVelY());
+        // Step 2: Collect all cars with max IG
+        List<Car> bestCandidates = new ArrayList<>();
+        for (Entry<Car, Double> entry : checkTrackable.entrySet()) {
+            if (entry.getValue() == iGmax) {
+                bestCandidates.add(entry.getKey());
+            }
+        }
+
+        // Step 3: Pick one randomly
+        Car selectedRaw = bestCandidates.get(rand.nextInt(bestCandidates.size()));
+
+        // Step 4: Construct the selected Car object
+        double[] stateUpdated = new double[]{
+            selectedRaw.getPosX(), selectedRaw.getPosY(), 
+            selectedRaw.getVelX(), selectedRaw.getVelY()
+        };
+        Car selected = new Car(
+            selectedRaw.getIdentifier(),
+            stateUpdated,
+            selectedRaw.getCov(),
+            time
+        );
+
+        // Step 5: Update targets
+        for (Car candidate : updatedTargets) {
+            if (candidate.getIdentifier() == selected.getIdentifier()) {
+                candidate.setState(selected.getPosX(), selected.getPosY(),
+                                selected.getVelX(), selected.getVelY());
                 candidate.setCov(selected.getCov());
                 candidate.setTime(selected.getTime());
                 candidate.setEpoch(selected.getEpoch());
+
                 this.lastUpdated = selected.getIdentifier();
                 this.lastUpdatedIG = iGmax;
                 break;
@@ -217,18 +236,22 @@ public class CarTrackingObjective implements Objective{
     public static double[] computeTrackReward(DecisionNode last, AbsoluteDate end) {
 
         // Convert observedObject to car
-        List<ObservedObject> trackedObjs = last.getEnvironment().getStateTracking();
-        List<Car> trackedCars = transformObservedObjectsToCars(trackedObjs);
+        //List<ObservedObject> trackedObjs = last.getEnvironment().getStateTracking();
+        //List<Car> trackedCars = transformObservedObjectsToCars(trackedObjs);
 
         // Initialise output
-        double[] out = new double[trackedObjs.size()];
+        double[] out = new double[1];
 
         // Propagate all targets from their intial state towards common epoch with Kepler dynamics
         Node root = last;
         while (root.getParent() != null) {
+            if (root.getClass().getSimpleName().equals("ChanceNode")) {
+                ChanceNode current = (ChanceNode)root;
+                out[0] += ((CarTrackingObjective)current.getMacro()).getLastUpdatedIG();
+            }
             root = root.getParent();
         }
-        List<ObservedObject> targetsInitial = 
+/*         List<ObservedObject> targetsInitial = 
             ((DecisionNode)root).getEnvironment().getStateTracking();
         List<Car> carsInitial = transformObservedObjectsToCars(targetsInitial);
         List<Car> targetsPredicted = Car.propagateCars(carsInitial, end);
@@ -267,7 +290,7 @@ public class CarTrackingObjective implements Objective{
                     break;
                 }
             }
-        }
+        } */
 
         return out;
     }

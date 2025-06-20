@@ -1,5 +1,6 @@
 package sensortasking.mcts;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -121,12 +122,34 @@ public class MultiObjectiveMcts {
         for(int i=0; i<iterations; i++) {  
             List<Node> outputRobustMaxRatio = new ArrayList<Node>();
 
-/*             if (i==14998) {
-                continue;
-                //C = 1.e12;
-            }  */
             System.out.println("Iteration: " + i + " MCTS call: " + mctsCall);
             selectNew(this.initial);
+
+            if (i==99) {
+                DecisionNode current = (DecisionNode)this.initial;
+                List<Map.Entry<String, Double>> branches = extractBranches(this.initial, "", 0.0);
+                double maxReward = Double.NEGATIVE_INFINITY;
+                for (Map.Entry<String, Double> entry : branches) {
+                    System.out.println("Branch " + entry.getKey() + " has reward " + entry.getValue());
+                    if (entry.getValue() > maxReward) {
+                        maxReward = entry.getValue();
+                    }
+                }
+
+                // Step 2: Collect all entries with that reward
+                List<Map.Entry<String, Double>> bestBranches = new ArrayList<>();
+                for (Map.Entry<String, Double> entry : branches) {
+                    if (entry.getValue() == maxReward) {
+                        bestBranches.add(entry);
+                    }
+                }
+
+                // Step 3: Print them
+                System.out.printf("Max reward: %.2f%n", maxReward);
+                for (Map.Entry<String, Double> entry : bestBranches) {
+                    System.out.printf("Best branch: %s with reward %.2f%n", entry.getKey(), entry.getValue());
+                }
+            }
             // Retrieve pointing strategy UCB
             Node current = initial;
 
@@ -162,6 +185,35 @@ public class MultiObjectiveMcts {
 
         return null;
     }
+
+    private List<Map.Entry<String, Double>> extractBranches(Node current, String path, double accumulatedReward) {
+        List<Map.Entry<String, Double>> result = new ArrayList<>();
+
+        // Base case: leaf node
+        if (current.getChildren().isEmpty()) {
+            result.add(new AbstractMap.SimpleEntry<>(path, accumulatedReward));
+            return result;
+        }
+
+        for (Node child : current.getChildren()) {
+            if (child instanceof ChanceNode) {
+                ChanceNode chanceChild = (ChanceNode) child;
+                CarTrackingObjective macro = (CarTrackingObjective) chanceChild.getMacro();
+                char decisionChar = macro.getLastUpdated();
+                double immediateReward = macro.getLastUpdatedIG();
+
+                String newPath = path + decisionChar;
+                double newAccumulatedReward = accumulatedReward + immediateReward;
+
+                result.addAll(extractBranches(chanceChild, newPath, newAccumulatedReward));
+            } else if (child instanceof DecisionNode) {
+                result.addAll(extractBranches(child, path, accumulatedReward));
+            }
+        }
+
+        return result;
+    }
+
 
     public Node selectChildRobustMaxRatio(Node current) {
         double robustMax = Double.NEGATIVE_INFINITY;
@@ -871,7 +923,7 @@ public class MultiObjectiveMcts {
         double[] utilityVec = computeUtilityVector(lastDecision, (DecisionNode)leaf);
         
         // add new utility vector to list of utilities
-        this.initial.addUtilityVec(leaf.getId(), utilityVec);
+        //this.initial.addUtilityVec(leaf.getId(), utilityVec);
         
         //lastDecision.setUtility(nDom);
 
@@ -1096,8 +1148,8 @@ public class MultiObjectiveMcts {
             for(int k=1; k<normedR.length; k++){
                 trackR = normedR[k] + trackR;
             }
-            //totalRtrackTotalRsearch.add(new double[]{searchR, trackR}); // scalarised tracking reward
-            totalRtrackTotalRsearch.add(normedR);
+            totalRtrackTotalRsearch.add(new double[]{searchR, trackR}); // scalarised tracking reward
+            //totalRtrackTotalRsearch.add(normedR);
         }
 
         // Filter
@@ -1107,7 +1159,7 @@ public class MultiObjectiveMcts {
             OptimisingVector opt = new OptimisingVector(totalRtrackTotalRsearch, removedUtility.length - 1);
             List<double[]> domVecs = 
                 opt.getDominatingVecs(removedUtility, 
-                                      new boolean[]{false, true, true}, 
+                                      new boolean[]{false, true}, 
                                       0);
             int utility = - domVecs.size();
             if(utility>maxUtility) {
