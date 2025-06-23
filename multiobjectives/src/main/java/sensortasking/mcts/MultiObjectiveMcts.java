@@ -40,7 +40,8 @@ public class MultiObjectiveMcts {
     final AbsoluteDate endCampaign;
 
     /** Tuning parameter fur UCB. */
-    static double C = 1.e50;
+    //static double C = 1.e50;
+    static double C = 2.;
 
     /** Topocentric horizon frame. */
     final TopocentricFrame stationFrame;
