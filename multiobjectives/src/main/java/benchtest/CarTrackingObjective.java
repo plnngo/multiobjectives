@@ -251,47 +251,6 @@ public class CarTrackingObjective implements Objective{
             }
             root = root.getParent();
         }
-/*         List<ObservedObject> targetsInitial = 
-            ((DecisionNode)root).getEnvironment().getStateTracking();
-        List<Car> carsInitial = transformObservedObjectsToCars(targetsInitial);
-        List<Car> targetsPredicted = Car.propagateCars(carsInitial, end);
-
-        // Propagate all targets from their updated final state towards common epoch
-        //List<ObservedObject> targetsUpdated = last.getEnvironment().getStateTracking();
-        List<Car> targetsFinal = Car.propagateCars(trackedCars, end);
-
-        // Calculate information gain
-        if(targetsPredicted.size() != targetsFinal.size()) {
-            throw new IllegalArgumentException("Information gain cannot be computed due to " 
-                                                + "dimension error in targets.");
-        }
-        double accumulatedIG = 0;
-
-        for(int i=0; i<targetsPredicted.size(); i++) {
-            int j=0;
-            while(j<targetsFinal.size()) {
-
-                // Make sure that ID of objects are the same when computing information gain
-                if(targetsPredicted.get(i).getIdentifier() != targetsFinal.get(j).getIdentifier()) {
-                    // Move to next object in targetFinals                                                                          
-                    j++;
-                } else {
-                    // Same ID found
-                    // TODO: check if i=0 is always A and i=1 is B
-                    out[i] = computeKLDivergence(targetsPredicted.get(i).getStateArray(), 
-                                                 targetsFinal.get(j).getStateArray(), 
-                                                 targetsPredicted.get(i).getCov(), 
-                                                 targetsFinal.get(j).getCov());
-                    accumulatedIG += out[i];
-                        
-                    // No need to continue searching in targetFinals
-                    targetsFinal.remove(j);
-                    j=0;
-                    break;
-                }
-            }
-        } */
-
         return out;
     }
 
