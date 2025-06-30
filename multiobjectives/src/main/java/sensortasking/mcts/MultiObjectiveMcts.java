@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Random;
 import java.util.Map;
 
 import org.hipparchus.util.FastMath;
@@ -41,7 +42,7 @@ public class MultiObjectiveMcts {
 
     /** Tuning parameter fur UCB. */
     //static double C = 1.e50;
-    static double C = 2.;
+    static double C = 100.;
 
     /** Topocentric horizon frame. */
     final TopocentricFrame stationFrame;
@@ -126,7 +127,7 @@ public class MultiObjectiveMcts {
             System.out.println("Iteration: " + i + " MCTS call: " + mctsCall);
             selectNew(this.initial);
 
-            if (i==99) {
+            if (i==98) {
                 DecisionNode current = (DecisionNode)this.initial;
                 List<Map.Entry<String, Double>> branches = extractBranches(this.initial, "", 0.0);
                 double maxReward = Double.NEGATIVE_INFINITY;
@@ -150,6 +151,8 @@ public class MultiObjectiveMcts {
                 for (Map.Entry<String, Double> entry : bestBranches) {
                     System.out.printf("Best branch: %s with reward %.2f%n", entry.getKey(), entry.getValue());
                 }
+            } else if (i==99) {
+                System.out.println("Break");
             }
             // Retrieve pointing strategy UCB
             Node current = initial;
@@ -920,7 +923,7 @@ public class MultiObjectiveMcts {
         } else {
             lastDecision = (DecisionNode) last;
         }
-        // Compute utility value of leaf node
+        // Compute multi-objective utility value of leaf node
         double[] utilityVec = computeUtilityVector(lastDecision, (DecisionNode)leaf);
         
         // add new utility vector to list of utilities
@@ -1184,14 +1187,22 @@ public class MultiObjectiveMcts {
         }
     
         // search for child that maximises ucb
+        Random rand = new Random();
         for(int i=0; i<ucb.length; i++) { 
             if(ucb[i]>maxUcb) {
                 maxUcb = ucb[i];
-                potentiallySelected = current.getChildren().get(i);
             } else if(ucb[i] == maxUcb) {
-                //System.out.println("several nodes share same optimal ucb");
+                System.out.println("several nodes share same optimal ucb");
+            } 
+        }
+        List<Node> bestCandidates = new ArrayList<>();
+        for (int i=0; i<ucb.length; i++) {
+            if (ucb[i] == maxUcb) {
+                bestCandidates.add(current.getChildren().get(i));
             }
         }
+        // Pick one randomly
+        potentiallySelected = bestCandidates.get(rand.nextInt(bestCandidates.size()));
         return potentiallySelected;
     }
 
@@ -1201,6 +1212,7 @@ public class MultiObjectiveMcts {
             double[] utilityNorm = new double[child.getUtilityVec().length];
             for(int i=0; i<utilityNorm.length; i++) {   
                 utilityNorm[i] = child.getUtilityVec()[i] / child.getNumVisits();
+                //utilityNorm[i] = child.getUtilityVec()[i];
             }
             utilityChildrenNorm.add(utilityNorm); 
         }
