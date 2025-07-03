@@ -28,12 +28,16 @@ public class Filter {
     double[][] covPred;
 
     /** Process noise. */
-    double Q = 1e-8;
+    double Q = 1E-15;
 
     /** Measurement noise. */
     double Rk = 0.02;
 
+    double epsilon = 1e-7;
+
     public void run_ckf(double[] X0_ref, double[][] P_pre, double t0, double t_obs, double obs_data) {
+
+        System.out.println(new ArrayRealVector(X0_ref) + " time: " + t_obs);
 
         RealMatrix P0 = new Array2DRowRealMatrix(P_pre);
         RealMatrix Rk_mat = new Array2DRowRealMatrix(new double[]{Rk});
@@ -76,7 +80,9 @@ public class Filter {
         for (int i=0; i<n; i++) {
 
             // Extract state vector
-            Xref[i] = y[i];
+            double rounded = FastMath.rint(y[i] / epsilon) * epsilon;
+            Xref[i] = rounded;
+            //System.out.println(Xref[i] + " ; " + FastMath.rint(y[i] / epsilon));
         }
         RealVector Xref_vec = new ArrayRealVector(Xref);
         this.statePred = Xref.clone();
@@ -105,13 +111,20 @@ public class Filter {
         // Compute system noise mapping matrix
         MeasurementModel measModel = LinearRangeMeasurementModel.generateHk(Xref); 
         double innov = obs_data - measModel.Gk;
+/*         if (innov < 1e-12) {
+            innov = 0.;
+        } */
         double[] hk_til = measModel.Hk_til;
+        System.out.println("Innovation: " + innov);
+        System.out.println(obs_data);
+        System.out.println(measModel.Gk);
         RealMatrix Hk_til = new Array2DRowRealMatrix(hk_til).transpose();
 
         // Kalman gain
         RealMatrix S = Hk_til.multiply(Pk_bar).multiplyTransposed(Hk_til).add(Rk_mat);
+        /* System.out.println("S covariance:");
+        App.printCovariance(S); */
         RealMatrix Kk = Pk_bar.multiplyTransposed(Hk_til).multiply(MatrixUtils.inverse(S));
-        //App.printCovariance(Kk);
 
         // Correction
         double[] xhat = xk_bar_mat.add(Kk.scalarMultiply(innov - Hk_til.operate(xk_bar)[0]))
@@ -119,11 +132,12 @@ public class Filter {
         RealVector xhat_vec = new ArrayRealVector(xhat);
         RealVector Xref_out = Xref_vec.add(xhat_vec);
         this.stateCorr = Xref_out.toArray();
+        if (FastMath.abs(Xref_out.getEntry(3))>0.00001) {
+            throw new IllegalArgumentException("Object is moving with non-zero velocity along "
+                                                    + "Y axis");
+        }
 
         // Joseph-form covariance update 
-        //App.printCovariance(Kk.multiply(Hk_til));
-        //RealMatrix kalmanCorr = ones.add(Kk.multiply(Hk_til).scalarMultiply(-1));
-
         RealMatrix kalmanCorr = ones.subtract(Kk.multiply(Hk_til));
         //App.printCovariance(kalmanCorr);
         RealMatrix P_out = kalmanCorr.multiply(Pk_bar)
