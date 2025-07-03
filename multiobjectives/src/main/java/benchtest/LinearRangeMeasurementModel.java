@@ -1,5 +1,7 @@
 package benchtest;
 
+import org.hipparchus.util.FastMath;
+
 public class LinearRangeMeasurementModel {
 
     public static class MeasurementModel {
@@ -18,7 +20,9 @@ public class LinearRangeMeasurementModel {
         double posX = X[0];
         double posY = X[1];
 
-        double Gk = Math.sqrt(posX * posX + posY * posY);
+        double Gk = FastMath.sqrt(posX * posX + posY * posY);
+/*         System.out.println(posX);
+        System.out.println(posY); */
 
         // Avoid division by zero
         if (Gk == 0) {

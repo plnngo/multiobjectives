@@ -42,7 +42,7 @@ public class MultiObjectiveMcts {
 
     /** Tuning parameter fur UCB. */
     //static double C = 1.e50;
-    static double C = 100.;
+    static double C = 10000.;
 
     /** Topocentric horizon frame. */
     final TopocentricFrame stationFrame;
@@ -127,7 +127,7 @@ public class MultiObjectiveMcts {
             System.out.println("Iteration: " + i + " MCTS call: " + mctsCall);
             selectNew(this.initial);
 
-            if (i==98) {
+            if (i==4998) {
                 DecisionNode current = (DecisionNode)this.initial;
                 List<Map.Entry<String, Double>> branches = extractBranches(this.initial, "", 0.0);
                 double maxReward = Double.NEGATIVE_INFINITY;
@@ -151,7 +151,7 @@ public class MultiObjectiveMcts {
                 for (Map.Entry<String, Double> entry : bestBranches) {
                     System.out.printf("Best branch: %s with reward %.2f%n", entry.getKey(), entry.getValue());
                 }
-            } else if (i==99) {
+            } else if (i==4999) {
                 System.out.println("Break");
             }
             // Retrieve pointing strategy UCB
