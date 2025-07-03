@@ -18,6 +18,7 @@ import org.orekit.time.AbsoluteDate;
 import lombok.Getter;
 import sensortasking.mcts.AngleType;
 import sensortasking.mcts.AngularDirection;
+import sensortasking.mcts.App;
 import sensortasking.mcts.ChanceNode;
 import sensortasking.mcts.DecisionNode;
 import sensortasking.mcts.Node;
@@ -68,6 +69,10 @@ public class CarTrackingObjective implements Objective{
             double simMeas = generateMeasurement(time, state);
             Filter est = new Filter();
             est.run_ckf(state, copy.getCov(), copy.getTime(), time, simMeas);
+            if (FastMath.abs(copy.getVelY())>0.00001) {
+                throw new IllegalArgumentException("Object is moving with non-zero velocity along "
+                                                        + "Y axis");
+            }
 
             // Compute information gain
 /*             System.out.println("predicted:");
@@ -77,13 +82,18 @@ public class CarTrackingObjective implements Objective{
             double iG = 
                 computeKLDivergence(est.statePred, est.stateCorr, 
                                                  est.covPred, est.covCorr);
+            //double iG = computeTraceChange(est.covPred, est.covCorr);
             Car copyUpdated = new Car(copy.getIdentifier(), est.stateCorr, est.covCorr, time);
+            if (FastMath.abs(copyUpdated.getVelY())>0.00001) {
+                throw new IllegalArgumentException("Object is moving with non-zero velocity along "
+                                                        + "Y axis");
+            }
             checkTrackable.put(copyUpdated, iG);
         }
 
         // Step 1: Find max IG
         Random rand = new Random();
-        double iGmax = Double.MIN_VALUE;
+        double iGmax = -Double.MAX_VALUE;
         for (Entry<Car, Double> entry : checkTrackable.entrySet()) {
             if (entry.getValue() > iGmax) {
                 iGmax = entry.getValue();
@@ -96,6 +106,9 @@ public class CarTrackingObjective implements Objective{
             if (entry.getValue() == iGmax) {
                 bestCandidates.add(entry.getKey());
             }
+        }
+        if (bestCandidates.isEmpty()) {
+            System.out.println("No candidates");
         }
 
         // Step 3: Pick one randomly
@@ -121,6 +134,10 @@ public class CarTrackingObjective implements Objective{
                 candidate.setCov(selected.getCov());
                 candidate.setTime(selected.getTime());
                 candidate.setEpoch(selected.getEpoch());
+                if (FastMath.abs(selected.getVelY())>0.00001) {
+                    throw new IllegalArgumentException("Object is moving with non-zero velocity along "
+                                                            + "Y axis");
+                }
 
                 this.lastUpdated = selected.getIdentifier();
                 this.lastUpdatedIG = iGmax;
@@ -137,6 +154,17 @@ public class CarTrackingObjective implements Objective{
                                                       AngleType.RADEC, range);
         angle.setDate(this.start.shiftedBy(time));
         return angle;
+    }
+
+    private double computeTraceChange(double[][] covPrior, double[][] covPost) {
+
+        // Retrieve covariances
+        RealMatrix covP = new Array2DRowRealMatrix(covPrior);
+        RealMatrix covQ = new Array2DRowRealMatrix(covPost);
+
+        double change = covP.getTrace() - covQ.getTrace();
+        System.out.println("Trace change " + change);
+        return change;
     }
 
     protected static double computeKLDivergence(double[] statePrior, 
@@ -157,8 +185,10 @@ public class CarTrackingObjective implements Objective{
         LUDecomposition decomQ = new LUDecomposition(covQ);
         double detP = decomP.getDeterminant();
         double detQ = decomQ.getDeterminant();
+        //detQ = 3.8462e-18;
 
         double logDetCovQByDetCovP = FastMath.log(detQ/detP);
+        double traceCovQ = covQ.getTrace();
 
         // Compute inverse of covQ
         RealMatrix invCovQ = MatrixUtils.inverse(covQ);
@@ -195,11 +225,10 @@ public class CarTrackingObjective implements Objective{
 
     private double generateMeasurement(double time, double[] state) {
         // Ensure that object only moves with constant velocity along X axis
-        if (FastMath.abs(state[3])>0.1) {
+        if (FastMath.abs(state[3])>0.00001) {
             throw new IllegalArgumentException("Object is moving with non-zero velocity along "
                                                     + "Y axis");
         } else {
-            //double posXCurrent = state[0];
             double velX = state[2];
             double dist = time * velX;
             double posXNew = dist;
