@@ -961,7 +961,11 @@ public class MultiObjectiveMcts {
             double[] preUtilityVec = current.getUtilityVec();
             double[] postUtilityVec = new double[preUtilityVec.length];
             for(int i=0; i<preUtilityVec.length; i++) {
-                postUtilityVec[i] = preUtilityVec[i] + utilityVec[i];
+
+                // Update Value of the node
+                postUtilityVec[i] = preUtilityVec[i] + (utilityVec[i] - preUtilityVec[i]
+                                                        /current.getNumVisits());
+                //postUtilityVec[i] = preUtilityVec[i] + utilityVec[i];
             }
             current.setUtilityVec(postUtilityVec);
             current = current.getParent();
@@ -970,13 +974,57 @@ public class MultiObjectiveMcts {
         this.initial.incrementNumVisits();
         // double updatedUtility = this.initial.getUtility() + nDom;
         // this.initial.setUtility(updatedUtility);
-        double[] preUtilityVec = this.initial.getUtilityVec();
+        /* double[] preUtilityVec = this.initial.getUtilityVec();
         double[] postUtilityVec = new double[preUtilityVec.length];
         for(int i=0; i<preUtilityVec.length; i++) {
             postUtilityVec[i] = preUtilityVec[i] + utilityVec[i];
-        }        // this.initial.setUtility(postUtilityVec);
+            postUtilityVec[i] = preUtilityVec[i] + (utilityVec[i] - preUtilityVec[i]
+                                                        /this.initial.getNumVisits());
+        }        // this.initial.setUtility(postUtilityVec); */
         return this.initial;
     }
+
+    /* private double computeRegret(DecisionNode lastDecision) {
+        List<ObservedObject> env = lastDecision.getEnvironment().getStateTracking();
+        ChanceNode parent = (ChanceNode) lastDecision.getParent();
+        char lastUpdated = ((CarTrackingObjective)parent.getMacro()).getLastUpdated();
+        //List<Node> siblings = parent.getChildren();
+        double regret = 0.;
+        for(ObservedObject objEnv : env) {
+            // Extract sibling 
+            Car sibling = (Car)objEnv;
+            if (sibling.getIdentifier() != lastUpdated) {
+
+                double timeUntilEnd = this.endCampaign.durationFrom(this.startCampaign);
+
+                double simMeasPred = 
+                    CarTrackingObjective.generateMeasurement(timeUntilEnd, sibling.getStateArray());
+                Filter estLoss = new Filter();
+
+                // Extract predicted covariance of sibling propagated to endCampaign 
+                estLoss.run_ckf(sibling.getStateArray(), sibling.getCov(), sibling.getTime(), 
+                                timeUntilEnd, simMeasPred);
+                double[][] predCovSibling = estLoss.getCovPred();
+                List<Car> predNoMeasSiblings = 
+                    ((CarTrackingObjective)parent.getMacro()).getPredictedTargets();
+                
+                // Extract predicted covariance of sibling without measurement updates propagated 
+                // to endCampaign 
+                double[][] predCovNoMeasSibling = 
+                    new double[predCovSibling.length][predCovSibling.length];
+                for (Car same : predNoMeasSiblings) {
+                    if (same.getIdentifier() == sibling.getIdentifier()) {
+                        predCovNoMeasSibling = same.getCov();
+                        break;
+                    }
+                }
+                regret += CarTrackingObjective.computeTraceChange(predCovNoMeasSibling, 
+                                                                  predCovSibling);
+            }
+        }
+        return regret;
+    } */
+
 
     /**
      * Return the utility vector. First entry contains search reward, the following all the rewards 
@@ -993,7 +1041,10 @@ public class MultiObjectiveMcts {
         if (orbitMode) {
             trackReward = computeTrackReward(last);
         } else {
-            trackReward = CarTrackingObjective.computeTrackReward(last, leaf, this.endCampaign);
+            double tCampaign = this.endCampaign.durationFrom(this.startCampaign);
+
+            // Reward measured as regret
+            trackReward = CarTrackingObjective.computeTrackReward(last, leaf, tCampaign);
         }
         
         // Compute searching reward

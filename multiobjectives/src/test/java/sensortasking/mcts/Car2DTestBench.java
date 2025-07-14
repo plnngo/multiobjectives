@@ -63,8 +63,8 @@ public class Car2DTestBench {
         List<String> objectives = new ArrayList<String>(Arrays.asList( "TRACK_CAR"));
         MultiObjectiveMcts mcts = 
             new MultiObjectiveMcts(root, objectives, root.getEpoch(), 
-                                   root.getEpoch().shiftedBy(15. * 60.), "Origin", cars, 
+                                   root.getEpoch().shiftedBy(5. * 60.), "Origin", cars, 
                                    null, sensor);
-        mcts.run(2000, 2);
+        mcts.run(100, 2);
     }
 }
