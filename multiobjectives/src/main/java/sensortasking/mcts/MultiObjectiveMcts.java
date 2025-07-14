@@ -20,6 +20,7 @@ import org.orekit.utils.IERSConventions;
 
 import benchtest.Car;
 import benchtest.CarTrackingObjective;
+import benchtest.Filter;
 import lombok.Getter;
 import sensortasking.stripescanning.Stripe;
 import sensortasking.stripescanning.Tasking;
@@ -70,6 +71,11 @@ public class MultiObjectiveMcts {
 
     final boolean orbitMode = false;        // else car mode
 
+    /** Cars propagated to end without measurement updates. */
+    final List<ObservedObject> predictedCars = new ArrayList<ObservedObject>();
+
+
+
     /** Basic constructor.
      * 
      * @param descisionTree
@@ -104,6 +110,20 @@ public class MultiObjectiveMcts {
                             + this.sensor.getReadoutT();
         double campaignT = endCampaign.durationFrom(startCampaign);
         this.dmax = FastMath.ceil(campaignT/minTaskT) - 1;
+
+        // If tracking cars
+        if (!orbitMode) {
+            for (ObservedObject obj : trackedObjects) {
+                Car car = (Car) obj;
+                Filter est = new Filter();
+                double simMeas = CarTrackingObjective.generateMeasurement(campaignT, 
+                                                                          car.getStateArray());
+                est.run_ckf(car.getStateArray(), car.getCov(), car.getTime(), campaignT, simMeas);
+                Car pred = new Car(car.getIdentifier(), est.getStatePred(), 
+                                   est.getCovPred(), campaignT);
+                predictedCars.add(pred);
+            }
+        }
     }
 
   
@@ -127,7 +147,7 @@ public class MultiObjectiveMcts {
             System.out.println("Iteration: " + i + " MCTS call: " + mctsCall);
             selectNew(this.initial);
 
-            if (i==4998) {
+            if (i==1996) {
                 DecisionNode current = (DecisionNode)this.initial;
                 List<Map.Entry<String, Double>> branches = extractBranches(this.initial, "", 0.0);
                 double maxReward = Double.NEGATIVE_INFINITY;
@@ -151,7 +171,7 @@ public class MultiObjectiveMcts {
                 for (Map.Entry<String, Double> entry : bestBranches) {
                     System.out.printf("Best branch: %s with reward %.2f%n", entry.getKey(), entry.getValue());
                 }
-            } else if (i==4999) {
+            } else if (i==1999) {
                 System.out.println("Break");
             }
             // Retrieve pointing strategy UCB
@@ -170,8 +190,8 @@ public class MultiObjectiveMcts {
                 for(Node currentNode : outputRobustMaxRatio) {
                     if (currentNode.getClass().getSimpleName().equals("ChanceNode")) {
                         String objective = ((ChanceNode) currentNode).getMacro().getClass().getSimpleName();
-                        if (objective.equals("TrackingObjective")) {
-                            long id = ((TrackingObjective)((ChanceNode) currentNode).getMacro())
+                        if (objective.equals("CarTrackingObjective")) {
+                            char id = ((CarTrackingObjective)((ChanceNode) currentNode).getMacro())
                                                                                         .getLastUpdated();
 
                             System.out.print(id + " ");
@@ -570,7 +590,8 @@ public class MultiObjectiveMcts {
                         }
                     }
                 }
-                objective = new CarTrackingObjective(ooiCar, this.startCampaign, this.endCampaign);
+                objective = new CarTrackingObjective(ooiCar, this.startCampaign, 
+                                                     this.endCampaign, this.predictedCars);
                 pointing = objective.setMicroAction(leaf.getEpoch(), leaf.getSensorPointing());
                 
                 //throw new IllegalAccessError("Unknown objective.");
@@ -961,8 +982,8 @@ public class MultiObjectiveMcts {
      * Return the utility vector. First entry contains search reward, the following all the rewards 
      * resulting from the tracking objective.
      * 
-     * @param last
-     * @param leaf
+     * @param last          last simulated node.
+     * @param leaf          last extisting node (without simulated nodes).
      * @return
      */
     private double[] computeUtilityVector(DecisionNode last, DecisionNode leaf) {
@@ -972,7 +993,7 @@ public class MultiObjectiveMcts {
         if (orbitMode) {
             trackReward = computeTrackReward(last);
         } else {
-            trackReward = CarTrackingObjective.computeTrackReward(last, this.endCampaign);
+            trackReward = CarTrackingObjective.computeTrackReward(last, leaf, this.endCampaign);
         }
         
         // Compute searching reward
@@ -1097,7 +1118,7 @@ public class MultiObjectiveMcts {
             }
             List<double[]> dominating = opt.getDominatingVecs(discrepance, domMin, 0);
             if(dominating.size() != 0) {
-                System.out.println("error");
+                //System.out.println("error");
                 searchReward = dominating.size() * (-1);
             }
 
@@ -1191,8 +1212,6 @@ public class MultiObjectiveMcts {
         for(int i=0; i<ucb.length; i++) { 
             if(ucb[i]>maxUcb) {
                 maxUcb = ucb[i];
-            } else if(ucb[i] == maxUcb) {
-                System.out.println("several nodes share same optimal ucb");
             } 
         }
         List<Node> bestCandidates = new ArrayList<>();

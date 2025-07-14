@@ -14,9 +14,10 @@ import org.hipparchus.ode.nonstiff.ClassicalRungeKuttaIntegrator;
 import org.hipparchus.util.FastMath;
 
 import benchtest.LinearRangeMeasurementModel.MeasurementModel;
+import lombok.Getter;
 import sensortasking.mcts.App;
 
-
+@Getter
 public class Filter {
 
     double[] stateCorr;
@@ -28,7 +29,7 @@ public class Filter {
     double[][] covPred;
 
     /** Process noise. */
-    double Q = 1E-15;
+    double Q = 0.;      //1E-15;
 
     /** Measurement noise. */
     double Rk = 0.02;
@@ -37,7 +38,7 @@ public class Filter {
 
     public void run_ckf(double[] X0_ref, double[][] P_pre, double t0, double t_obs, double obs_data) {
 
-        System.out.println(new ArrayRealVector(X0_ref) + " time: " + t_obs);
+        //System.out.println(new ArrayRealVector(X0_ref) + " time: " + t_obs);
 
         RealMatrix P0 = new Array2DRowRealMatrix(P_pre);
         RealMatrix Rk_mat = new Array2DRowRealMatrix(new double[]{Rk});
@@ -82,7 +83,9 @@ public class Filter {
             // Extract state vector
             double rounded = FastMath.rint(y[i] / epsilon) * epsilon;
             Xref[i] = rounded;
-            //System.out.println(Xref[i] + " ; " + FastMath.rint(y[i] / epsilon));
+            if(i==2) {
+                //System.out.println(Xref[i]);
+            }
         }
         RealVector Xref_vec = new ArrayRealVector(Xref);
         this.statePred = Xref.clone();
@@ -115,9 +118,9 @@ public class Filter {
             innov = 0.;
         } */
         double[] hk_til = measModel.Hk_til;
-        System.out.println("Innovation: " + innov);
+/*         System.out.println("Innovation: " + innov);
         System.out.println(obs_data);
-        System.out.println(measModel.Gk);
+        System.out.println(measModel.Gk); */
         RealMatrix Hk_til = new Array2DRowRealMatrix(hk_til).transpose();
 
         // Kalman gain

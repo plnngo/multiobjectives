@@ -39,7 +39,14 @@ public class CarTrackingObjective implements Objective{
 
     double lastUpdatedIG = 0.;
 
-    public CarTrackingObjective(List<ObservedObject> targets, AbsoluteDate startCampaign, AbsoluteDate endCampaign) {
+    final double tstep = 60.;         // originally 1.
+
+    final List<Car> predictedTargets = new ArrayList<>();
+
+    final double iLLimit = 1e-7;
+
+    public CarTrackingObjective(List<ObservedObject> targets, AbsoluteDate startCampaign, 
+                                AbsoluteDate endCampaign, List<ObservedObject> targetsPred) {
 
         // Initialise list of targets
         for (ObservedObject target : targets) {
@@ -47,12 +54,17 @@ public class CarTrackingObjective implements Objective{
         }
         this.start = startCampaign;
         this.end = endCampaign;
+
+        // Set predicted targets propagated to end date without considering measurement updates
+        for (ObservedObject target : targetsPred) {
+            predictedTargets.add((Car) target);
+        }
     }
 
     @Override
     public AngularDirection setMicroAction(AbsoluteDate current, AngularDirection sensorPointing) {
-
-        double time = current.durationFrom(this.start) + 1.;
+        
+        double time = current.durationFrom(this.start) + tstep;
 
         // No cars to track
         if (this.updatedTargets.isEmpty()) {
@@ -60,7 +72,7 @@ public class CarTrackingObjective implements Objective{
         }
 
         // List of candidates that might be trackable
-        Map<Car, Double> checkTrackable = new HashMap<Car, Double>();        
+        Map<Car, Double[]> checkTrackable = new HashMap<Car, Double[]>();        
         for (Car obj : updatedTargets) {
             double[] state = new double[]{obj.getPosX(), obj.getPosY(), obj.getVelX(), obj.getVelY()};
             Car copy = new Car(obj.getIdentifier(), state, obj.getCov(), obj.getTime());
@@ -79,22 +91,65 @@ public class CarTrackingObjective implements Objective{
             App.printCovariance(new Array2DRowRealMatrix(est.covPred));
             System.out.println("corrected:");
             App.printCovariance(new Array2DRowRealMatrix(est.covCorr)); */
-            double iG = 
+            /* double iG = 
                 computeKLDivergence(est.statePred, est.stateCorr, 
-                                                 est.covPred, est.covCorr);
-            //double iG = computeTraceChange(est.covPred, est.covCorr);
+                                                 est.covPred, est.covCorr); */
+            double iG = computeTraceChange(est.covPred, est.covCorr);
+
+            // propagate predicted state to end date and compute loss of information update
+            Filter estLoss = new Filter();
+            //double timeUntilEnd = this.end.durationFrom(current) - tstep;
+            double timeUntilEnd = this.end.durationFrom(this.start);
+
+            double simMeasPred = generateMeasurement(timeUntilEnd, est.statePred);
+            estLoss.run_ckf(est.statePred, est.covPred, time, timeUntilEnd, simMeasPred);
+
+            // search for the corresponding target in predicted targets
+            double[][] predCovNoMeas = new double[estLoss.covCorr.length][estLoss.covCorr.length];
+            for (Car objPred : predictedTargets) {
+                if (objPred.getIdentifier() == obj.getIdentifier()) {
+                    predCovNoMeas = objPred.getCov();
+                }
+            }
+
+            double iL = computeTraceChange(predCovNoMeas, estLoss.covPred );
             Car copyUpdated = new Car(copy.getIdentifier(), est.stateCorr, est.covCorr, time);
             if (FastMath.abs(copyUpdated.getVelY())>0.00001) {
                 throw new IllegalArgumentException("Object is moving with non-zero velocity along "
                                                         + "Y axis");
             }
-            checkTrackable.put(copyUpdated, iG);
+            checkTrackable.put(copyUpdated, new Double[]{iG, iL});
         }
+
+        // Step 0: extract reward (iG-iL)
+        Map<Car, Double> checkTrackableReward = new HashMap<Car, Double>();        
+
+        for (Entry<Car, Double[]> entry : checkTrackable.entrySet()) {
+            double noRegret = 0;
+            for (Entry<Car, Double[]> other : checkTrackable.entrySet()) {
+                if (other.getKey().getIdentifier() != entry.getKey().getIdentifier()) {
+                    // define lost
+                    noRegret += other.getValue()[1];
+                }
+            }
+            double reward = noRegret;     //entry.getValue()[0];
+            /* if (checkTrackable.entrySet().size() != 1) {
+                // No alternative candidate
+                //reward = reward - 1./lost;
+                if (noRegret < iLLimit) {
+                    noRegret = iLLimit;
+                }
+                reward = FastMath.abs(1./noRegret);
+                System.out.println(1./noRegret);
+            } */
+            checkTrackableReward.put(entry.getKey(), reward);
+        }
+
 
         // Step 1: Find max IG
         Random rand = new Random();
         double iGmax = -Double.MAX_VALUE;
-        for (Entry<Car, Double> entry : checkTrackable.entrySet()) {
+        for (Entry<Car, Double> entry : checkTrackableReward.entrySet()) {
             if (entry.getValue() > iGmax) {
                 iGmax = entry.getValue();
             }
@@ -102,17 +157,15 @@ public class CarTrackingObjective implements Objective{
 
         // Step 2: Collect all cars with max IG
         List<Car> bestCandidates = new ArrayList<>();
-        for (Entry<Car, Double> entry : checkTrackable.entrySet()) {
+        for (Entry<Car, Double> entry : checkTrackableReward.entrySet()) {
             if (entry.getValue() == iGmax) {
                 bestCandidates.add(entry.getKey());
             }
         }
-        if (bestCandidates.isEmpty()) {
-            System.out.println("No candidates");
-        }
 
         // Step 3: Pick one randomly
         Car selectedRaw = bestCandidates.get(rand.nextInt(bestCandidates.size()));
+        //System.out.println("selected car: " + selectedRaw.getIdentifier());
 
         // Step 4: Construct the selected Car object
         double[] stateUpdated = new double[]{
@@ -162,8 +215,10 @@ public class CarTrackingObjective implements Objective{
         RealMatrix covP = new Array2DRowRealMatrix(covPrior);
         RealMatrix covQ = new Array2DRowRealMatrix(covPost);
 
+        //App.printCovariance(covP);
+        //App.printCovariance(covQ);
         double change = covP.getTrace() - covQ.getTrace();
-        System.out.println("Trace change " + change);
+        //double changeNorm = change/covP.getTrace();
         return change;
     }
 
@@ -223,7 +278,7 @@ public class CarTrackingObjective implements Objective{
         return dKL;
     }
 
-    private double generateMeasurement(double time, double[] state) {
+    public static double generateMeasurement(double time, double[] state) {
         // Ensure that object only moves with constant velocity along X axis
         if (FastMath.abs(state[3])>0.00001) {
             throw new IllegalArgumentException("Object is moving with non-zero velocity along "
@@ -241,10 +296,10 @@ public class CarTrackingObjective implements Objective{
     @Override
     public AbsoluteDate[] getExecusionDuration(AbsoluteDate current) {
 
-        double exeTime = 2.;
-        if(current.durationFrom(this.start) < 0.9) {
+        double exeTime = tstep + 1.;
+/*         if(current.durationFrom(this.start) < 0.9) {
             exeTime = 2.;       // Integration in setMicroAction fails for delta t = 0;
-        } 
+        }  */
         AbsoluteDate[] interval = new AbsoluteDate[]{current, current.shiftedBy(exeTime)};
         return interval;
     }
@@ -262,7 +317,15 @@ public class CarTrackingObjective implements Objective{
         return out;
     }
 
-    public static double[] computeTrackReward(DecisionNode last, AbsoluteDate end) {
+    /**
+     * 
+     * @param last          last simulated node.
+     * @param leaf          last extisting node (without simulated nodes).
+     * @param end
+     * @return
+     */
+    public static double[] computeTrackReward(DecisionNode last, DecisionNode leaf, 
+                                              AbsoluteDate end) {
 
         // Convert observedObject to car
         //List<ObservedObject> trackedObjs = last.getEnvironment().getStateTracking();
@@ -273,13 +336,26 @@ public class CarTrackingObjective implements Objective{
 
         // Propagate all targets from their intial state towards common epoch with Kepler dynamics
         Node root = last;
-        while (root.getParent() != null) {
-            if (root.getClass().getSimpleName().equals("ChanceNode")) {
-                ChanceNode current = (ChanceNode)root;
-                out[0] += ((CarTrackingObjective)current.getMacro()).getLastUpdatedIG();
+        AbsoluteDate preLeaf = leaf.getParent().getParent().getEpoch();
+
+        // Check if simulation phase was entered
+        if(last.getEpoch().compareTo(leaf.getEpoch())!=0)  {
+            while (root.getEpoch().compareTo(preLeaf)!=0) {
+                if (root.getClass().getSimpleName().equals("ChanceNode")) {
+                    ChanceNode current = (ChanceNode)root;
+                    out[0] += ((CarTrackingObjective)current.getMacro()).getLastUpdatedIG();
+                    /*System.out.println(((CarTrackingObjective)current.getMacro()).getLastUpdated() 
+                                            + " : " + ((CarTrackingObjective)current.getMacro()).getLastUpdatedIG()); */
+                }
+                root = root.getParent();
             }
-            root = root.getParent();
         }
+
+        // Add leaf reward too
+        ChanceNode parentLeaf = (ChanceNode)leaf.getParent();
+        out[0] += ((CarTrackingObjective)parentLeaf.getMacro()).getLastUpdatedIG();
+/*         System.out.println(((CarTrackingObjective)parentLeaf.getMacro()).getLastUpdated() 
+                                        + " : " + ((CarTrackingObjective)parentLeaf.getMacro()).getLastUpdatedIG()); */
         return out;
     }
 
