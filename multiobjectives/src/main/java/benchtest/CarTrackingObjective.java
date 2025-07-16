@@ -345,22 +345,20 @@ public class CarTrackingObjective implements Objective{
         Node root = last;
         AbsoluteDate preLeaf = leaf.getParent().getParent().getEpoch();
 
-        // Check if simulation phase was entered
-        if(last.getEpoch().compareTo(leaf.getEpoch())!=0)  {
-            while (root.getEpoch().compareTo(preLeaf)!=0) {
-                if (root.getClass().getSimpleName().equals("DecisionNode")) {
-                    DecisionNode current = (DecisionNode)root;
-                    //out[0] += ((CarTrackingObjective)current.getMacro()).getLastUpdatedIG();
-                    out[0] += CarTrackingObjective.computeRegret(current, tCampaign);
-                }
-                root = root.getParent();
+        // Check if simulation phase was entered  
+        while (root.getEpoch().compareTo(preLeaf)!=0) {
+            if (root.getClass().getSimpleName().equals("DecisionNode")) {
+                DecisionNode current = (DecisionNode)root;
+                //out[0] += ((CarTrackingObjective)current.getMacro()).getLastUpdatedIG();
+                out[0] += CarTrackingObjective.computeRegret(current, tCampaign);
             }
+            root = root.getParent();
         }
 
         // Add leaf reward too
         //ChanceNode parentLeaf = (ChanceNode)leaf.getParent();
         //out[0] += ((CarTrackingObjective)parentLeaf.getMacro()).getLastUpdatedIG();
-        out[0] += CarTrackingObjective.computeRegret(leaf, tCampaign);
+        //out[0] += CarTrackingObjective.computeRegret(leaf, tCampaign);
 
         return out;
     }

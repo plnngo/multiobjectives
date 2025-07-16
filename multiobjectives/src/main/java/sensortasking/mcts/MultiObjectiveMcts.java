@@ -43,7 +43,7 @@ public class MultiObjectiveMcts {
 
     /** Tuning parameter fur UCB. */
     //static double C = 1.e50;
-    static double C = 10000.;
+    static double C = 100;
 
     /** Topocentric horizon frame. */
     final TopocentricFrame stationFrame;
@@ -147,7 +147,7 @@ public class MultiObjectiveMcts {
             System.out.println("Iteration: " + i + " MCTS call: " + mctsCall);
             selectNew(this.initial);
 
-            if (i==1996) {
+            if (i==596) {
                 DecisionNode current = (DecisionNode)this.initial;
                 List<Map.Entry<String, Double>> branches = extractBranches(this.initial, "", 0.0);
                 double maxReward = Double.NEGATIVE_INFINITY;
@@ -171,7 +171,7 @@ public class MultiObjectiveMcts {
                 for (Map.Entry<String, Double> entry : bestBranches) {
                     System.out.printf("Best branch: %s with reward %.2f%n", entry.getKey(), entry.getValue());
                 }
-            } else if (i==1999) {
+            } else if (i==599) {
                 System.out.println("Break");
             }
             // Retrieve pointing strategy UCB
@@ -181,7 +181,8 @@ public class MultiObjectiveMcts {
             outputRobustMaxRatio.add(initial);
             // Travers decision until leaf node
             while(!Objects.isNull(current) && current.getChildren().size() !=0){
-                current = selectChildRobustMax(current);    //TODO: utility is still null
+                //current = selectChildRobustMax(current);    //TODO: utility is still null
+                current = selectChildMaxUtility(current);
                 outputRobustMaxRatio.add(current);
             }
             if(i==iterations-1) {
@@ -224,10 +225,22 @@ public class MultiObjectiveMcts {
                 ChanceNode chanceChild = (ChanceNode) child;
                 CarTrackingObjective macro = (CarTrackingObjective) chanceChild.getMacro();
                 char decisionChar = macro.getLastUpdated();
-                double immediateReward = macro.getLastUpdatedIG();
+                List<Node> children = child.getParent().getChildren();
+                double regret = 0.;
+                for (Node sibling : children) {
+                    ChanceNode chanceSibling = ((ChanceNode) sibling);
+                    char other = ((CarTrackingObjective)chanceSibling.getMacro()).getLastUpdated();
+                    if (other != decisionChar) {
+                        regret = ((CarTrackingObjective)chanceSibling.getMacro()).getRegret();
+                    }
+                }
+                //double immediateReward = macro.getLastUpdatedIG();
+                //double regret = chanceChild.getUtilityVec()[1];
 
                 String newPath = path + decisionChar;
-                double newAccumulatedReward = accumulatedReward + immediateReward;
+                //double newAccumulatedReward = accumulatedReward + immediateReward;
+                double newAccumulatedReward = accumulatedReward + regret;
+
 
                 result.addAll(extractBranches(chanceChild, newPath, newAccumulatedReward));
             } else if (child instanceof DecisionNode) {
@@ -963,8 +976,8 @@ public class MultiObjectiveMcts {
             for(int i=0; i<preUtilityVec.length; i++) {
 
                 // Update Value of the node
-                postUtilityVec[i] = preUtilityVec[i] + (utilityVec[i] - preUtilityVec[i]
-                                                        /current.getNumVisits());
+                postUtilityVec[i] = preUtilityVec[i] + (utilityVec[i] - preUtilityVec[i])
+                                                        /current.getNumVisits();
                 //postUtilityVec[i] = preUtilityVec[i] + utilityVec[i];
             }
             current.setUtilityVec(postUtilityVec);
@@ -1281,8 +1294,8 @@ public class MultiObjectiveMcts {
         for (Node child : children) {
             double[] utilityNorm = new double[child.getUtilityVec().length];
             for(int i=0; i<utilityNorm.length; i++) {   
-                utilityNorm[i] = child.getUtilityVec()[i] / child.getNumVisits();
-                //utilityNorm[i] = child.getUtilityVec()[i];
+                //utilityNorm[i] = child.getUtilityVec()[i] / child.getNumVisits();
+                utilityNorm[i] = child.getUtilityVec()[i];
             }
             utilityChildrenNorm.add(utilityNorm); 
         }
@@ -1294,35 +1307,31 @@ public class MultiObjectiveMcts {
         double robustMax = Double.NEGATIVE_INFINITY;
         Node potentiallySelected = null;
         
-        // Reevaluate utility for every child
-        //double weight = 1./3.;
-        //List<double[]> utilityChildrenNorm = normaliseUtilityChildren(current.getChildren(), weight);
-        
-/*         for (Node child : current.getChildren()) {
-            double[] utilityNorm = new double[child.getUtilityVec().length];
-            for(int i=0; i<utilityNorm.length; i++) {
-                utilityNorm[i] = child.getUtilityVec()[i] / child.getNumVisits();
-            }
-            utilityChildrenNorm.add(utilityNorm);
-        } */
-
         for (Node child : current.getChildren()){
             double n = child.getNumVisits();
             double v = child.getUtility();
-            /* double[] removedUtility = utilityChildrenNorm.remove(0);
-            double n = child.getNumVisits();
-            OptimisingVector opt = new OptimisingVector(utilityChildrenNorm, removedUtility.length - 1);
-            List<double[]> domVecs = 
-                opt.getDominatingVecs(removedUtility, 
-                                      new boolean[]{true, true, true, true}, 
-                                      0);
-            int v = - domVecs.size(); */
             double sum = v + n;
 
             // search for child that maximises the sum of visits and values
             if (sum>robustMax) {
                 potentiallySelected = child;
                 robustMax = sum;
+            } // TODO: need to add removed utility to utilityChildrenNorm
+        }
+        return potentiallySelected;
+    }
+
+    protected static Node selectChildMaxUtility(Node current) {
+        double maxUtility = Double.NEGATIVE_INFINITY;
+        Node potentiallySelected = null;
+        
+        for (Node child : current.getChildren()){
+            double v = child.getUtility();
+
+            // search for child that maximises the sum of visits and values
+            if (v>maxUtility) {
+                potentiallySelected = child;
+                maxUtility = v;
             } // TODO: need to add removed utility to utilityChildrenNorm
         }
         return potentiallySelected;
