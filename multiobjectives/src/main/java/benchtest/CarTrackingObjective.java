@@ -332,7 +332,8 @@ public class CarTrackingObjective implements Objective{
      * @param leaf          last extisting node (without simulated nodes).
      * @return
      */
-    public static double[] computeTrackReward(DecisionNode last, DecisionNode leaf, double tCampaign) {
+    public static double[] computeTrackReward(DecisionNode last, DecisionNode leaf, 
+                                              double tCampaign, double discount) {
 
         // Convert observedObject to car
         //List<ObservedObject> trackedObjs = last.getEnvironment().getStateTracking();
@@ -342,23 +343,20 @@ public class CarTrackingObjective implements Objective{
         double[] out = new double[1];
 
         // Propagate all targets from their intial state towards common epoch with Kepler dynamics
-        Node root = last;
-        AbsoluteDate preLeaf = leaf.getParent().getParent().getEpoch();
+        Node futureBranch = last;
+        AbsoluteDate leafEpoch = leaf.getEpoch();
 
-        // Check if simulation phase was entered  
-        while (root.getEpoch().compareTo(preLeaf)!=0) {
-            if (root.getClass().getSimpleName().equals("DecisionNode")) {
-                DecisionNode current = (DecisionNode)root;
+        while (futureBranch.getEpoch().compareTo(leafEpoch)!=0) {
+            if (futureBranch.getClass().getSimpleName().equals("DecisionNode")) {
+                DecisionNode current = (DecisionNode)futureBranch;
                 //out[0] += ((CarTrackingObjective)current.getMacro()).getLastUpdatedIG();
-                out[0] += CarTrackingObjective.computeRegret(current, tCampaign);
+                out[0] += discount * CarTrackingObjective.computeRegret(current, tCampaign);
             }
-            root = root.getParent();
+            futureBranch = futureBranch.getParent();
         }
 
-        // Add leaf reward too
-        //ChanceNode parentLeaf = (ChanceNode)leaf.getParent();
-        //out[0] += ((CarTrackingObjective)parentLeaf.getMacro()).getLastUpdatedIG();
-        //out[0] += CarTrackingObjective.computeRegret(leaf, tCampaign);
+        // Add leaf reward without discount factor
+        out[0] += CarTrackingObjective.computeRegret(leaf, tCampaign);
 
         return out;
     }
