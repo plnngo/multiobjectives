@@ -80,7 +80,8 @@ public class CarTrackingObjective implements Objective{
             Car copy = new Car(obj.getIdentifier(), state, obj.getCov(), obj.getTime());
 
             // Simulate measuremement
-            double simMeas = generateMeasurement(time, state);
+            //double simMeas = generateRangeMeasurement(time, state);
+            double simMeas = generateBearingMeasurement(time, state);
             Filter est = new Filter();
             est.run_ckf(state, copy.getCov(), copy.getTime(), time, simMeas);
             if (FastMath.abs(copy.getVelY())>0.00001) {
@@ -103,7 +104,9 @@ public class CarTrackingObjective implements Objective{
             //double timeUntilEnd = this.end.durationFrom(current) - tstep;
             double timeUntilEnd = this.end.durationFrom(this.start);
 
-            double simMeasPred = generateMeasurement(timeUntilEnd, est.statePred);
+            //double simMeasPred = generateRangeMeasurement(timeUntilEnd, est.statePred);
+            double simMeasPred = generateBearingMeasurement(timeUntilEnd, est.statePred);
+
             estLoss.run_ckf(est.statePred, est.covPred, time, timeUntilEnd, simMeasPred);
 
             // search for the corresponding target in predicted targets
@@ -224,8 +227,10 @@ public class CarTrackingObjective implements Objective{
         RealMatrix covP = new Array2DRowRealMatrix(covPrior);
         RealMatrix covQ = new Array2DRowRealMatrix(covPost);
 
-        //App.printCovariance(covP);
-        //App.printCovariance(covQ);
+/*         App.printCovariance(covP);
+        System.out.println(covP.getTrace());
+        App.printCovariance(covQ);
+        System.out.println(covQ.getTrace()); */
         double change = covP.getTrace() - covQ.getTrace();
         //double changeNorm = change/covP.getTrace();
         return change;
@@ -287,7 +292,7 @@ public class CarTrackingObjective implements Objective{
         return dKL;
     }
 
-    public static double generateMeasurement(double tobs, double[] initialState) {
+    public static double generateRangeMeasurement(double tobs, double[] initialState) {
         // Ensure that object only moves with constant velocity along X axis
         if (FastMath.abs(initialState[3])>0.00001) {
             throw new IllegalArgumentException("Object is moving with non-zero velocity along "
@@ -298,6 +303,21 @@ public class CarTrackingObjective implements Objective{
             double posXNew = dist;
             double[] stateNew = new double[]{posXNew, initialState[1], velX, initialState[3]}; 
             double simMeas = LinearRangeMeasurementModel.generateHk(stateNew).Gk;
+            return simMeas;
+        }
+    }
+
+    public static double generateBearingMeasurement(double tobs, double[] initialState) {
+        // Ensure that object only moves with constant velocity along X axis
+        if (FastMath.abs(initialState[3])>0.00001) {
+            throw new IllegalArgumentException("Object is moving with non-zero velocity along "
+                                                    + "Y axis");
+        } else {
+            double velX = initialState[2];
+            double dist = tobs * velX;
+            double posXNew = dist;
+            double[] stateNew = new double[]{posXNew, initialState[1], velX, initialState[3]}; 
+            double simMeas = LinearBearingMeasurementModel.generateHk(stateNew).Gk;
             return simMeas;
         }
     }
@@ -371,10 +391,13 @@ public class CarTrackingObjective implements Objective{
             // Extract sibling 
             Car sibling = (Car)objEnv;
             if (sibling.getIdentifier() != lastUpdated) {
-
                 double simMeasPred = 
-                    CarTrackingObjective.generateMeasurement(timeUntilEnd, 
-                                                             sibling.getStateArray());
+                    CarTrackingObjective.generateBearingMeasurement(timeUntilEnd, 
+                                                                    sibling.getStateArray());
+
+/*                 double simMeasPred = 
+                    CarTrackingObjective.generateRangeMeasurement(timeUntilEnd, 
+                                                             sibling.getStateArray()); */
                 Filter estLoss = new Filter();
 
                 // Extract predicted covariance of sibling propagated to endCampaign 

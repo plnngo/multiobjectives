@@ -43,7 +43,7 @@ public class MultiObjectiveMcts {
 
     /** Tuning parameter fur UCB. */
     //static double C = 1.e50;
-    static double C = 100;
+    static double C = 1000;
 
     /** Discount factor. */
     final double discount = 0.5;
@@ -119,8 +119,10 @@ public class MultiObjectiveMcts {
             for (ObservedObject obj : trackedObjects) {
                 Car car = (Car) obj;
                 Filter est = new Filter();
-                double simMeas = CarTrackingObjective.generateMeasurement(campaignT, 
-                                                                          car.getStateArray());
+                /* double simMeas = 
+                    CarTrackingObjective.generateRangeMeasurement(campaignT, car.getStateArray()); */
+                double simMeas = 
+                    CarTrackingObjective.generateBearingMeasurement(campaignT, car.getStateArray());
                 est.run_ckf(car.getStateArray(), car.getCov(), car.getTime(), campaignT, simMeas);
                 Car pred = new Car(car.getIdentifier(), est.getStatePred(), 
                                    est.getCovPred(), campaignT);
@@ -150,7 +152,7 @@ public class MultiObjectiveMcts {
             System.out.println("Iteration: " + i + " MCTS call: " + mctsCall);
             selectNew(this.initial);
 
-            if (i==596) {
+            if (i==96) {
                 DecisionNode current = (DecisionNode)this.initial;
                 List<Map.Entry<String, Double>> branches = extractBranches(this.initial, "", 0.0);
                 double maxReward = Double.NEGATIVE_INFINITY;
@@ -174,7 +176,7 @@ public class MultiObjectiveMcts {
                 for (Map.Entry<String, Double> entry : bestBranches) {
                     System.out.printf("Best branch: %s with reward %.2f%n", entry.getKey(), entry.getValue());
                 }
-            } else if (i==599) {
+            } else if (i==99) {
                 System.out.println("Break");
             }
             // Retrieve pointing strategy UCB

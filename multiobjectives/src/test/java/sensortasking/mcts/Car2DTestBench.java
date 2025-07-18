@@ -41,7 +41,7 @@ public class Car2DTestBench {
         // Initialise second car
         double[] initB = new double[]{0, 1, 5, 0};
         //DiagonalMatrix P0B = new DiagonalMatrix(new double[]{0.1, 0.1, 0.01, 0.01});
-        DiagonalMatrix P0B = new DiagonalMatrix(new double[]{0.2, 0.1, 0.01, 0.01});
+        DiagonalMatrix P0B = new DiagonalMatrix(new double[]{0.1, 0.1, 0.01, 0.01});
         Car carB = new Car('B', initB, P0B.getData(), 0.);
 
         List<ObservedObject> cars = new ArrayList<ObservedObject>();
@@ -66,6 +66,6 @@ public class Car2DTestBench {
             new MultiObjectiveMcts(root, objectives, root.getEpoch(), 
                                    root.getEpoch().shiftedBy(5. * 60.), "Origin", cars, 
                                    null, sensor);
-        mcts.run(600, 2);
+        mcts.run(100, 2);
     }
 }
