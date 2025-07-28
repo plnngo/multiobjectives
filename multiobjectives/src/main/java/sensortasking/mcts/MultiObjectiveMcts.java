@@ -806,7 +806,7 @@ public class MultiObjectiveMcts {
      * @param leaf              Current leaf node of the decision tree (not including simulated nodes).
      * @param last              Termination node.
      */
-    public Node backpropagateTimeUtility(Node leaf, Node last) {
+    /* public Node backpropagateTimeUtility(Node leaf, Node last) {
 
         DecisionNode lastDecision;
         ChanceNode lastChance;
@@ -904,7 +904,7 @@ public class MultiObjectiveMcts {
             this.initial.setUtility(updatedUtility);
             return this.initial;
         }
-    }
+    } */
 
     /**
      * Update the state of every parent node along the episode from the initial node down to the 
@@ -963,14 +963,14 @@ public class MultiObjectiveMcts {
             lastDecision = (DecisionNode) last;
         }
         // Compute multi-objective utility value of leaf node
-        double[] utilityVec = computeUtilityVector(lastDecision, (DecisionNode)leaf);
+        computeUtilityVector(lastDecision, (DecisionNode)leaf);
         
         // add new utility vector to list of utilities
         //this.initial.addUtilityVec(leaf.getId(), utilityVec);
         
         //lastDecision.setUtility(nDom);
 
-        Node current = leaf;
+        /* Node current = leaf;
 
         while (!current.equals(this.initial)) {
             current.incrementNumVisits();
@@ -998,7 +998,7 @@ public class MultiObjectiveMcts {
             postUtilityVec[i] = preUtilityVec[i] + (utilityVec[i] - preUtilityVec[i]
                                                         /this.initial.getNumVisits());
         }        
-        this.initial.setUtilityVec(postUtilityVec);
+        this.initial.setUtilityVec(postUtilityVec); */
         return this.initial;
     }
 
@@ -1052,7 +1052,7 @@ public class MultiObjectiveMcts {
      * @param leaf          last extisting node (without simulated nodes).
      * @return
      */
-    private double[] computeUtilityVector(DecisionNode last, DecisionNode leaf) {
+    private void computeUtilityVector(DecisionNode last, DecisionNode leaf) {
 
         // Compute tracking reward
         double[] trackReward = null;
@@ -1062,7 +1062,7 @@ public class MultiObjectiveMcts {
             double tCampaign = this.endCampaign.durationFrom(this.startCampaign);
 
             // Reward measured as regret
-            trackReward = CarTrackingObjective.computeTrackReward(last, leaf, tCampaign, discount);
+            CarTrackingObjective.computeTrackReward(last, leaf, this.initial, tCampaign, discount);
         }
         
         // Compute searching reward
@@ -1070,7 +1070,7 @@ public class MultiObjectiveMcts {
         if(searchReward!=0.) {
             System.out.println("Search reward erroneous");
         } */
-        double searchReward = last.getTimeSpentStripe();
+/*         double searchReward = last.getTimeSpentStripe();
 
         double[] out = new double[trackReward.length + 1];
         out[0] = searchReward;
@@ -1080,7 +1080,7 @@ public class MultiObjectiveMcts {
 
         // Build up utility vector from macro action rewards                
         //return new double[]{searchReward, trackReward};
-        return out;
+        return out; */
     }
 
     protected double[] computeTrackReward(DecisionNode last) {

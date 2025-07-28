@@ -355,36 +355,49 @@ public class CarTrackingObjective implements Objective{
      * @param leaf          last extisting node (without simulated nodes).
      * @return
      */
-    public static double[] computeTrackReward(DecisionNode last, DecisionNode leaf, 
-                                              double tCampaign, double discount) {
+    public static void computeTrackReward(DecisionNode last, DecisionNode leaf, 
+                                          DecisionNode initial, double tCampaign, 
+                                          double discount) {
 
         // Initialise output
-        double[] out = new double[1];
+        //double[] out = new double[1];
+        double accDiscountedR = 0.;
 
         // Propagate all targets from their intial state towards common epoch with Kepler dynamics
         Node futureBranch = last;
         AbsoluteDate leafEpoch = leaf.getEpoch();
+        if(futureBranch.getEpoch().compareTo(leafEpoch)==0) {
+            // no simulation phase took place
+            futureBranch = leaf;
+        }
 
-        while (futureBranch.getEpoch().compareTo(leafEpoch)!=0) {
+        while (!futureBranch.equals(initial)) {
             if (futureBranch.getClass().getSimpleName().equals("DecisionNode")) {
                 DecisionNode current = (DecisionNode)futureBranch;
-                double levelDif = current.getDepth()-leaf.getDepth();
+                current.incrementNumVisits();
+                current.getParent().incrementNumVisits();
                 /* out[0] += FastMath.pow(discount, levelDif) 
                             * CarTrackingObjective.computeRegretWrtSimEnd(current, tCampaign); */
-                out[0] += FastMath.pow(discount, levelDif) 
-                            * CarTrackingObjective.computeAccImmediateReward(current, tCampaign);
+                accDiscountedR = CarTrackingObjective.computeImmediateReward(current) 
+                                    + discount * accDiscountedR;
+                double utilityTrack = current.getUtilityVec()[1];       //0=search; 1=track
+                utilityTrack = utilityTrack + (accDiscountedR - utilityTrack)
+                                                        /current.getNumVisits();
+                double[] utility = new double[]{current.getUtilityVec()[0], utilityTrack};
+                current.setUtilityVec(utility);
+                current.getParent().setUtilityVec(utility);
             }
             futureBranch = futureBranch.getParent();
         }
 
         // Add leaf reward without discount factor
         //out[0] += CarTrackingObjective.computeRegretWrtSimEnd(leaf, tCampaign);
-        out[0] += CarTrackingObjective.computeAccImmediateReward(leaf, tCampaign);
+/*         out[0] += CarTrackingObjective.computeImmediateReward(leaf, tCampaign);
 
-        return out;
+        return out; */
     }
 
-    private static double computeAccImmediateReward(DecisionNode current, double tCampaign) {
+    private static double computeImmediateReward(DecisionNode current) {
         ChanceNode parent = (ChanceNode) current.getParent();
         double lastUpdatedIG = ((CarTrackingObjective)parent.getMacro()).getLastUpdatedIG();
         return lastUpdatedIG;
