@@ -32,8 +32,8 @@ public class Filter {
     double Q = 0.;      //1E-15;
 
     /** Measurement noise. */
-    //double Rk = 0.02;
-    double Rk = FastMath.pow(1 * FastMath.PI/(180*3600), 2);     // 1 arcsec
+    double Rk = 0.02;
+    //double Rk = FastMath.pow(1 * FastMath.PI/(180*3600), 2);     // 1 arcsec
 
     double epsilon = 1e-7;
 
@@ -113,9 +113,9 @@ public class Filter {
         this.covPred = Pk_bar.getData();
 
         // Compute system noise mapping matrix
-        //MeasurementModel measModel = LinearRangeMeasurementModel.generateHk(Xref); 
-        benchtest.LinearBearingMeasurementModel.MeasurementModel measModel = 
-            LinearBearingMeasurementModel.generateHk(Xref);
+        MeasurementModel measModel = LinearRangeMeasurementModel.generateHk(Xref); 
+        /* benchtest.LinearBearingMeasurementModel.MeasurementModel measModel = 
+            LinearBearingMeasurementModel.generateHk(Xref); */
         double innov = obs_data - measModel.Gk;
 /*         if (innov < 1e-12) {
             innov = 0.;

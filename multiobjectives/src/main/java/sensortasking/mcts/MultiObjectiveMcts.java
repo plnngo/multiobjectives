@@ -119,10 +119,10 @@ public class MultiObjectiveMcts {
             for (ObservedObject obj : trackedObjects) {
                 Car car = (Car) obj;
                 Filter est = new Filter();
-                /* double simMeas = 
-                    CarTrackingObjective.generateRangeMeasurement(campaignT, car.getStateArray()); */
                 double simMeas = 
-                    CarTrackingObjective.generateBearingMeasurement(campaignT, car.getStateArray());
+                    CarTrackingObjective.generateRangeMeasurement(campaignT, car.getStateArray());
+                /* double simMeas = 
+                    CarTrackingObjective.generateBearingMeasurement(campaignT, car.getStateArray()); */
                 est.run_ckf(car.getStateArray(), car.getCov(), car.getTime(), campaignT, simMeas);
                 Car pred = new Car(car.getIdentifier(), est.getStatePred(), 
                                    est.getCovPred(), campaignT);
@@ -231,20 +231,20 @@ public class MultiObjectiveMcts {
                 CarTrackingObjective macro = (CarTrackingObjective) chanceChild.getMacro();
                 char decisionChar = macro.getLastUpdated();
                 List<Node> children = child.getParent().getChildren();
-                double regret = 0.;
+                /* double regret = 0.;
                 for (Node sibling : children) {
                     ChanceNode chanceSibling = ((ChanceNode) sibling);
                     char other = ((CarTrackingObjective)chanceSibling.getMacro()).getLastUpdated();
                     if (other != decisionChar) {
                         regret = ((CarTrackingObjective)chanceSibling.getMacro()).getRegret();
                     }
-                }
-                //double immediateReward = macro.getLastUpdatedIG();
+                } */
+                double immediateReward = macro.getLastUpdatedIG();
                 //double regret = chanceChild.getUtilityVec()[1];
 
                 String newPath = path + decisionChar;
-                //double newAccumulatedReward = accumulatedReward + immediateReward;
-                double newAccumulatedReward = accumulatedReward + regret;
+                double newAccumulatedReward = accumulatedReward + immediateReward;
+                //double newAccumulatedReward = accumulatedReward + regret;
 
 
                 result.addAll(extractBranches(chanceChild, newPath, newAccumulatedReward));
@@ -992,13 +992,13 @@ public class MultiObjectiveMcts {
         this.initial.incrementNumVisits();
         // double updatedUtility = this.initial.getUtility() + nDom;
         // this.initial.setUtility(updatedUtility);
-        /* double[] preUtilityVec = this.initial.getUtilityVec();
+        double[] preUtilityVec = this.initial.getUtilityVec();
         double[] postUtilityVec = new double[preUtilityVec.length];
         for(int i=0; i<preUtilityVec.length; i++) {
-            postUtilityVec[i] = preUtilityVec[i] + utilityVec[i];
             postUtilityVec[i] = preUtilityVec[i] + (utilityVec[i] - preUtilityVec[i]
                                                         /this.initial.getNumVisits());
-        }        // this.initial.setUtility(postUtilityVec); */
+        }        
+        this.initial.setUtilityVec(postUtilityVec);
         return this.initial;
     }
 

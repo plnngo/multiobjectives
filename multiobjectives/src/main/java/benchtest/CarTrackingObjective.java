@@ -68,6 +68,10 @@ public class CarTrackingObjective implements Objective{
         
         double time = current.durationFrom(this.start) + tstep;
 
+        if(time == 60.) {
+            time++;
+        }
+
         // No cars to track
         if (this.updatedTargets.isEmpty()) {
             return null;
@@ -80,8 +84,8 @@ public class CarTrackingObjective implements Objective{
             Car copy = new Car(obj.getIdentifier(), state, obj.getCov(), obj.getTime());
 
             // Simulate measuremement
-            //double simMeas = generateRangeMeasurement(time, state);
-            double simMeas = generateBearingMeasurement(time, state);
+            double simMeas = generateRangeMeasurement(time, state);
+            //double simMeas = generateBearingMeasurement(time, state);
             Filter est = new Filter();
             est.run_ckf(state, copy.getCov(), copy.getTime(), time, simMeas);
             if (FastMath.abs(copy.getVelY())>0.00001) {
@@ -90,7 +94,7 @@ public class CarTrackingObjective implements Objective{
             }
 
             // Compute information gain
-/*             System.out.println("predicted:");
+            /* System.out.println("predicted:");
             App.printCovariance(new Array2DRowRealMatrix(est.covPred));
             System.out.println("corrected:");
             App.printCovariance(new Array2DRowRealMatrix(est.covCorr)); */
@@ -101,11 +105,10 @@ public class CarTrackingObjective implements Objective{
 
             // propagate predicted state to end date and compute loss of information update
             Filter estLoss = new Filter();
-            //double timeUntilEnd = this.end.durationFrom(current) - tstep;
             double timeUntilEnd = this.end.durationFrom(this.start);
 
-            //double simMeasPred = generateRangeMeasurement(timeUntilEnd, est.statePred);
-            double simMeasPred = generateBearingMeasurement(timeUntilEnd, est.statePred);
+            double simMeasPred = generateRangeMeasurement(timeUntilEnd, est.statePred);
+            //double simMeasPred = generateBearingMeasurement(timeUntilEnd, est.statePred);
 
             estLoss.run_ckf(est.statePred, est.covPred, time, timeUntilEnd, simMeasPred);
 
@@ -227,10 +230,10 @@ public class CarTrackingObjective implements Objective{
         RealMatrix covP = new Array2DRowRealMatrix(covPrior);
         RealMatrix covQ = new Array2DRowRealMatrix(covPost);
 
-/*         App.printCovariance(covP);
-        System.out.println(covP.getTrace());
-        App.printCovariance(covQ);
-        System.out.println(covQ.getTrace()); */
+        //App.printCovariance(covP);
+        //System.out.println("Prior: " + covP.getTrace());
+        //App.printCovariance(covQ);
+        //System.out.println("Post:" + covQ.getTrace());
         double change = covP.getTrace() - covQ.getTrace();
         //double changeNorm = change/covP.getTrace();
         return change;
@@ -355,10 +358,6 @@ public class CarTrackingObjective implements Objective{
     public static double[] computeTrackReward(DecisionNode last, DecisionNode leaf, 
                                               double tCampaign, double discount) {
 
-        // Convert observedObject to car
-        //List<ObservedObject> trackedObjs = last.getEnvironment().getStateTracking();
-        //List<Car> trackedCars = transformObservedObjectsToCars(trackedObjs);
-
         // Initialise output
         double[] out = new double[1];
 
@@ -369,19 +368,29 @@ public class CarTrackingObjective implements Objective{
         while (futureBranch.getEpoch().compareTo(leafEpoch)!=0) {
             if (futureBranch.getClass().getSimpleName().equals("DecisionNode")) {
                 DecisionNode current = (DecisionNode)futureBranch;
-                //out[0] += ((CarTrackingObjective)current.getMacro()).getLastUpdatedIG();
-                out[0] += discount * CarTrackingObjective.computeRegret(current, tCampaign);
+                double levelDif = current.getDepth()-leaf.getDepth();
+                /* out[0] += FastMath.pow(discount, levelDif) 
+                            * CarTrackingObjective.computeRegretWrtSimEnd(current, tCampaign); */
+                out[0] += FastMath.pow(discount, levelDif) 
+                            * CarTrackingObjective.computeAccImmediateReward(current, tCampaign);
             }
             futureBranch = futureBranch.getParent();
         }
 
         // Add leaf reward without discount factor
-        out[0] += CarTrackingObjective.computeRegret(leaf, tCampaign);
+        //out[0] += CarTrackingObjective.computeRegretWrtSimEnd(leaf, tCampaign);
+        out[0] += CarTrackingObjective.computeAccImmediateReward(leaf, tCampaign);
 
         return out;
     }
 
-    private static double computeRegret(DecisionNode lastDecision, double timeUntilEnd) {
+    private static double computeAccImmediateReward(DecisionNode current, double tCampaign) {
+        ChanceNode parent = (ChanceNode) current.getParent();
+        double lastUpdatedIG = ((CarTrackingObjective)parent.getMacro()).getLastUpdatedIG();
+        return lastUpdatedIG;
+    }
+
+    private static double computeRegretWrtSimEnd(DecisionNode lastDecision, double timeUntilEnd) {
         List<ObservedObject> env = lastDecision.getEnvironment().getStateTracking();
         ChanceNode parent = (ChanceNode) lastDecision.getParent();
         char lastUpdated = ((CarTrackingObjective)parent.getMacro()).getLastUpdated();
@@ -391,13 +400,55 @@ public class CarTrackingObjective implements Objective{
             // Extract sibling 
             Car sibling = (Car)objEnv;
             if (sibling.getIdentifier() != lastUpdated) {
-                double simMeasPred = 
-                    CarTrackingObjective.generateBearingMeasurement(timeUntilEnd, 
-                                                                    sibling.getStateArray());
+/*                double simMeasPred = 
+                     CarTrackingObjective.generateBearingMeasurement(timeUntilEnd, 
+                                                                    sibling.getStateArray()); */
 
-/*                 double simMeasPred = 
+                double simMeasPred = 
                     CarTrackingObjective.generateRangeMeasurement(timeUntilEnd, 
-                                                             sibling.getStateArray()); */
+                                                             sibling.getStateArray());
+                Filter estLoss = new Filter();
+
+                // Extract predicted covariance of sibling propagated to endCampaign 
+                estLoss.run_ckf(sibling.getStateArray(), sibling.getCov(), sibling.getTime(), 
+                                timeUntilEnd, simMeasPred);
+                double[][] predCovSibling = estLoss.getCovPred();
+                List<Car> predNoMeasSiblings = 
+                    ((CarTrackingObjective)parent.getMacro()).getPredictedTargets();
+                
+                // Extract predicted covariance of sibling without measurement updates propagated 
+                // to endCampaign 
+                double[][] predCovNoMeasSibling = 
+                    new double[predCovSibling.length][predCovSibling.length];
+                for (Car same : predNoMeasSiblings) {
+                    if (same.getIdentifier() == sibling.getIdentifier()) {
+                        predCovNoMeasSibling = same.getCov();
+                        break;
+                    }
+                }
+                regret += CarTrackingObjective.computeTraceChange(predCovNoMeasSibling, 
+                                                                  predCovSibling);
+            }
+        }
+        return regret;
+    }
+
+    private static double computeRegretWrtFOV(DecisionNode lastDecision, double timeUntilEnd) {
+        List<ObservedObject> env = lastDecision.getEnvironment().getStateTracking();
+        ChanceNode parent = (ChanceNode) lastDecision.getParent();
+        char lastUpdated = ((CarTrackingObjective)parent.getMacro()).getLastUpdated();
+        double regret = 0.;
+        for(ObservedObject objEnv : env) {
+            // Extract sibling 
+            Car sibling = (Car)objEnv;
+            if (sibling.getIdentifier() != lastUpdated) {
+                /* double simMeasPred = 
+                    CarTrackingObjective.generateBearingMeasurement(timeUntilEnd, 
+                                                                    sibling.getStateArray()); */
+                double simMeasPred = 
+                    CarTrackingObjective.generateRangeMeasurement(timeUntilEnd, 
+                                                                    sibling.getStateArray());                                                    
+
                 Filter estLoss = new Filter();
 
                 // Extract predicted covariance of sibling propagated to endCampaign 
