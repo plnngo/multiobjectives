@@ -32,8 +32,8 @@ public class Filter {
     double Q = 0.;      //1E-15;
 
     /** Measurement noise. */
-    double Rk = 0.02;
-    //double Rk = FastMath.pow(1 * FastMath.PI/(180*3600), 2);     // 1 arcsec
+    //double Rk = 0.02;
+    double Rk = FastMath.pow(1 * FastMath.PI/(180*3600), 2);     // 1 arcsec
 
     double epsilon = 1e-7;
 
@@ -67,42 +67,47 @@ public class Filter {
 
         Car carA_0 = new Car('f', X0_ref, P_pre, t0);
         ExpandableODE expandable = new ExpandableODE(carA_0);
-
-        ODEIntegrator integrator = new ClassicalRungeKuttaIntegrator(0.01);
-        ODEState initialState = new ODEState(t0, Xref_Stm0);
-        ODEStateAndDerivative finalState = integrator.integrate(expandable, initialState, t_obs);
-        if (FastMath.abs(t_obs-finalState.getTime())>1e-2) {
-            throw new IllegalArgumentException("Did not propagate the state to the observation" 
-                                                + "epoch");
-        }
-
-        // Extract propagated state
-        double[] y = finalState.getPrimaryState();
+        RealMatrix Phik;
         double[] Xref = new double[n];
-        for (int i=0; i<n; i++) {
-
-            // Extract state vector
-            double rounded = FastMath.rint(y[i] / epsilon) * epsilon;
-            Xref[i] = rounded;
-            if(i==2) {
-                //System.out.println(Xref[i]);
+        if(t0 == t_obs) {
+            Phik = ones;
+            this.statePred = X0_ref.clone();
+            Xref = X0_ref.clone();
+        } else {
+            ODEIntegrator integrator = new ClassicalRungeKuttaIntegrator(0.01);
+            ODEState initialState = new ODEState(t0, Xref_Stm0);
+            ODEStateAndDerivative finalState = integrator.integrate(expandable, initialState, t_obs);
+            if (FastMath.abs(t_obs-finalState.getTime())>1e-2) {
+                throw new IllegalArgumentException("Did not propagate the state to the observation" 
+                                                    + "epoch");
             }
-        }
-        RealVector Xref_vec = new ArrayRealVector(Xref);
-        this.statePred = Xref.clone();
 
-        // Extract phi matrix from X (column-major to 2D array)
-        double[][] Phik_arr = new double[4][4];
-        for (int col = 0; col < n; col++) {
-            for (int row = 0; row < n; row++) {
-                Phik_arr[row][col] = y[n + col * n + row];
+            // Extract propagated state
+            double[] y = finalState.getPrimaryState();
+            
+            for (int i=0; i<n; i++) {
+
+                // Extract state vector
+                double rounded = FastMath.rint(y[i] / epsilon) * epsilon;
+                Xref[i] = rounded;
             }
+            this.statePred = Xref.clone();
+
+            // Extract phi matrix from X (column-major to 2D array)
+            double[][] Phik_arr = new double[4][4];
+            for (int col = 0; col < n; col++) {
+                for (int row = 0; row < n; row++) {
+                    Phik_arr[row][col] = y[n + col * n + row];
+                }
+            }
+            Phik = new Array2DRowRealMatrix(Phik_arr).transpose();
         }
-        RealMatrix Phik = new Array2DRowRealMatrix(Phik_arr).transpose();
+
         double[][] gamma = computeGamma(0, t_obs);
         RealMatrix Gamma = new Array2DRowRealMatrix(gamma);
 
         // Predicted correction 
+        RealVector Xref_vec = new ArrayRealVector(Xref);
         double[] xk_bar = Phik.operate(xhat_pre);
         RealMatrix xk_bar_mat = new Array2DRowRealMatrix(xk_bar);
 
@@ -113,9 +118,9 @@ public class Filter {
         this.covPred = Pk_bar.getData();
 
         // Compute system noise mapping matrix
-        MeasurementModel measModel = LinearRangeMeasurementModel.generateHk(Xref); 
-        /* benchtest.LinearBearingMeasurementModel.MeasurementModel measModel = 
-            LinearBearingMeasurementModel.generateHk(Xref); */
+        //MeasurementModel measModel = LinearRangeMeasurementModel.generateHk(Xref); 
+        benchtest.LinearBearingMeasurementModel.MeasurementModel measModel = 
+            LinearBearingMeasurementModel.generateHk(Xref);
         double innov = obs_data - measModel.Gk;
 /*         if (innov < 1e-12) {
             innov = 0.;

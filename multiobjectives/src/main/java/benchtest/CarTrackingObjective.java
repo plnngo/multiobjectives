@@ -68,9 +68,9 @@ public class CarTrackingObjective implements Objective{
         
         double time = current.durationFrom(this.start) + tstep;
 
-        if(time == 60.) {
+/*         if(time == 60.) {
             time++;
-        }
+        } */
 
         // No cars to track
         if (this.updatedTargets.isEmpty()) {
@@ -84,8 +84,8 @@ public class CarTrackingObjective implements Objective{
             Car copy = new Car(obj.getIdentifier(), state, obj.getCov(), obj.getTime());
 
             // Simulate measuremement
-            double simMeas = generateRangeMeasurement(time, state);
-            //double simMeas = generateBearingMeasurement(time, state);
+            //double simMeas = generateRangeMeasurement(time, state);
+            double simMeas = generateBearingMeasurement(time, state);
             Filter est = new Filter();
             est.run_ckf(state, copy.getCov(), copy.getTime(), time, simMeas);
             if (FastMath.abs(copy.getVelY())>0.00001) {
@@ -107,8 +107,8 @@ public class CarTrackingObjective implements Objective{
             Filter estLoss = new Filter();
             double timeUntilEnd = this.end.durationFrom(this.start);
 
-            double simMeasPred = generateRangeMeasurement(timeUntilEnd, est.statePred);
-            //double simMeasPred = generateBearingMeasurement(timeUntilEnd, est.statePred);
+            //double simMeasPred = generateRangeMeasurement(timeUntilEnd, est.statePred);
+            double simMeasPred = generateBearingMeasurement(timeUntilEnd, est.statePred);
 
             estLoss.run_ckf(est.statePred, est.covPred, time, timeUntilEnd, simMeasPred);
 
@@ -328,7 +328,7 @@ public class CarTrackingObjective implements Objective{
     @Override
     public AbsoluteDate[] getExecusionDuration(AbsoluteDate current) {
 
-        double exeTime = tstep + 1.;
+        double exeTime = tstep;     // + 1.;
 /*         if(current.durationFrom(this.start) < 0.9) {
             exeTime = 2.;       // Integration in setMicroAction fails for delta t = 0;
         }  */
@@ -376,19 +376,21 @@ public class CarTrackingObjective implements Objective{
                 DecisionNode current = (DecisionNode)futureBranch;
                 current.incrementNumVisits();
                 current.getParent().incrementNumVisits();
-                /* out[0] += FastMath.pow(discount, levelDif) 
-                            * CarTrackingObjective.computeRegretWrtSimEnd(current, tCampaign); */
+                /* double immediate = CarTrackingObjective.computeRegretWrtSimEnd(current, tCampaign);
+                accDiscountedR = immediate + discount * accDiscountedR */;
                 accDiscountedR = CarTrackingObjective.computeImmediateReward(current) 
                                     + discount * accDiscountedR;
                 double utilityTrack = current.getUtilityVec()[1];       //0=search; 1=track
                 utilityTrack = utilityTrack + (accDiscountedR - utilityTrack)
                                                         /current.getNumVisits();
                 double[] utility = new double[]{current.getUtilityVec()[0], utilityTrack};
+                //((CarTrackingObjective)((ChanceNode)current.getParent()).getMacro()).regret = immediate;
                 current.setUtilityVec(utility);
                 current.getParent().setUtilityVec(utility);
             }
             futureBranch = futureBranch.getParent();
         }
+        initial.incrementNumVisits();
 
         // Add leaf reward without discount factor
         //out[0] += CarTrackingObjective.computeRegretWrtSimEnd(leaf, tCampaign);
@@ -413,13 +415,13 @@ public class CarTrackingObjective implements Objective{
             // Extract sibling 
             Car sibling = (Car)objEnv;
             if (sibling.getIdentifier() != lastUpdated) {
-/*                double simMeasPred = 
+               double simMeasPred = 
                      CarTrackingObjective.generateBearingMeasurement(timeUntilEnd, 
-                                                                    sibling.getStateArray()); */
+                                                                    sibling.getStateArray());
 
-                double simMeasPred = 
+/*                 double simMeasPred = 
                     CarTrackingObjective.generateRangeMeasurement(timeUntilEnd, 
-                                                             sibling.getStateArray());
+                                                             sibling.getStateArray()) */;
                 Filter estLoss = new Filter();
 
                 // Extract predicted covariance of sibling propagated to endCampaign 

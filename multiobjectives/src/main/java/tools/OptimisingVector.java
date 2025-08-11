@@ -72,6 +72,7 @@ public class OptimisingVector {
                 for(int entry=0; entry<this.all.size(); entry++) {
                     int endIndex = this.all.size() - 1;
                     if(this.all.get(endIndex - entry)[dim] >= toCompare[dim]) {
+                        //System.out.println(this.all.get(endIndex - entry)[dim] + " vs " + toCompare[dim]);
                         dominating.add(this.all.get(endIndex - entry));
                     } else {
                         break;
