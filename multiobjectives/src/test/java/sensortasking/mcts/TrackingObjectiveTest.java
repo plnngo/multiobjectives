@@ -723,7 +723,7 @@ public class TrackingObjectiveTest {
 
             // Set up MCTS
             MultiObjectiveMcts mcts = MultiObjectiveMctsTest.setUpMcts(date, end, topohorizon, enviro);
-            List<Node> strategy = mcts.run(mctsIter, i);
+            List<Node> strategy = mcts.run(mctsIter);
             System.out.println(strategy.size());
         }
 

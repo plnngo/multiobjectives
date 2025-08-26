@@ -46,7 +46,7 @@ public class MultiObjectiveMcts {
     static double C = 10000;
 
     /** Discount factor. */
-    final double discount = 1.;
+    final double discount = 0.;
 
     /** Topocentric horizon frame. */
     final TopocentricFrame stationFrame;
@@ -122,7 +122,7 @@ public class MultiObjectiveMcts {
                 /* double simMeas = 
                     CarTrackingObjective.generateRangeMeasurement(campaignT, car.getStateArray()); */
                 double simMeas = 
-                    CarTrackingObjective.generateBearingMeasurement(campaignT, car.getStateArray());
+                    CarTrackingObjective.generateBearingMeasurement(campaignT, car.getStateArray(), car);
                 est.run_ckf(car.getStateArray(), car.getCov(), car.getTime(), campaignT, simMeas);
                 Car pred = new Car(car.getIdentifier(), est.getStatePred(), 
                                    est.getCovPred(), campaignT);
@@ -141,7 +141,7 @@ public class MultiObjectiveMcts {
         return stripes[1];
     }
 
-    public List<Node> run(int iterations, int mctsCall) {
+    public List<Node> run(int iterations) {
 
         //List<Node> outputUCB = new ArrayList<Node>();
         //List<Node> outputRobustMax = new ArrayList<Node>();
@@ -149,10 +149,10 @@ public class MultiObjectiveMcts {
         for(int i=0; i<iterations; i++) {  
             List<Node> outputRobustMaxRatio = new ArrayList<Node>();
 
-            System.out.println("Iteration: " + i + " MCTS call: " + mctsCall);
+            System.out.println("Iteration: " + i);
             selectNew(this.initial);
 
-            if (i==20) {
+            /* if (i==130) {
                 DecisionNode current = (DecisionNode)this.initial;
                 List<Map.Entry<String, Double>> branches = extractBranches(this.initial, "", 0.0);
                 double maxReward = Double.NEGATIVE_INFINITY;
@@ -178,7 +178,7 @@ public class MultiObjectiveMcts {
                 }
             } else if (i==499) {
                 System.out.println("Break");
-            }
+            } */
             // Retrieve pointing strategy UCB
             Node current = initial;
 
@@ -1062,7 +1062,8 @@ public class MultiObjectiveMcts {
             double tCampaign = this.endCampaign.durationFrom(this.startCampaign);
 
             // Reward measured as regret
-            CarTrackingObjective.computeTrackReward(last, leaf, this.initial, tCampaign, discount);
+            CarTrackingObjective.computeTrackReward(last, leaf, this.initial, tCampaign, 
+                                                    discount, this.sensor);
         }
         
         // Compute searching reward

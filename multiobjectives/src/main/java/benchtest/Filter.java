@@ -29,11 +29,11 @@ public class Filter {
     double[][] covPred;
 
     /** Process noise. */
-    double Q = 0.;      //1E-15;
+    static double Q = 1E-5;      //1E-15;
 
     /** Measurement noise. */
     //double Rk = 0.02;
-    double Rk = FastMath.pow(1 * FastMath.PI/(180*3600), 2);     // 1 arcsec
+    public static double Rk = FastMath.pow(10 * FastMath.PI/(180*3600), 2);     // 10 arcsec
 
     double epsilon = 1e-7;
 
@@ -103,7 +103,7 @@ public class Filter {
             Phik = new Array2DRowRealMatrix(Phik_arr).transpose();
         }
 
-        double[][] gamma = computeGamma(0, t_obs);
+        double[][] gamma = computeGamma(t0, t_obs);
         RealMatrix Gamma = new Array2DRowRealMatrix(gamma);
 
         // Predicted correction 
@@ -143,10 +143,10 @@ public class Filter {
         RealVector xhat_vec = new ArrayRealVector(xhat);
         RealVector Xref_out = Xref_vec.add(xhat_vec);
         this.stateCorr = Xref_out.toArray();
-        if (FastMath.abs(Xref_out.getEntry(3))>0.00001) {
+/*         if (FastMath.abs(Xref_out.getEntry(3))>0.00001) {
             throw new IllegalArgumentException("Object is moving with non-zero velocity along "
                                                     + "Y axis");
-        }
+        } */
 
         // Joseph-form covariance update 
         RealMatrix kalmanCorr = ones.subtract(Kk.multiply(Hk_til));

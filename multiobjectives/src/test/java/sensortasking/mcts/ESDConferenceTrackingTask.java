@@ -91,7 +91,7 @@ public class ESDConferenceTrackingTask {
 
             final PropoagatedEnvironment enviro = new PropoagatedEnvironment(ooi, stripeBullseyeCompleted);
             MultiObjectiveMcts mcts = MultiObjectiveMctsTest.setUpMcts(date, end, topohorizon, enviro);
-            List<Node> strategy = mcts.run(mctsIter, i);
+            List<Node> strategy = mcts.run(mctsIter);
             System.out.println(strategy.size());
 
             String[] selected = new String[(strategy.size()-1)/2 + 1 + ooi.size()];

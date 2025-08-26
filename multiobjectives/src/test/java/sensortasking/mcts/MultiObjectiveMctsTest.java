@@ -300,7 +300,7 @@ public class MultiObjectiveMctsTest {
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", ooi, 
                                    new ArrayList<ObservedObject>(), sensor);
-        List<Node> strategy = mctsTracking.run(10, 1);
+        List<Node> strategy = mctsTracking.run(10);
         for(Node selected : strategy) {
             if(selected.getClass().getSimpleName().equals("ChanceNode")) {
 
@@ -389,7 +389,7 @@ public class MultiObjectiveMctsTest {
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", ooi, 
                                    new ArrayList<ObservedObject>(), sensor);
-        List<Node> strategy = mctsTracking.run(70000000, 1);
+        List<Node> strategy = mctsTracking.run(70000000);
         
         //performIODsearch(strategy, current, fov, topohorizon, initialOoi);
 
@@ -1122,7 +1122,7 @@ public class MultiObjectiveMctsTest {
 
             MultiObjectiveMcts mcts = setUpMcts(current, endCampaign, topohorizon, enviro);
 
-            List<Node> strategy = mcts.run(mctsIter, i);
+            List<Node> strategy = mcts.run(mctsIter);
             String[] selected = new String[(strategy.size()-1)/2 + 1 + ooi.size()];
             int j =0;
             for(Node currentNode : strategy) {
