@@ -7,10 +7,17 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 
+import org.apache.commons.lang3.ArrayUtils;
+import org.hipparchus.distribution.continuous.NormalDistribution;
 import org.hipparchus.linear.Array2DRowRealMatrix;
 import org.hipparchus.linear.LUDecomposition;
 import org.hipparchus.linear.MatrixUtils;
 import org.hipparchus.linear.RealMatrix;
+import org.hipparchus.ode.ExpandableODE;
+import org.hipparchus.ode.ODEIntegrator;
+import org.hipparchus.ode.ODEState;
+import org.hipparchus.ode.ODEStateAndDerivative;
+import org.hipparchus.ode.nonstiff.ClassicalRungeKuttaIntegrator;
 import org.hipparchus.util.FastMath;
 import org.orekit.frames.FramesFactory;
 import org.orekit.time.AbsoluteDate;
@@ -24,6 +31,7 @@ import sensortasking.mcts.DecisionNode;
 import sensortasking.mcts.Node;
 import sensortasking.mcts.Objective;
 import sensortasking.mcts.ObservedObject;
+import sensortasking.mcts.Sensor;
 
 @SuppressWarnings("rawtypes")
 @Getter
@@ -47,6 +55,8 @@ public class CarTrackingObjective implements Objective{
 
     final double iLLimit = 1e-7;
 
+    final static double epsilon = 1e-7;
+
     public CarTrackingObjective(List<ObservedObject> targets, AbsoluteDate startCampaign, 
                                 AbsoluteDate endCampaign, List<ObservedObject> targetsPred) {
 
@@ -66,7 +76,7 @@ public class CarTrackingObjective implements Objective{
     @Override
     public AngularDirection setMicroAction(AbsoluteDate current, AngularDirection sensorPointing) {
         
-        double time = current.durationFrom(this.start) + tstep;
+        double tobs = current.durationFrom(this.start) + tstep;
 
 /*         if(time == 60.) {
             time++;
@@ -85,13 +95,9 @@ public class CarTrackingObjective implements Objective{
 
             // Simulate measuremement
             //double simMeas = generateRangeMeasurement(time, state);
-            double simMeas = generateBearingMeasurement(time, state);
+            double simMeas = generateBearingMeasurement(tobs, state, copy);
             Filter est = new Filter();
-            est.run_ckf(state, copy.getCov(), copy.getTime(), time, simMeas);
-            if (FastMath.abs(copy.getVelY())>0.00001) {
-                throw new IllegalArgumentException("Object is moving with non-zero velocity along "
-                                                        + "Y axis");
-            }
+            est.run_ckf(state, copy.getCov(), copy.getTime(), tobs, simMeas);
 
             // Compute information gain
             /* System.out.println("predicted:");
@@ -103,14 +109,16 @@ public class CarTrackingObjective implements Objective{
                                                  est.covPred, est.covCorr); */
             double iG = computeTraceChange(est.covPred, est.covCorr);
 
-            // propagate predicted state to end date and compute loss of information update
+/*             // propagate predicted state to end date and compute loss of information update
             Filter estLoss = new Filter();
             double timeUntilEnd = this.end.durationFrom(this.start);
 
             //double simMeasPred = generateRangeMeasurement(timeUntilEnd, est.statePred);
-            double simMeasPred = generateBearingMeasurement(timeUntilEnd, est.statePred);
+            Car copyFuture = new Car(copy.getIdentifier(), est.statePred, est.covPred, tobs);
 
-            estLoss.run_ckf(est.statePred, est.covPred, time, timeUntilEnd, simMeasPred);
+            double simMeasPred = generateBearingMeasurement(timeUntilEnd, est.statePred, copyFuture);
+
+            estLoss.run_ckf(est.statePred, est.covPred, tobs, timeUntilEnd, simMeasPred);
 
             // search for the corresponding target in predicted targets
             double[][] predCovNoMeas = new double[estLoss.covCorr.length][estLoss.covCorr.length];
@@ -120,12 +128,10 @@ public class CarTrackingObjective implements Objective{
                 }
             }
 
-            double iL = computeTraceChange(predCovNoMeas, estLoss.covPred );
-            Car copyUpdated = new Car(copy.getIdentifier(), est.stateCorr, est.covCorr, time);
-            if (FastMath.abs(copyUpdated.getVelY())>0.00001) {
-                throw new IllegalArgumentException("Object is moving with non-zero velocity along "
-                                                        + "Y axis");
-            }
+            double iL = computeTraceChange(predCovNoMeas, estLoss.covPred );*/
+            double iL =0.;
+            Car copyUpdated = new Car(copy.getIdentifier(), est.stateCorr, est.covCorr, tobs); 
+
             checkTrackable.put(copyUpdated, new Double[]{iG, iL});
         }
 
@@ -185,7 +191,7 @@ public class CarTrackingObjective implements Objective{
             selectedRaw.getIdentifier(),
             stateUpdated,
             selectedRaw.getCov(),
-            time
+            tobs
         );
 
         // Step 5: Update targets
@@ -196,11 +202,7 @@ public class CarTrackingObjective implements Objective{
                 candidate.setCov(selected.getCov());
                 candidate.setTime(selected.getTime());
                 candidate.setEpoch(selected.getEpoch());
-                if (FastMath.abs(selected.getVelY())>0.00001) {
-                    throw new IllegalArgumentException("Object is moving with non-zero velocity along "
-                                                            + "Y axis");
-                }
-
+                
                 this.lastUpdated = selected.getIdentifier();
                 this.lastUpdatedIG = iGmax;
                 for (Entry<Car, Double[]> entry : checkTrackable.entrySet()) {
@@ -214,13 +216,13 @@ public class CarTrackingObjective implements Objective{
         }  
 
         // Compute pointing angle
-        double alpha = FastMath.atan2(selected.getPosX(), selected.getPosY());
+        double alpha = FastMath.atan2(selected.getPosY(), selected.getPosX());
         double range = FastMath.sqrt(selected.getPosX() * selected.getPosX() 
                                         + selected.getPosY() * selected.getPosY());
         AngularDirection angle = new AngularDirection(FramesFactory.getEME2000(), 
                                                       new double[]{alpha, 0.}, 
                                                       AngleType.RADEC, range);
-        angle.setDate(this.start.shiftedBy(time));
+        angle.setDate(this.start.shiftedBy(tobs));
         return angle;
     }
 
@@ -310,19 +312,53 @@ public class CarTrackingObjective implements Objective{
         }
     }
 
-    public static double generateBearingMeasurement(double tobs, double[] initialState) {
-        // Ensure that object only moves with constant velocity along X axis
-        if (FastMath.abs(initialState[3])>0.00001) {
-            throw new IllegalArgumentException("Object is moving with non-zero velocity along "
-                                                    + "Y axis");
-        } else {
-            double velX = initialState[2];
-            double dist = tobs * velX;
-            double posXNew = dist;
-            double[] stateNew = new double[]{posXNew, initialState[1], velX, initialState[3]}; 
-            double simMeas = LinearBearingMeasurementModel.generateHk(stateNew).Gk;
-            return simMeas;
+    public static double generateBearingMeasurement(double tobs, double[] initialState, Car car) {
+        int n = initialState.length;
+        double[] stateNew = new double[n];
+        double[] y = propagateStateAndSTM(tobs, initialState, car);
+
+        for (int i=0; i<n; i++) {
+
+            // Extract state vector
+            double rounded = FastMath.rint(y[i] / epsilon) * epsilon;
+            stateNew[i] = rounded;
         }
+
+        double simMeas = LinearBearingMeasurementModel.generateHk(stateNew).Gk;
+        return simMeas;
+        
+    }
+
+    private static double[] propagateStateAndSTM(double tobs, double[] initialState, Car car) {
+        int n = initialState.length;
+
+        // Combine initial state and STM (identity matrix)
+        double[][] identity = new double[n][n];
+        for (int col=0; col<n; col++) {
+            for (int row=0; row<n; row++) {
+                if(row==col) {
+                    identity[row][col] = 1.;
+                } else {
+                    identity[row][col] = 0;
+                }
+            }
+        }
+        RealMatrix ones = new Array2DRowRealMatrix(identity);
+        double[] ones_arr = Filter.flattenRowMajor(ones.getData());
+        double[] Xref_Stm0 = ArrayUtils.addAll(initialState, ones_arr);
+        double[] y = new double[Xref_Stm0.length];
+
+        ExpandableODE expandable = new ExpandableODE(car);
+        ODEIntegrator integrator = new ClassicalRungeKuttaIntegrator(0.01);
+        ODEState initial = new ODEState(car.getTime(), Xref_Stm0);
+
+        if(car.getTime() == tobs) {
+            y = Xref_Stm0;
+        } else {
+            ODEStateAndDerivative finalState = integrator.integrate(expandable, initial, tobs);
+            y = finalState.getPrimaryState();
+        }
+        return y;
     }
 
     @Override
@@ -357,7 +393,7 @@ public class CarTrackingObjective implements Objective{
      */
     public static void computeTrackReward(DecisionNode last, DecisionNode leaf, 
                                           DecisionNode initial, double tCampaign, 
-                                          double discount) {
+                                          double discount, Sensor sensor) {
 
         // Initialise output
         //double[] out = new double[1];
@@ -376,9 +412,12 @@ public class CarTrackingObjective implements Objective{
                 DecisionNode current = (DecisionNode)futureBranch;
                 current.incrementNumVisits();
                 current.getParent().incrementNumVisits();
+                double tobs = current.getEpoch().durationFrom(initial.getEpoch());
                 /* double immediate = CarTrackingObjective.computeRegretWrtSimEnd(current, tCampaign);
                 accDiscountedR = immediate + discount * accDiscountedR */;
-                accDiscountedR = CarTrackingObjective.computeImmediateReward(current) 
+                /* accDiscountedR = CarTrackingObjective.computeImmediateReward(current) 
+                                    + discount * accDiscountedR; */
+                accDiscountedR = CarTrackingObjective.computeRegretWrtFov(current, tobs, sensor) 
                                     + discount * accDiscountedR;
                 double utilityTrack = current.getUtilityVec()[1];       //0=search; 1=track
                 utilityTrack = utilityTrack + (accDiscountedR - utilityTrack)
@@ -399,6 +438,77 @@ public class CarTrackingObjective implements Objective{
         return out; */
     }
 
+    private static double computeRegretWrtFov(DecisionNode lastDecision, double tobs, 
+                                              Sensor sensor){
+
+        double halfFov = sensor.getFov().getHeight()/2.;
+        List<ObservedObject> env = lastDecision.getEnvironment().getStateTracking();
+        ChanceNode parent = (ChanceNode) lastDecision.getParent();
+        char lastUpdated = ((CarTrackingObjective)parent.getMacro()).getLastUpdated();
+        double regret = 0.;
+        for(ObservedObject objEnv : env) {
+            // Extract sibling 
+            Car sibling = (Car)objEnv;
+            if (sibling.getIdentifier() != lastUpdated) {
+                RealMatrix P0 = new Array2DRowRealMatrix(sibling.getCov());
+/*                 System.out.println(sibling.getPosX() + " " + sibling.getPosY() + " " 
+                                    + sibling.getVelX() + " " + sibling.getVelY());
+                App.printCovariance(P0); */
+                double[] y = propagateStateAndSTM(tobs, sibling.getStateArray(), sibling);
+                int n = sibling.getStateArray().length;
+                double[] Xref = new double[n];
+
+                for (int i=0; i<n; i++) {
+
+                    // Extract state vector
+                    double rounded = FastMath.rint(y[i] / epsilon) * epsilon;
+                    Xref[i] = rounded;
+                }
+            
+                // Extract phi matrix from X (column-major to 2D array)
+                double[][] Phik_arr = new double[4][4];
+                for (int col = 0; col < n; col++) {
+                    for (int row = 0; row < n; row++) {
+                        Phik_arr[row][col] = y[n + col * n + row];
+                    }
+                }
+                // Compute propagated uncertainty
+                RealMatrix Phik = new Array2DRowRealMatrix(Phik_arr).transpose();
+
+                double[][] gamma = Filter.computeGamma(sibling.getTime(), tobs);
+                RealMatrix Gamma = new Array2DRowRealMatrix(gamma);
+                RealMatrix mappedUnmodelAcc =  Gamma.scalarMultiply(Filter.Q).multiplyTransposed(Gamma);
+
+                RealMatrix Pk_bar = Phik.multiply(P0).multiplyTransposed(Phik).add(mappedUnmodelAcc);
+                //App.printCovariance(Pk_bar);
+                //System.out.println("Trace: " + Pk_bar.getTrace());
+
+                // Transform uncertainty from state space into measurement space
+                double[] H = LinearBearingMeasurementModel.generateHk(Xref).Hk_til;
+                //System.out.println(LinearBearingMeasurementModel.generateHk(Xref).Gk);
+                RealMatrix obsMatrix = new Array2DRowRealMatrix(H).transpose();
+                RealMatrix Pk_bar_meas = obsMatrix.multiply(Pk_bar).multiplyTransposed(obsMatrix);
+                //App.printCovariance(Pk_bar_meas);
+
+                // Extract standard deviation
+                int dim = Pk_bar_meas.getColumnDimension();
+                double[] std = new double[dim];
+                for(int i=0; i<dim; i++) {
+                    std[i] = FastMath.sqrt(Pk_bar_meas.getEntry(i, i));
+                }
+
+                // TODO: code assumes one dimensional measurement vector
+                // Assume perfect pointing --> mean = 0
+                NormalDistribution gaussian = new NormalDistribution(0., std[0]);
+
+                // Compute probability of the sibling to be in the FOV
+                double prob = gaussian.probability(-halfFov, halfFov);
+                regret += prob;
+            }
+        }
+        return regret;
+    }
+
     private static double computeImmediateReward(DecisionNode current) {
         ChanceNode parent = (ChanceNode) current.getParent();
         double lastUpdatedIG = ((CarTrackingObjective)parent.getMacro()).getLastUpdatedIG();
@@ -417,7 +527,7 @@ public class CarTrackingObjective implements Objective{
             if (sibling.getIdentifier() != lastUpdated) {
                double simMeasPred = 
                      CarTrackingObjective.generateBearingMeasurement(timeUntilEnd, 
-                                                                    sibling.getStateArray());
+                                                                    sibling.getStateArray(), sibling);
 
 /*                 double simMeasPred = 
                     CarTrackingObjective.generateRangeMeasurement(timeUntilEnd, 
@@ -448,7 +558,7 @@ public class CarTrackingObjective implements Objective{
         return regret;
     }
 
-    private static double computeRegretWrtFOV(DecisionNode lastDecision, double timeUntilEnd) {
+/*     private static double computeRegretWrtFOV(DecisionNode lastDecision, double timeUntilEnd) {
         List<ObservedObject> env = lastDecision.getEnvironment().getStateTracking();
         ChanceNode parent = (ChanceNode) lastDecision.getParent();
         char lastUpdated = ((CarTrackingObjective)parent.getMacro()).getLastUpdated();
@@ -459,7 +569,7 @@ public class CarTrackingObjective implements Objective{
             if (sibling.getIdentifier() != lastUpdated) {
                 /* double simMeasPred = 
                     CarTrackingObjective.generateBearingMeasurement(timeUntilEnd, 
-                                                                    sibling.getStateArray()); */
+                                                                    sibling.getStateArray()); 
                 double simMeasPred = 
                     CarTrackingObjective.generateRangeMeasurement(timeUntilEnd, 
                                                                     sibling.getStateArray());                                                    
@@ -488,7 +598,7 @@ public class CarTrackingObjective implements Objective{
             }
         }
         return regret;
-    }
+    } */
 
     private static List<Car> transformObservedObjectsToCars(List<ObservedObject> trackedObjs) {
         List<Car> out = new ArrayList<Car>();
