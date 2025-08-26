@@ -12,6 +12,7 @@ import org.hipparchus.ode.ODEState;
 import org.hipparchus.ode.ODEStateAndDerivative;
 import org.hipparchus.ode.OrdinaryDifferentialEquation;
 import org.hipparchus.ode.nonstiff.ClassicalRungeKuttaIntegrator;
+import org.hipparchus.util.FastMath;
 import org.orekit.frames.FramesFactory;
 import org.orekit.time.AbsoluteDate;
 
@@ -40,6 +41,8 @@ public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
     static final int dim = 4;
 
     static AbsoluteDate origin = new AbsoluteDate();
+
+    final static double w = 1 * FastMath.PI/180;     // 1 deg/s
 
     public Car(char id, double x, double y, double xdot, double ydot, double[][] cov, double t) {
         super(id, null, null, new AbsoluteDate().shiftedBy(t), FramesFactory.getEME2000());
@@ -77,15 +80,19 @@ public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
         this.velY = velY;
     }
 
+    private static double[][] getConstAngularMatrix() {
 
+        double[][] A = {
+            {0, -w, 1, 0},
+            {w, 0, 0, 1},
+            {-FastMath.pow(w, 2), 0, 0, 0},
+            {0, -FastMath.pow(w, 2), 0, 0}
+        };
 
-    private static double[] int_constant_vel_stm(double[] X) {
+        return A;
+    }
 
-        // X = [x, y, vx, vy, phi (4x4 matrix flattened in column-major order)]
-
-        int stateSize = 4;
-        int stmSize = 16; // 4x4 STM
-        double[] dX = new double[stateSize + stmSize];
+    private static double[][] getConstVelMatrix() {
 
         // Define the constant velocity system matrix A
         double[][] A = {
@@ -94,6 +101,20 @@ public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
             {0, 0, 0, 0},
             {0, 0, 0, 0}
         };
+        return A;
+    }
+
+
+    private static double[] int_stm(double[] X) {
+
+        // X = [x, y, vx, vy, phi (4x4 matrix flattened in column-major order)]
+
+        int stateSize = 4;
+        int stmSize = 16; // 4x4 STM
+        double[] dX = new double[stateSize + stmSize];
+
+        // Define the constant velocity system matrix A
+        double[][] A = getConstAngularMatrix();
 
         // Extract phi matrix from X (column-major to 2D array)
         double[][] phi = new double[4][4];
@@ -103,14 +124,10 @@ public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
             }
         }
 
-        // Compute A * X(1:4)
-        for (int i = 0; i < 4; i++) {
-            dX[i] = 0;
-            for (int j = 0; j < 4; j++) {
-                dX[i] += A[i][j] * X[j];
-            }
-        }
-
+        // Compute state derivative
+        //dX = computeLinearDerivative(A, X, dX);
+        dX = computeCircularDerivative(A, X, dX);
+        
         // Compute dphi = A * phi
         double[][] dphi = new double[4][4];
         for (int i = 0; i < 4; i++) {
@@ -131,9 +148,35 @@ public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
         return dX;
     }
 
+    private static double[] computeCircularDerivative(double[][] A, double[] X, double[] dX) {
+
+        double[] out = new double[dX.length];
+        double angle = FastMath.atan2(X[1], X[0]);
+        double radius = FastMath.sqrt(X[0] * X[0] + X[1] * X[1]);
+
+        out[0] = -w * radius * FastMath.sin(angle);
+        out[1] = w * radius * FastMath.cos(angle);
+        out[2] = - w * w * radius * FastMath.cos(angle);
+        out[3] = - w * w * radius * FastMath.sin(angle);
+
+        return out;
+    }
+
+    private static double[] computeLinearDerivative(double[][] A, double[] X, double[] dX) {
+
+        double[] out = new double[dX.length] ;
+        for (int i = 0; i < 4; i++) {
+            out[i] = 0;
+            for (int j = 0; j < 4; j++) {
+                out[i] += A[i][j] * X[j];
+            }
+        }
+        return out;
+    }
+
     @Override
     public double[] computeDerivatives(double time, double[] state) {
-        return int_constant_vel_stm(state);
+        return int_stm(state);
     }
 
     @Override
