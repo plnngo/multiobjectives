@@ -78,10 +78,6 @@ public class CarTrackingObjective implements Objective{
         
         double tobs = current.durationFrom(this.start) + tstep;
 
-/*         if(time == 60.) {
-            time++;
-        } */
-
         // No cars to track
         if (this.updatedTargets.isEmpty()) {
             return null;
@@ -95,9 +91,9 @@ public class CarTrackingObjective implements Objective{
 
             // Simulate measuremement
             //double simMeas = generateRangeMeasurement(time, state);
-            double simMeas = generateBearingMeasurement(tobs, state, copy);
+            //double simMeas = generateBearingMeasurement(tobs, state, copy);
             Filter est = new Filter();
-            est.run_ckf(state, copy.getCov(), copy.getTime(), tobs, simMeas);
+            est.run_ckf(state, copy.getCov(), copy.getTime(), tobs);
 
             // Compute information gain
             /* System.out.println("predicted:");
@@ -148,18 +144,8 @@ public class CarTrackingObjective implements Objective{
             }
             //double reward = noRegret;     //entry.getValue()[0];
             double reward = entry.getValue()[0];
-            /* if (checkTrackable.entrySet().size() != 1) {
-                // No alternative candidate
-                //reward = reward - 1./lost;
-                if (noRegret < iLLimit) {
-                    noRegret = iLLimit;
-                }
-                reward = FastMath.abs(1./noRegret);
-                System.out.println(1./noRegret);
-            } */
             checkTrackableReward.put(entry.getKey(), reward);
         }
-
 
         // Step 1: Find max IG
         Random rand = new Random();
@@ -237,7 +223,6 @@ public class CarTrackingObjective implements Objective{
         //App.printCovariance(covQ);
         //System.out.println("Post:" + covQ.getTrace());
         double change = covP.getTrace() - covQ.getTrace();
-        //double changeNorm = change/covP.getTrace();
         return change;
     }
 
@@ -259,10 +244,8 @@ public class CarTrackingObjective implements Objective{
         LUDecomposition decomQ = new LUDecomposition(covQ);
         double detP = decomP.getDeterminant();
         double detQ = decomQ.getDeterminant();
-        //detQ = 3.8462e-18;
 
         double logDetCovQByDetCovP = FastMath.log(detQ/detP);
-        double traceCovQ = covQ.getTrace();
 
         // Compute inverse of covQ
         RealMatrix invCovQ = MatrixUtils.inverse(covQ);
@@ -413,12 +396,12 @@ public class CarTrackingObjective implements Objective{
                 current.incrementNumVisits();
                 current.getParent().incrementNumVisits();
                 double tobs = current.getEpoch().durationFrom(initial.getEpoch());
-                /* double immediate = CarTrackingObjective.computeRegretWrtSimEnd(current, tCampaign);
-                accDiscountedR = immediate + discount * accDiscountedR */;
-                /* accDiscountedR = CarTrackingObjective.computeImmediateReward(current) 
-                                    + discount * accDiscountedR; */
-                accDiscountedR = CarTrackingObjective.computeRegretWrtFov(current, tobs, sensor) 
+/*                 double immediate = CarTrackingObjective.computeRegretWrtSimEnd(current, tCampaign);
+                accDiscountedR = immediate + discount * accDiscountedR; */
+                accDiscountedR = CarTrackingObjective.computeImmediateReward(current) 
                                     + discount * accDiscountedR;
+/*                 accDiscountedR = CarTrackingObjective.computeRegretWrtFov(current, tobs, sensor) 
+                                    + discount * accDiscountedR; */
                 double utilityTrack = current.getUtilityVec()[1];       //0=search; 1=track
                 utilityTrack = utilityTrack + (accDiscountedR - utilityTrack)
                                                         /current.getNumVisits();
@@ -525,9 +508,9 @@ public class CarTrackingObjective implements Objective{
             // Extract sibling 
             Car sibling = (Car)objEnv;
             if (sibling.getIdentifier() != lastUpdated) {
-               double simMeasPred = 
+               /* double simMeasPred = 
                      CarTrackingObjective.generateBearingMeasurement(timeUntilEnd, 
-                                                                    sibling.getStateArray(), sibling);
+                                                                    sibling.getStateArray(), sibling); */
 
 /*                 double simMeasPred = 
                     CarTrackingObjective.generateRangeMeasurement(timeUntilEnd, 
@@ -536,7 +519,7 @@ public class CarTrackingObjective implements Objective{
 
                 // Extract predicted covariance of sibling propagated to endCampaign 
                 estLoss.run_ckf(sibling.getStateArray(), sibling.getCov(), sibling.getTime(), 
-                                timeUntilEnd, simMeasPred);
+                                timeUntilEnd);
                 double[][] predCovSibling = estLoss.getCovPred();
                 List<Car> predNoMeasSiblings = 
                     ((CarTrackingObjective)parent.getMacro()).getPredictedTargets();
