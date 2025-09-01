@@ -83,7 +83,7 @@ public class Car2DTestBench {
     }
 
     private void evaluation(List<Node> strategy) throws IOException {
-        try (FileWriter writer = new FileWriter("Strategy_Car.csv")) {
+        try (FileWriter writer = new FileWriter("Strategy_Car_Option2_1_discount1.csv")) {
             writer.append("car,time,meas,x1,x2,x3,x4,std1,std2,std3,std4\n");
             char id = 'o';
             double noisyAngle = Double.MIN_VALUE;

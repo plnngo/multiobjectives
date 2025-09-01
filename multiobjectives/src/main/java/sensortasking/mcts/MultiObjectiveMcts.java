@@ -46,7 +46,7 @@ public class MultiObjectiveMcts {
     static double C = 10000;
 
     /** Discount factor. */
-    final double discount = 0.;
+    final double discount = 1.;
 
     /** Topocentric horizon frame. */
     final TopocentricFrame stationFrame;
@@ -121,9 +121,9 @@ public class MultiObjectiveMcts {
                 Filter est = new Filter();
                 /* double simMeas = 
                     CarTrackingObjective.generateRangeMeasurement(campaignT, car.getStateArray()); */
-                double simMeas = 
-                    CarTrackingObjective.generateBearingMeasurement(campaignT, car.getStateArray(), car);
-                est.run_ckf(car.getStateArray(), car.getCov(), car.getTime(), campaignT, simMeas);
+                /* double simMeas = 
+                    CarTrackingObjective.generateBearingMeasurement(campaignT, car.getStateArray(), car); */
+                est.run_ckf(car.getStateArray(), car.getCov(), car.getTime(), campaignT);
                 Car pred = new Car(car.getIdentifier(), est.getStatePred(), 
                                    est.getCovPred(), campaignT);
                 predictedCars.add(pred);
@@ -1345,33 +1345,5 @@ public class MultiObjectiveMcts {
             } // TODO: need to add removed utility to utilityChildrenNorm
         }
         return potentiallySelected;
-    }
-
-        
-    public static void main(String[] args) {
-/*         List<Node> test = new ArrayList<Node>();
-        Node decision = new Node();
-        decision.setUtility(9);
-        Node chance = new Node();
-        decision.setChild(chance);
-        chance.setUtility(7);
-        test.add(decision);
-        test.add(chance);
-        System.out.println("Utility of initial chance node: " + chance.getUtility());
-
-        //Extract node
-        Node extractedChance = test.get(1);
-        extractedChance.setUtility(10);
-        System.out.println("Utility of extracted chance node:" + extractedChance.getUtility());
-
-        for(Node node : test) {
-            System.out.println("Utilities in tree: " + node.getUtility());
-        } */
-
-/*         Node test = new DecisionNode(C, 0, null, new double[]{0.3, 0.7}, null);
-        System.out.println(test.getClass().getSimpleName().equals("DecisionNode"));
-        DecisionNode convert = (DecisionNode) test;
-        double[] weights = convert.getWeights();
-        System.out.println(weights[0] + weights[1]); */
     }
 }
