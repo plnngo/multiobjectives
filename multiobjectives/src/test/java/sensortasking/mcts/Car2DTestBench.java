@@ -21,6 +21,7 @@ import org.orekit.time.AbsoluteDate;
 import benchtest.Car;
 import benchtest.CarTrackingObjective;
 import benchtest.Filter;
+import benchtest.RewardFunction;
 
 public class Car2DTestBench {
     @Before
@@ -71,12 +72,15 @@ public class Car2DTestBench {
         Sensor sensor = new Sensor("Origin", fov, pos, 8., 7., 
                                     FastMath.toRadians(1.)/1., 7., FastMath.toRadians(5.));
 
+        // Set reward function
+        RewardFunction reward = RewardFunction.REWARD_WRT_SIMULATED_END;
+
         // Set up MCTS
         List<String> objectives = new ArrayList<String>(Arrays.asList( "TRACK_CAR"));
         MultiObjectiveMcts mcts = 
             new MultiObjectiveMcts(root, objectives, root.getEpoch(), 
-                                   root.getEpoch().shiftedBy(60. * 60.), "Origin", cars, 
-                                   null, sensor);
+                                   root.getEpoch().shiftedBy(5. * 60.), "Origin", cars, 
+                                   null, sensor, reward);
         List<Node> strategy = mcts.run(3000);
 
         evaluation(strategy);

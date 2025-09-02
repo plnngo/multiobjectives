@@ -396,17 +396,18 @@ public class CarTrackingObjective implements Objective{
                 current.incrementNumVisits();
                 current.getParent().incrementNumVisits();
                 double tobs = current.getEpoch().durationFrom(initial.getEpoch());
-/*                 double immediate = CarTrackingObjective.computeRegretWrtSimEnd(current, tCampaign);
-                accDiscountedR = immediate + discount * accDiscountedR; */
-                accDiscountedR = CarTrackingObjective.computeImmediateReward(current) 
-                                    + discount * accDiscountedR;
+                double immediate = CarTrackingObjective.computeRegretWrtSimEnd(current, tCampaign);
+                ((CarTrackingObjective)((ChanceNode)current.getParent()).getMacro()).regret = immediate;
+                accDiscountedR = immediate + discount * accDiscountedR;
+/*                 accDiscountedR = CarTrackingObjective.computeImmediateReward(current) 
+                                    + discount * accDiscountedR; */
 /*                 accDiscountedR = CarTrackingObjective.computeRegretWrtFov(current, tobs, sensor) 
                                     + discount * accDiscountedR; */
                 double utilityTrack = current.getUtilityVec()[1];       //0=search; 1=track
                 utilityTrack = utilityTrack + (accDiscountedR - utilityTrack)
                                                         /current.getNumVisits();
                 double[] utility = new double[]{current.getUtilityVec()[0], utilityTrack};
-                //((CarTrackingObjective)((ChanceNode)current.getParent()).getMacro()).regret = immediate;
+                
                 current.setUtilityVec(utility);
                 current.getParent().setUtilityVec(utility);
             }
@@ -414,11 +415,6 @@ public class CarTrackingObjective implements Objective{
         }
         initial.incrementNumVisits();
 
-        // Add leaf reward without discount factor
-        //out[0] += CarTrackingObjective.computeRegretWrtSimEnd(leaf, tCampaign);
-/*         out[0] += CarTrackingObjective.computeImmediateReward(leaf, tCampaign);
-
-        return out; */
     }
 
     private static double computeRegretWrtFov(DecisionNode lastDecision, double tobs, 

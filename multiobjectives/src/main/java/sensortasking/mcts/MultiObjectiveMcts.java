@@ -21,6 +21,7 @@ import org.orekit.utils.IERSConventions;
 import benchtest.Car;
 import benchtest.CarTrackingObjective;
 import benchtest.Filter;
+import benchtest.RewardFunction;
 import lombok.Getter;
 import sensortasking.stripescanning.Stripe;
 import sensortasking.stripescanning.Tasking;
@@ -77,6 +78,7 @@ public class MultiObjectiveMcts {
     /** Cars propagated to end without measurement updates. */
     final List<ObservedObject> predictedCars = new ArrayList<ObservedObject>();
 
+    final RewardFunction reward;
 
 
     /** Basic constructor.
@@ -89,12 +91,13 @@ public class MultiObjectiveMcts {
     public MultiObjectiveMcts(Node descisionTree, List<String> objectives,
                               AbsoluteDate start, AbsoluteDate end, String stationName,
                               List<ObservedObject> trackedObjects, List<ObservedObject> detectedObjects,
-                              Sensor sensor) {
+                              Sensor sensor, RewardFunction selectedReward) {
 
         this.initial = (DecisionNode) descisionTree;
         MultiObjectiveMcts.objectives = objectives;
         this.startCampaign = start;
         this.endCampaign = end;
+        this.reward = selectedReward;
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);

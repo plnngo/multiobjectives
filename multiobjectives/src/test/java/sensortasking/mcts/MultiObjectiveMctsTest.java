@@ -299,7 +299,7 @@ public class MultiObjectiveMctsTest {
         Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0., 0.);
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", ooi, 
-                                   new ArrayList<ObservedObject>(), sensor);
+                                   new ArrayList<ObservedObject>(), sensor, null);
         List<Node> strategy = mctsTracking.run(10);
         for(Node selected : strategy) {
             if(selected.getClass().getSimpleName().equals("ChanceNode")) {
@@ -388,7 +388,7 @@ public class MultiObjectiveMctsTest {
                         .setWeightsSearchingTask(new double[]{1.0, 0.});
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", ooi, 
-                                   new ArrayList<ObservedObject>(), sensor);
+                                   new ArrayList<ObservedObject>(), sensor, null);
         List<Node> strategy = mctsTracking.run(70000000);
         
         //performIODsearch(strategy, current, fov, topohorizon, initialOoi);
@@ -887,7 +887,7 @@ public class MultiObjectiveMctsTest {
         Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0., 0.);
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", ooi, 
-                                   new ArrayList<ObservedObject>(), sensor);
+                                   new ArrayList<ObservedObject>(), sensor, null);
         Node lastLeaf = mctsTracking.select(root);
         Node parent = lastLeaf.getParent();
 
@@ -1310,7 +1310,7 @@ public class MultiObjectiveMctsTest {
         Node root = new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0., 0.);
         MultiObjectiveMcts mcts = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", null, 
-                                   new ArrayList<ObservedObject>(), sensor);
+                                   new ArrayList<ObservedObject>(), sensor, null);
         return mcts;
     }
         
@@ -1526,7 +1526,7 @@ public class MultiObjectiveMctsTest {
             new DecisionNode(initUtility, numVisits, initPointing, current, enviro, 0, 0., 0.);
         MultiObjectiveMcts mctsTracking = 
             new MultiObjectiveMcts(root, objectives, current, endCampaign, "TDRS Station", ooi, 
-                                   new ArrayList<ObservedObject>(), sensor);
+                                   new ArrayList<ObservedObject>(), sensor, null);
         Node lastLeaf = mctsTracking.select(root);
         //System.out.println(rootUpdated.getUtility());
     }
@@ -1605,7 +1605,7 @@ public class MultiObjectiveMctsTest {
         List<ObservedObject> ooiAll = setListOOI(current);
         MultiObjectiveMcts mcts = new MultiObjectiveMcts(root, objectives, current, endCampaign, 
                                                          "TDRS Station", ooiAll, 
-                                                         new ArrayList<ObservedObject>(), sensor);
+                                                         new ArrayList<ObservedObject>(), sensor, null);
         double actualReward = mcts.computeSearchReward(d31, d31);
 
         Assert.assertEquals(-3., actualReward, 1e-16);
@@ -1735,7 +1735,7 @@ public class MultiObjectiveMctsTest {
 
         MultiObjectiveMcts mcts = new MultiObjectiveMcts(root, objectives, initDate, target, 
                                                          "TDRS Station", targetsInit, 
-                                                         new ArrayList<ObservedObject>(), sensor);
+                                                         new ArrayList<ObservedObject>(), sensor, null);
         /* double actualReward = mcts.computeTrackReward(leaf);
         Assert.assertEquals(2.7682235805565E7, actualReward, 1e-16); */
    }
@@ -1836,7 +1836,7 @@ public class MultiObjectiveMctsTest {
         List<String> objectives = new ArrayList<String>(Arrays.asList("SEARCH", "TRACK"));
         MultiObjectiveMcts mcts = 
             new MultiObjectiveMcts(root, objectives, initDate, epochAPrime, "TDRS Station", 
-                                   targetsInit, new ArrayList<ObservedObject>(), sensor);
+                                   targetsInit, new ArrayList<ObservedObject>(), sensor, null);
         mcts.backpropagate(decisionA, decisionAPrime);
 
         // Compare
@@ -1883,7 +1883,7 @@ public class MultiObjectiveMctsTest {
         DecisionNode.setParent(decisionBPrime, chanceBPrime);  
         MultiObjectiveMcts mcts2 = 
             new MultiObjectiveMcts(root, objectives, initDate, epochAPrime, "TDRS Station", 
-                                   targetsInit, new ArrayList<ObservedObject>(), sensor);
+                                   targetsInit, new ArrayList<ObservedObject>(), sensor, null);
         mcts2.backpropagate(decisionB, decisionBPrime);
 
         // Compare
@@ -1923,7 +1923,7 @@ public class MultiObjectiveMctsTest {
         DecisionNode.setParent(decisionCPrime, chanceCPrime);
         MultiObjectiveMcts mcts3 = 
             new MultiObjectiveMcts(root, objectives, initDate, epochCPrime, "TDRS Station", 
-                                   targetsInit, new ArrayList<ObservedObject>(), sensor);
+                                   targetsInit, new ArrayList<ObservedObject>(), sensor, null);
         mcts3.backpropagate(decisionC, decisionCPrime);
 
         // Compare
@@ -1954,7 +1954,7 @@ public class MultiObjectiveMctsTest {
         DecisionNode.setParent(decisionAPrimePrime, chanceAPrimePrime);
         MultiObjectiveMcts mcts4 =
             new MultiObjectiveMcts(root, objectives, initDate, epochAPrimePrime, "TDRS Station", 
-                                   targetsInit, new ArrayList<ObservedObject>(), sensor);
+                                   targetsInit, new ArrayList<ObservedObject>(), sensor, null);
         mcts4.backpropagate(decisionAPrime, decisionAPrimePrime);
         Assert.assertEquals(0., root.getUtility(), 1e-16);
         Assert.assertEquals(5, root.getNumVisits());
