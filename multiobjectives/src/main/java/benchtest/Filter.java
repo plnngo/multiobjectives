@@ -29,11 +29,11 @@ public class Filter {
     double[][] covPred;
 
     /** Process noise. */
-    static double Q = 1E-5;      //1E-15;
+    static double Q = 1E-15;      //;1E-5
 
     /** Measurement noise. */
-    //double Rk = 0.02;
-    public static double Rk = FastMath.pow(10 * FastMath.PI/(180*3600), 2);     // 10 arcsec
+    public static double Rk = 0.02;
+    //public static double Rk = FastMath.pow(10 * FastMath.PI/(180*3600), 2);     // 10 arcsec
 
     double epsilon = 1e-7;
 
@@ -124,9 +124,9 @@ public class Filter {
         this.covPred = Pk_bar.getData();
 
         // Compute system noise mapping matrix
-        //MeasurementModel measModel = LinearRangeMeasurementModel.generateHk(Xref); 
-        benchtest.LinearBearingMeasurementModel.MeasurementModel measModel = 
-            LinearBearingMeasurementModel.generateHk(Xref);
+        MeasurementModel measModel = LinearRangeMeasurementModel.generateHk(Xref); 
+        /* benchtest.LinearBearingMeasurementModel.MeasurementModel measModel = 
+            LinearBearingMeasurementModel.generateHk(Xref); */
         double[] hk_til = measModel.Hk_til;
         RealMatrix Hk_til = new Array2DRowRealMatrix(hk_til).transpose();
 
@@ -144,7 +144,6 @@ public class Filter {
 
         // Joseph-form covariance update 
         RealMatrix kalmanCorr = ones.subtract(Kk.multiply(Hk_til));
-        //App.printCovariance(kalmanCorr);
         RealMatrix P_out = kalmanCorr.multiply(Pk_bar)
                                      .multiplyTransposed(kalmanCorr)
                                      .add(Kk.multiply(Rk_mat).multiplyTransposed(Kk));

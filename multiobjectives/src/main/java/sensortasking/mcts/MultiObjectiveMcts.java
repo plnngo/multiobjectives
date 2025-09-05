@@ -47,7 +47,7 @@ public class MultiObjectiveMcts {
     static double C = 10000;
 
     /** Discount factor. */
-    final double discount = 1.;
+    final double discount = 1;
 
     /** Topocentric horizon frame. */
     final TopocentricFrame stationFrame;
@@ -1066,7 +1066,7 @@ public class MultiObjectiveMcts {
 
             // Reward measured as regret
             CarTrackingObjective.computeTrackReward(last, leaf, this.initial, tCampaign, 
-                                                    discount, this.sensor);
+                                                    discount, this.sensor, this.reward);
         }
         
         // Compute searching reward
