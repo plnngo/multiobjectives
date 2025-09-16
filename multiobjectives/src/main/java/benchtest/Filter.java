@@ -29,10 +29,10 @@ public class Filter {
     double[][] covPred;
 
     /** Process noise. */
-    static double Q = 1E-15;      //;1E-5
+    static double Q = 1E-25;      //;1E-5
 
     /** Measurement noise. */
-    public static double Rk = 0.02;
+    public static double Rk = 1E-3; //9E-5;
     //public static double Rk = FastMath.pow(10 * FastMath.PI/(180*3600), 2);     // 10 arcsec
 
     double epsilon = 1e-7;

@@ -114,7 +114,8 @@ public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
         double[] dX = new double[stateSize + stmSize];
 
         // Define the constant velocity system matrix A
-        double[][] A = getConstAngularMatrix();
+        //double[][] A = getConstAngularMatrix();
+        double[][] A = getConstVelMatrix();
 
         // Extract phi matrix from X (column-major to 2D array)
         double[][] phi = new double[4][4];
@@ -125,8 +126,8 @@ public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
         }
 
         // Compute state derivative
-        //dX = computeLinearDerivative(A, X, dX);
-        dX = computeCircularDerivative(A, X, dX);
+        dX = computeLinearDerivative(A, X, dX);
+        //dX = computeCircularDerivative(A, X, dX);
         
         // Compute dphi = A * phi
         double[][] dphi = new double[4][4];

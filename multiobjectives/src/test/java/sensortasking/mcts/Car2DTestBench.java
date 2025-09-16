@@ -39,18 +39,17 @@ public class Car2DTestBench {
         long start = System.currentTimeMillis();
 
         // Initialise first car 
-        //double[] initA = new double[]{0, -1, 5, 0};
-        double[] initA = new double[]{-2, 0, 0., -FastMath.PI/90.};
-        //DiagonalMatrix P0A = new DiagonalMatrix(new double[]{0.5, 0.5, 0.05, 0.05});
-        DiagonalMatrix P0A = new DiagonalMatrix(new double[]{0.1, 0.1, 0.01, 0.01});
+        double[] initA = new double[]{0, -1, 5, 0};
+        //double[] initA = new double[]{-2, 0, 0., -FastMath.PI/90.};
+        DiagonalMatrix P0A = new DiagonalMatrix(new double[]{0.5, 0.5, 0.05, 0.05});
+        //DiagonalMatrix P0A = new DiagonalMatrix(new double[]{0.01, 0.01, 0.001, 0.001});
 
         Car carA = new Car('A', initA, P0A.getData(), 0.);
 
         // Initialise second car
-        //double[] initB = new double[]{0, 1, 5, 0};
-        //double[] initB = new double[]{0, 2, -FastMath.PI/180., 0};
-        double[] initB = new double[]{2, 0, 0., FastMath.PI/90.};
-        DiagonalMatrix P0B = new DiagonalMatrix(new double[]{0.1, 0.1, 0.01, 0.01});
+        double[] initB = new double[]{0, 1, 5, 0};
+        //double[] initB = new double[]{2, 0, 0., FastMath.PI/90.};
+        DiagonalMatrix P0B = new DiagonalMatrix(new double[]{0.01, 0.01, 0.001, 0.001});
         //DiagonalMatrix P0B = new DiagonalMatrix(new double[]{0.5, 0.5, 0.05, 0.05});
 
         Car carB = new Car('B', initB, P0B.getData(), 0.);
@@ -72,15 +71,15 @@ public class Car2DTestBench {
                                     FastMath.toRadians(1.)/1., 7., FastMath.toRadians(5.));
 
         // Set reward function
-        RewardFunction reward = RewardFunction.REGRET_WRT_SIMULATED_END;
+        RewardFunction reward = RewardFunction.IMMEDIATE_REWARD;
 
         // Set up MCTS
         List<String> objectives = new ArrayList<String>(Arrays.asList( "TRACK_CAR"));
         MultiObjectiveMcts mcts = 
             new MultiObjectiveMcts(root, objectives, root.getEpoch(), 
-                                   root.getEpoch().shiftedBy(60. * 60.), "Origin", cars, 
+                                   root.getEpoch().shiftedBy(20. * 60.), "Origin", cars, 
                                    null, sensor, reward);
-        List<Node> strategy = mcts.run(3000);
+        List<Node> strategy = mcts.run(4500);
 
         evaluation(strategy);
         long finish = System.currentTimeMillis();
@@ -89,7 +88,7 @@ public class Car2DTestBench {
     }
 
     private void evaluation(List<Node> strategy) throws IOException {
-        try (FileWriter writer = new FileWriter("Strategy_Car_Option2_2_sameCovs_range_discount1.csv")) {
+        try (FileWriter writer = new FileWriter("Strategy_Car_Option21_AlargeCov_discount1_range_20min.csv")) {
             writer.append("car,time,meas,x1,x2,x3,x4,std1,std2,std3,std4\n");
             char id = 'o';
             double noisyAngle = Double.MIN_VALUE;
@@ -98,7 +97,7 @@ public class Car2DTestBench {
                     id = ((CarTrackingObjective)((ChanceNode) current).getMacro()).getLastUpdated();
                     AngularDirection task = ((ChanceNode) current).getMicro();
                     Random r = new java.util.Random();
-                    noisyAngle = r.nextGaussian() * FastMath.sqrt(Filter.Rk) + task.getAngle1();
+                    noisyAngle = /* r.nextGaussian() * FastMath.sqrt(Filter.Rk) + */  task.getScale();
                 } else {
                     List<ObservedObject> targets = 
                         ((DecisionNode)current).getEnvironment().getStateTracking();
