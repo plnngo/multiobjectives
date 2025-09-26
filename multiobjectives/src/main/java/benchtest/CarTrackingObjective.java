@@ -91,8 +91,6 @@ public class CarTrackingObjective implements Objective{
             Car copy = new Car(obj.getIdentifier(), state, obj.getCov(), obj.getTime());
 
             // Simulate measuremement
-            //double simMeas = generateRangeMeasurement(time, state);
-            //double simMeas = generateBearingMeasurement(tobs, state, copy);
             Filter est = new Filter();
             est.run_ckf(state, copy.getCov(), copy.getTime(), tobs);
 
@@ -525,37 +523,13 @@ public class CarTrackingObjective implements Objective{
             if (sibling.getIdentifier() != lastUpdated) {
                 Car propSibling = propagateCar(sibling, tobs); //TODO: check that covariance is same as Pk_bar
 
-                RealMatrix P0 = new Array2DRowRealMatrix(sibling.getCov());
-                double[] y = propagateStateAndSTM(tobs, sibling.getStateArray(), sibling);
-                int n = sibling.getStateArray().length;
-                double[] Xref = new double[n];
-
-                for (int i=0; i<n; i++) {
-
-                    // Extract state vector
-                    double rounded = FastMath.rint(y[i] / epsilon) * epsilon;
-                    Xref[i] = rounded;
-                }
-            
-                // Extract phi matrix from X (column-major to 2D array)
-                double[][] Phik_arr = new double[4][4];
-                for (int col = 0; col < n; col++) {
-                    for (int row = 0; row < n; row++) {
-                        Phik_arr[row][col] = y[n + col * n + row];
-                    }
-                }
-                // Compute propagated uncertainty
-                RealMatrix Phik = new Array2DRowRealMatrix(Phik_arr).transpose();
-
-                double[][] gamma = Filter.computeGamma(sibling.getTime(), tobs);
-                RealMatrix Gamma = new Array2DRowRealMatrix(gamma);
-                RealMatrix mappedUnmodelAcc =  Gamma.scalarMultiply(Filter.Q).multiplyTransposed(Gamma);
-
-                RealMatrix Pk_bar = Phik.multiply(P0).multiplyTransposed(Phik).add(mappedUnmodelAcc);
+                RealMatrix Pk_bar = new Array2DRowRealMatrix(propSibling.getCov());
+                double[] Xref = propSibling.getStateArray();
 
                 // Transform uncertainty from state space into measurement space
-                double[] H = LinearBearingMeasurementModel.generateHk(Xref).Hk_til;
-                RealMatrix obsMatrix = new Array2DRowRealMatrix(H).transpose();
+                //double[] H = LinearBearingMeasurementModel.generateHk(Xref).Hk_til;
+                double[][] H = LinearRangeBearingMeasurementModel.generateHk(Xref).Hk_til;
+                RealMatrix obsMatrix = new Array2DRowRealMatrix(H);
                 RealMatrix Pk_bar_meas = obsMatrix.multiply(Pk_bar).multiplyTransposed(obsMatrix);
 
                 // Extract standard deviation

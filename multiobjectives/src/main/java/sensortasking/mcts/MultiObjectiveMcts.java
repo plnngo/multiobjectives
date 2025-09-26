@@ -47,7 +47,7 @@ public class MultiObjectiveMcts {
     static double C = 10000;
 
     /** Discount factor. */
-    final double discount = 1.;
+    final double discount = 0.;
 
     /** Topocentric horizon frame. */
     final TopocentricFrame stationFrame;

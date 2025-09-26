@@ -39,16 +39,16 @@ public class Car2DTestBench {
         long start = System.currentTimeMillis();
 
         // Initialise first car 
-        double[] initA = new double[]{0, -1, 5, 0};
-        //double[] initA = new double[]{-2, 0, 0., -FastMath.PI/90.};
-        DiagonalMatrix P0A = new DiagonalMatrix(new double[]{0.5, 0.5, 0.05, 0.05});
-        //DiagonalMatrix P0A = new DiagonalMatrix(new double[]{0.01, 0.01, 0.001, 0.001});
+        //double[] initA = new double[]{0, -1, 5, 0};
+        double[] initA = new double[]{-2, 0, 0., -FastMath.PI/90.};
+        //DiagonalMatrix P0A = new DiagonalMatrix(new double[]{0.5, 0.5, 0.05, 0.05});
+        DiagonalMatrix P0A = new DiagonalMatrix(new double[]{0.01, 0.01, 0.001, 0.001});
 
         Car carA = new Car('A', initA, P0A.getData(), 0.);
 
         // Initialise second car
-        double[] initB = new double[]{0, 1, 5, 0};
-        //double[] initB = new double[]{2, 0, 0., FastMath.PI/90.};
+        //double[] initB = new double[]{0, 1, 5, 0};
+        double[] initB = new double[]{2, 0, 0., FastMath.PI/90.};
         DiagonalMatrix P0B = new DiagonalMatrix(new double[]{0.01, 0.01, 0.001, 0.001});
         //DiagonalMatrix P0B = new DiagonalMatrix(new double[]{0.5, 0.5, 0.05, 0.05});
 
@@ -71,7 +71,7 @@ public class Car2DTestBench {
                                     FastMath.toRadians(1.)/1., 7., FastMath.toRadians(5.));
 
         // Set reward function
-        RewardFunction reward = RewardFunction.IMMEDIATE_REWARD;
+        RewardFunction reward = RewardFunction.REGRET_WRT_FOV;
 
         // Set up MCTS
         List<String> objectives = new ArrayList<String>(Arrays.asList( "TRACK_CAR"));
@@ -79,7 +79,7 @@ public class Car2DTestBench {
             new MultiObjectiveMcts(root, objectives, root.getEpoch(), 
                                    root.getEpoch().shiftedBy(20. * 60.), "Origin", cars, 
                                    null, sensor, reward);
-        List<Node> strategy = mcts.run(4500);
+        List<Node> strategy = mcts.run(200000);
 
         evaluation(strategy);
         long finish = System.currentTimeMillis();
@@ -88,7 +88,7 @@ public class Car2DTestBench {
     }
 
     private void evaluation(List<Node> strategy) throws IOException {
-        try (FileWriter writer = new FileWriter("Strategy_Car_Option21_AlargeCov_discount1_range_20min.csv")) {
+        try (FileWriter writer = new FileWriter("Strategy_Car_Option23_samCov_circle_discount0_rangeBearing_20min.csv")) {
             writer.append("car,time,meas,x1,x2,x3,x4,std1,std2,std3,std4\n");
             char id = 'o';
             double noisyAngle = Double.MIN_VALUE;

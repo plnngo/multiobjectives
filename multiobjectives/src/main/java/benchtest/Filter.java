@@ -32,8 +32,9 @@ public class Filter {
     static double Q = 1E-25;      //;1E-5
 
     /** Measurement noise. */
-    public static double Rk = 1E-3; //9E-5;
-    //public static double Rk = FastMath.pow(10 * FastMath.PI/(180*3600), 2);     // 10 arcsec
+    public static double[][] rkArray = {{FastMath.pow(1 * FastMath.PI/(180*3600), 2), 0.}, 
+                                        {0., FastMath.pow(1E-3, 2)}};
+    public static RealMatrix Rk = new Array2DRowRealMatrix(rkArray);
 
     double epsilon = 1e-7;
 
@@ -48,7 +49,7 @@ public class Filter {
     public void run_ckf(double[] X0_ref, double[][] P_pre, double t0, double t_obs) {
 
         RealMatrix P0 = new Array2DRowRealMatrix(P_pre);
-        RealMatrix Rk_mat = new Array2DRowRealMatrix(new double[]{Rk});
+        RealMatrix Rk_mat = Rk;
 
         // State dimension
         int n = X0_ref.length;
@@ -124,20 +125,27 @@ public class Filter {
         this.covPred = Pk_bar.getData();
 
         // Compute system noise mapping matrix
-        MeasurementModel measModel = LinearRangeMeasurementModel.generateHk(Xref); 
+        benchtest.LinearRangeBearingMeasurementModel.MeasurementModel measModel = 
+            LinearRangeBearingMeasurementModel.generateHk(Xref);
+        //MeasurementModel measModel = LinearRangeMeasurementModel.generateHk(Xref); 
         /* benchtest.LinearBearingMeasurementModel.MeasurementModel measModel = 
             LinearBearingMeasurementModel.generateHk(Xref); */
-        double[] hk_til = measModel.Hk_til;
-        RealMatrix Hk_til = new Array2DRowRealMatrix(hk_til).transpose();
+        double[][] hk_til = measModel.Hk_til;
+        RealMatrix Hk_til = new Array2DRowRealMatrix(hk_til);
+        //App.printCovariance(Hk_til);
 
         // Kalman gain
         RealMatrix S = Hk_til.multiply(Pk_bar).multiplyTransposed(Hk_til).add(Rk_mat);
 
         RealMatrix Kk = Pk_bar.multiplyTransposed(Hk_til).multiply(MatrixUtils.inverse(S));
+        //App.printCovariance(Kk);
+
+        RealMatrix projMeasPred = new Array2DRowRealMatrix(Hk_til.operate(xk_bar));
 
         // Correction
-        double[] xhat = xk_bar_mat.add(Kk.scalarMultiply(0. - Hk_til.operate(xk_bar)[0]))
-                                  .getColumn(0);
+        RealMatrix xhatMatrix = xk_bar_mat.add(Kk.multiply(projMeasPred.scalarMultiply(-1)));
+        //App.printCovariance(xhatMatrix);
+        double[] xhat = xhatMatrix.getColumn(0);
         RealVector xhat_vec = new ArrayRealVector(xhat);
         RealVector Xref_out = Xref_vec.add(xhat_vec);
         this.stateCorr = Xref_out.toArray();
@@ -164,7 +172,7 @@ public class Filter {
         //System.out.println(new ArrayRealVector(X0_ref) + " time: " + t_obs);
 
         RealMatrix P0 = new Array2DRowRealMatrix(P_pre);
-        RealMatrix Rk_mat = new Array2DRowRealMatrix(new double[]{Rk});
+        RealMatrix Rk_mat = Rk;
 
         // State dimension
         int n = X0_ref.length;
