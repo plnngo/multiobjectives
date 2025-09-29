@@ -78,7 +78,7 @@ public class Car2DTestBench {
         MultiObjectiveMcts mcts = 
             new MultiObjectiveMcts(root, objectives, root.getEpoch(), 
                                    root.getEpoch().shiftedBy(20. * 60.), "Origin", cars, 
-                                   null, sensor, reward);
+                                   null, sensor, reward, false);
         List<Node> strategy = mcts.run(200000);
 
         evaluation(strategy);
@@ -87,7 +87,7 @@ public class Car2DTestBench {
         System.out.println("Run time in milliseconds: " + timeElapsed);
     }
 
-    private void evaluation(List<Node> strategy) throws IOException {
+    public static void evaluation(List<Node> strategy) throws IOException {
         try (FileWriter writer = new FileWriter("Strategy_Car_Option23_samCov_circle_discount0_rangeBearing_20min.csv")) {
             writer.append("car,time,meas,x1,x2,x3,x4,std1,std2,std3,std4\n");
             char id = 'o';

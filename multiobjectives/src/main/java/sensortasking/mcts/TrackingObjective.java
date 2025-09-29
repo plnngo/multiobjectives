@@ -2,10 +2,12 @@ package sensortasking.mcts;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Random;
 
@@ -68,6 +70,9 @@ import org.orekit.utils.IERSConventions;
 import org.orekit.utils.PVCoordinates;
 import org.orekit.utils.TimeStampedPVCoordinates;
 
+import benchtest.Car;
+import benchtest.CarTrackingObjective;
+import benchtest.Filter;
 import lombok.Getter;
 import sensortasking.stripescanning.Tasking;
 import tools.OptimisingVector;
@@ -100,6 +105,9 @@ public class TrackingObjective implements Objective{
     /** Last object whose state has been updated. */
     long lastUpdated = Long.MIN_VALUE;
 
+    /** Last object#s information gain. */
+    double lastUpdatedIG = 0.;
+
     /** Preparation time duraution in [sec]. */
     static double preparation = 6.;
 
@@ -131,8 +139,11 @@ public class TrackingObjective implements Objective{
 
     AbsoluteDate endCampaign;
 
+    AbsoluteDate startCampaign;
 
-    public TrackingObjective(List<ObservedObject> targets, Sensor sensor, AbsoluteDate endCampaign) {
+
+    public TrackingObjective(List<ObservedObject> targets, Sensor sensor, 
+                             AbsoluteDate endCampaign, AbsoluteDate startCampaign) {
 
         // Initialise list of targets
         for (ObservedObject target : targets) {
@@ -142,6 +153,7 @@ public class TrackingObjective implements Objective{
         this.sensor = sensor;
         this.sensorApartureRadius = sensor.getFov().getWidth()/2;       // TODO: currently assumed that aparture is circular
         this.endCampaign = endCampaign;
+        this.startCampaign = startCampaign;
     }
 
     public void setStationHorizonFrame(TopocentricFrame frame){
@@ -953,14 +965,101 @@ public class TrackingObjective implements Objective{
         
         return out;
     }
+
+    @Override
+    public AngularDirection setMicroAction(AbsoluteDate current, AngularDirection sensorPointing){
+        final double tstep = 10.;   
+        double tobs = current.durationFrom(this.startCampaign) + tstep;
+
+        // No cars to track
+        if (this.updatedTargets.isEmpty()) {
+            return null;
+        }
+
+        // List of candidates that might be trackable
+        Map<ObservedObject, Double> checkTrackable = new HashMap<ObservedObject, Double>();        
+        for (ObservedObject obj : updatedTargets) {
+            ObservedObject copy = new ObservedObject(obj.getId(), obj.getState(), 
+                                                     obj.getCovariance(), obj.getEpoch(), 
+                                                     obj.getFrame());
+            Filter est = new Filter();
+            double[] state = new double[]{copy.getState().getPositionVector().getX(),
+                                          copy.getState().getPositionVector().getY(),
+                                          copy.getState().getPositionVector().getZ(),
+                                          copy.getState().getVelocityVector().getX(),
+                                          copy.getState().getVelocityVector().getY(),
+                                          copy.getState().getVelocityVector().getZ()};
+            double[][] stateCov = copy.getCovariance().getCovarianceMatrix().getData();
+            est.run_ckf(state, stateCov, copy.getEpoch().durationFrom(this.startCampaign), tobs);
+            
+            // Compute informtion gain
+            double iG = CarTrackingObjective.computeTraceChange(est.getCovPred(), 
+                                                                est.getCovCorr());
+
+            ObservedObject copyUpdated = 
+                new ObservedObject(copy.getId(), 
+                                   ObservedObject.arrayToStateVector(est.getStateCorr()), 
+                                   ObservedObject.arrayToCartesianCov(est.getCovCorr()), 
+                                   current.shiftedBy(tstep), copy.getFrame());
+            checkTrackable.put(copyUpdated, iG);
+        }
+
+        // Step 1: Find max IG
+        Random rand = new Random();
+        double iGmax = -Double.MAX_VALUE;
+        for (Entry<ObservedObject, Double> entry : checkTrackable.entrySet()) {
+            if (entry.getValue() > iGmax) {
+                iGmax = entry.getValue();
+            }
+        }
+
+        // Step 2: Collect all cars with max IG
+        List<ObservedObject> bestCandidates = new ArrayList<>();
+        for (Entry<ObservedObject, Double> entry : checkTrackable.entrySet()) {
+            if (entry.getValue() == iGmax) {
+                bestCandidates.add(entry.getKey());
+            }
+        }
+
+        // Step 3: Pick one randomly
+        ObservedObject selectedRaw = bestCandidates.get(rand.nextInt(bestCandidates.size()));
+
+         // Step 4: Construct the selected Car object
+        double[] stateUpdated = new double[]{selectedRaw.getState().getPositionVector().getX(),
+                                             selectedRaw.getState().getPositionVector().getY(), 
+                                             selectedRaw.getState().getPositionVector().getZ(),
+                                             selectedRaw.getState().getVelocityVector().getX(),
+                                             selectedRaw.getState().getVelocityVector().getY(),
+                                             selectedRaw.getState().getVelocityVector().getZ()};
+        ObservedObject selected = 
+            new ObservedObject(selectedRaw.getId(),
+                               ObservedObject.arrayToStateVector(stateUpdated),
+                               selectedRaw.getCovariance(),
+                               current.shiftedBy(tstep),
+                               selectedRaw.getFrame());
+        // Step 5: Update targets
+        for (ObservedObject candidate : this.updatedTargets) {
+            if (candidate.getId() == selected.getId()) {
+                candidate.setState(ObservedObject.arrayToStateVector(stateUpdated));
+                candidate.setCovariance(selectedRaw.getCovariance());
+                candidate.setEpoch(selected.getEpoch());                
+                this.lastUpdated = selected.getId();
+                this.lastUpdatedIG = iGmax;
+
+                break;
+            }
+        } 
+        
+        // Compute pointing angle
+        return null;
+    }
     /**
      * 
      * @param current           Epoch of the last decision node
      * @param sensorPointing    Pointing location of the sensor at the current epoch
      * 
     */
-    @Override
-    public AngularDirection setMicroAction(AbsoluteDate current, AngularDirection sensorPointing){
+    public AngularDirection setMicroActionWithVisibilityChecks(AbsoluteDate current, AngularDirection sensorPointing){
 
         // List of potentially updated target 
         List<ObservedObject> targets = new ArrayList<ObservedObject>();

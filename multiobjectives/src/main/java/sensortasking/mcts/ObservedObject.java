@@ -84,6 +84,19 @@ public class ObservedObject {
         this.pseudoTle = pseudoTle;
     }
 
+    public static StateVector arrayToStateVector(double[] state){
+
+        StateVector stateVec = new StateVector();
+        stateVec.setX(state[0]);
+        stateVec.setY(state[1]);
+        stateVec.setZ(state[2]);
+        stateVec.setXdot(state[3]);
+        stateVec.setYdot(state[4]);
+        stateVec.setZdot(state[5]);
+
+        return stateVec;
+    }
+
     public static StateVector spacecraftStateToStateVector(SpacecraftState spacecraftState, 
                                                            Frame outputFrame){
 
@@ -116,6 +129,20 @@ public class ObservedObject {
         for (int row=0; row<rowDim; row++) {
             for (int col=0; col<colDim; col++) {
                 double entry = stateCov.getMatrix().getEntry(row, col);
+                output.setCovarianceMatrixEntry(row, col, entry);
+            }
+        }
+        return output;
+    }
+
+    public static CartesianCovariance arrayToCartesianCov(double[][] cov) {
+        CartesianCovariance output = new CartesianCovariance(null);
+        
+        int colDim = cov[0].length;
+        int rowDim = cov.length;
+        for (int row=0; row<rowDim; row++) {
+            for (int col=0; col<colDim; col++) {
+                double entry = cov[row][col];
                 output.setCovarianceMatrixEntry(row, col, entry);
             }
         }

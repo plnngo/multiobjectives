@@ -335,7 +335,7 @@ public class TrackingObjectiveTest {
         Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
         Transform eciToTopo = new Transform(target, coordinatesStationEci.negate());
         Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
-        TrackingObjective tracking = new TrackingObjective(ooi, null, target);
+        TrackingObjective tracking = new TrackingObjective(ooi, null, target, current);
 
         for (int simulation=0; simulation<10; simulation++) {
             AngularDirection pointing = tracking.setMicroAction(current, null);
@@ -425,7 +425,7 @@ public class TrackingObjectiveTest {
         List<ObservedObject> ooi = new ArrayList<ObservedObject>();
         ooi.add(singleKeplerianTestCase);
         //TrackingObjective track = new TrackingObjective(ooi, topoHorizon, topoCentric, sensor);
-        TrackingObjective track = new TrackingObjective(ooi, sensor, target);
+        TrackingObjective track = new TrackingObjective(ooi, sensor, target, current);
 
         AngularDirection initPointing = 
             new AngularDirection(topoCentric, new double[]{0.,0.}, AngleType.RADEC, 1.);
@@ -518,7 +518,7 @@ public class TrackingObjectiveTest {
 
         // Call test function 
         //TrackingObjective trackTask = new TrackingObjective(ooi, this.topoHorizon, null, this.sensor);
-        TrackingObjective trackTask = new TrackingObjective(ooi, this.sensor, date);
+        TrackingObjective trackTask = new TrackingObjective(ooi, this.sensor, date, date);
 
         // Compute sensor pointing
         Entry<SpacecraftState, StateCovariance> stateAndCov = 
@@ -553,7 +553,7 @@ public class TrackingObjectiveTest {
 
         // Call test function 
         //TrackingObjective trackTask = new TrackingObjective(ooi, this.topoHorizon, null, this.sensor);
-        TrackingObjective trackTask = new TrackingObjective(ooi, this.sensor, date);
+        TrackingObjective trackTask = new TrackingObjective(ooi, this.sensor, date, date);
         
         // Compute sensor pointing
         Entry<SpacecraftState, StateCovariance> stateAndCov = 

@@ -73,7 +73,7 @@ public class MultiObjectiveMcts {
     /** Minimal time duration requested by user that should be spent on time. */
     final double userSearchTrequested = 0.1;
 
-    final boolean orbitMode = false;        // else car mode
+    boolean orbitMode = false;        // else car mode
 
     /** Cars propagated to end without measurement updates. */
     final List<ObservedObject> predictedCars = new ArrayList<ObservedObject>();
@@ -91,13 +91,14 @@ public class MultiObjectiveMcts {
     public MultiObjectiveMcts(Node descisionTree, List<String> objectives,
                               AbsoluteDate start, AbsoluteDate end, String stationName,
                               List<ObservedObject> trackedObjects, List<ObservedObject> detectedObjects,
-                              Sensor sensor, RewardFunction selectedReward) {
+                              Sensor sensor, RewardFunction selectedReward, boolean orbitMode) {
 
         this.initial = (DecisionNode) descisionTree;
         MultiObjectiveMcts.objectives = objectives;
         this.startCampaign = start;
         this.endCampaign = end;
         this.reward = selectedReward;
+        this.orbitMode = orbitMode;
 
         // Frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -494,7 +495,7 @@ public class MultiObjectiveMcts {
         for (int i=0; i<weights.length; i++) {
             indexObjective[i] = i;
         }
-        int indexSelectedObjective = 3;
+        int indexSelectedObjective = 1;
             //WeightedRandomNumberPicker.pickNumber(indexObjective, weights);
         Objective objective;
         AngularDirection pointing = null;
@@ -558,7 +559,7 @@ public class MultiObjectiveMcts {
                     }
                 }
 
-                objective = new TrackingObjective(ooi, sensor, this.endCampaign);
+                objective = new TrackingObjective(ooi, sensor, this.endCampaign, this.startCampaign);
                 //leaf.setEpochSensorPointing(leaf.getEpoch());
                 pointing = objective.setMicroAction(leaf.getEpoch(), leaf.getSensorPointing());
 
