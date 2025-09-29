@@ -5,8 +5,8 @@ import org.hipparchus.util.FastMath;
 public class OrbitRangeAngularMeasurementModel {
 
     public static class MeasurementModel {
-        public double[][] Hk_til; // 1x4 vector
-        public double[] Gk;       // Scalar
+        public double[][] Hk_til; // 3x6 vector
+        public double[] Gk;       // ra, dec, range
 
         public MeasurementModel(double[][] Hk_til, double[] Gk) {
             this.Hk_til = Hk_til;
@@ -57,5 +57,4 @@ public class OrbitRangeAngularMeasurementModel {
 
         return new MeasurementModel(Hk_til, Gk);
     }
-    
 }
