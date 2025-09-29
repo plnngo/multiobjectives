@@ -25,14 +25,12 @@ import org.orekit.time.AbsoluteDate;
 import lombok.Getter;
 import sensortasking.mcts.AngleType;
 import sensortasking.mcts.AngularDirection;
-import sensortasking.mcts.App;
 import sensortasking.mcts.ChanceNode;
 import sensortasking.mcts.DecisionNode;
 import sensortasking.mcts.Node;
 import sensortasking.mcts.Objective;
 import sensortasking.mcts.ObservedObject;
 import sensortasking.mcts.Sensor;
-import sensortasking.mcts.TrackingObjective;
 
 @SuppressWarnings("rawtypes")
 @Getter
@@ -85,71 +83,26 @@ public class CarTrackingObjective implements Objective{
         }
 
         // List of candidates that might be trackable
-        Map<Car, Double[]> checkTrackable = new HashMap<Car, Double[]>();        
+        Map<Car, Double> checkTrackable = new HashMap<Car, Double>();        
         for (Car obj : updatedTargets) {
             double[] state = new double[]{obj.getPosX(), obj.getPosY(), obj.getVelX(), obj.getVelY()};
             Car copy = new Car(obj.getIdentifier(), state, obj.getCov(), obj.getTime());
 
             // Simulate measuremement
             Filter est = new Filter();
-            est.run_ckf(state, copy.getCov(), copy.getTime(), tobs);
+            est.run_ckf(state, copy.getCov(), obj.getEpoch(), current.shiftedBy(tstep));
 
             // Compute information gain
-            /* System.out.println("predicted:");
-            App.printCovariance(new Array2DRowRealMatrix(est.covPred));
-            System.out.println("corrected:");
-            App.printCovariance(new Array2DRowRealMatrix(est.covCorr)); */
-            /* double iG = 
-                computeKLDivergence(est.statePred, est.stateCorr, 
-                                                 est.covPred, est.covCorr); */
             double iG = computeTraceChange(est.covPred, est.covCorr);
-
-/*             // propagate predicted state to end date and compute loss of information update
-            Filter estLoss = new Filter();
-            double timeUntilEnd = this.end.durationFrom(this.start);
-
-            //double simMeasPred = generateRangeMeasurement(timeUntilEnd, est.statePred);
-            Car copyFuture = new Car(copy.getIdentifier(), est.statePred, est.covPred, tobs);
-
-            double simMeasPred = generateBearingMeasurement(timeUntilEnd, est.statePred, copyFuture);
-
-            estLoss.run_ckf(est.statePred, est.covPred, tobs, timeUntilEnd, simMeasPred);
-
-            // search for the corresponding target in predicted targets
-            double[][] predCovNoMeas = new double[estLoss.covCorr.length][estLoss.covCorr.length];
-            for (Car objPred : predictedTargets) {
-                if (objPred.getIdentifier() == obj.getIdentifier()) {
-                    predCovNoMeas = objPred.getCov();
-                }
-            }
-
-            double iL = computeTraceChange(predCovNoMeas, estLoss.covPred );*/
-            double iL =0.;
             Car copyUpdated = new Car(copy.getIdentifier(), est.stateCorr, est.covCorr, tobs); 
 
-            checkTrackable.put(copyUpdated, new Double[]{iG, iL});
-        }
-
-        // Step 0: extract reward (iG-iL)
-        Map<Car, Double> checkTrackableReward = new HashMap<Car, Double>();        
-
-        for (Entry<Car, Double[]> entry : checkTrackable.entrySet()) {
-            double noRegret = 0;
-            for (Entry<Car, Double[]> other : checkTrackable.entrySet()) {
-                if (other.getKey().getIdentifier() != entry.getKey().getIdentifier()) {
-                    // define lost
-                    noRegret += other.getValue()[1];
-                }
-            }
-            //double reward = noRegret;     //entry.getValue()[0];
-            double reward = entry.getValue()[0];
-            checkTrackableReward.put(entry.getKey(), reward);
+            checkTrackable.put(copyUpdated, iG);
         }
 
         // Step 1: Find max IG
         Random rand = new Random();
         double iGmax = -Double.MAX_VALUE;
-        for (Entry<Car, Double> entry : checkTrackableReward.entrySet()) {
+        for (Entry<Car, Double> entry : checkTrackable.entrySet()) {
             if (entry.getValue() > iGmax) {
                 iGmax = entry.getValue();
             }
@@ -157,7 +110,7 @@ public class CarTrackingObjective implements Objective{
 
         // Step 2: Collect all cars with max IG
         List<Car> bestCandidates = new ArrayList<>();
-        for (Entry<Car, Double> entry : checkTrackableReward.entrySet()) {
+        for (Entry<Car, Double> entry : checkTrackable.entrySet()) {
             if (entry.getValue() == iGmax) {
                 bestCandidates.add(entry.getKey());
             }
@@ -190,12 +143,6 @@ public class CarTrackingObjective implements Objective{
                 
                 this.lastUpdated = selected.getIdentifier();
                 this.lastUpdatedIG = iGmax;
-                for (Entry<Car, Double[]> entry : checkTrackable.entrySet()) {
-                    if (entry.getKey().getIdentifier() == candidate.getIdentifier()) {
-                        this.regret = entry.getValue()[1];
-                        break;
-                    }
-                }
                 break;
             }
         }  
@@ -443,7 +390,7 @@ public class CarTrackingObjective implements Objective{
         // Compute propagated uncertainty
         RealMatrix Phik = new Array2DRowRealMatrix(Phik_arr).transpose();
 
-        double[][] gamma = Filter.computeGamma(initialCar.getTime(), tCampaign);
+        double[][] gamma = Filter.computeGamma(tCampaign-initialCar.getTime());
         RealMatrix Gamma = new Array2DRowRealMatrix(gamma);
         RealMatrix mappedUnmodelAcc =  Gamma.scalarMultiply(Filter.Q).multiplyTransposed(Gamma);
 
