@@ -26,10 +26,6 @@ import org.orekit.bodies.OneAxisEllipsoid;
 import org.orekit.estimation.measurements.AngularAzEl;
 import org.orekit.estimation.measurements.GroundStation;
 import org.orekit.estimation.measurements.ObservableSatellite;
-import org.orekit.estimation.measurements.ObservedMeasurement;
-import org.orekit.estimation.sequential.ConstantProcessNoise;
-import org.orekit.estimation.sequential.KalmanEstimator;
-import org.orekit.estimation.sequential.KalmanEstimatorBuilder;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
 import org.orekit.frames.FactoryManagedFrame;
@@ -46,15 +42,11 @@ import org.orekit.orbits.OrbitType;
 import org.orekit.orbits.PositionAngleType;
 import org.orekit.propagation.AbstractPropagator;
 import org.orekit.propagation.MatricesHarvester;
-import org.orekit.propagation.Propagator;
 import org.orekit.propagation.SpacecraftState;
 import org.orekit.propagation.StateCovariance;
 import org.orekit.propagation.StateCovarianceMatrixProvider;
 import org.orekit.propagation.analytical.KeplerianPropagator;
-import org.orekit.propagation.analytical.tle.TLE;
 import org.orekit.propagation.analytical.tle.TLEPropagator;
-import org.orekit.propagation.analytical.tle.generation.FixedPointTleGenerationAlgorithm;
-import org.orekit.propagation.conversion.TLEPropagatorBuilder;
 import org.orekit.propagation.events.EclipseDetector;
 import org.orekit.propagation.events.ElevationDetector;
 import org.orekit.propagation.events.EventDetector;
@@ -70,9 +62,9 @@ import org.orekit.utils.IERSConventions;
 import org.orekit.utils.PVCoordinates;
 import org.orekit.utils.TimeStampedPVCoordinates;
 
-import benchtest.Car;
 import benchtest.CarTrackingObjective;
 import benchtest.Filter;
+import benchtest.OrbitRangeAngularMeasurementModel;
 import benchtest.Satellite;
 import lombok.Getter;
 import sensortasking.stripescanning.Tasking;
@@ -1031,6 +1023,7 @@ public class TrackingObjective implements Objective{
                           selectedRaw.getCovariance(),
                           current.shiftedBy(tstep),
                           selectedRaw.getFrame());
+
         // Step 5: Update targets
         for (ObservedObject candidate : this.updatedTargets) {
             if (candidate.getId() == selected.getId()) {
@@ -1042,20 +1035,28 @@ public class TrackingObjective implements Objective{
                 this.lastUpdatedIG = iGmax;
 
                 // Step 6: Transform into topocentric frame
+                Frame topo = sensor.getTopoInertialFrame(candidate.getEpoch(), sensor.getPosition());
                 Transform toTopo = 
-                    candidate.getFrame().getTransformTo(sensorPointing.getFrame(), candidate.getEpoch());
+                    candidate.getFrame().getTransformTo(topo, candidate.getEpoch());
                 PVCoordinates pvGeo = new PVCoordinates(candidate.getState().getPositionVector(), 
                                                         candidate.getState().getVelocityVector());
                 PVCoordinates pvTopo = toTopo.transformPVCoordinates(pvGeo);
                 Vector3D posTopo = pvTopo.getPosition();
-
-                break;
+                double[] simMeas = 
+                    OrbitRangeAngularMeasurementModel.generateHk(new double[]{posTopo.getX(), 
+                                                                              posTopo.getY(), 
+                                                                              posTopo.getZ()}).Gk;
+                // Extract angular measurement
+                double ra = simMeas[0];
+                double dec = simMeas[1];
+                double range = simMeas[2];
+                AngularDirection angle = 
+                    new AngularDirection(topo, new double[]{ra, dec}, AngleType.RADEC, range);
+                angle.setDate(candidate.getEpoch());
+                return angle;
             }
         } 
-        
-        // Compute pointing angle
-        // Measurement
-        
+        // No targets to track
         return null;
     }
     /**
