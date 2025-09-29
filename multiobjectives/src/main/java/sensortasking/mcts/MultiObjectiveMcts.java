@@ -154,33 +154,6 @@ public class MultiObjectiveMcts {
             System.out.println("Iteration: " + i);
             selectNew(this.initial);
 
-            /* if (i==130) {
-                DecisionNode current = (DecisionNode)this.initial;
-                List<Map.Entry<String, Double>> branches = extractBranches(this.initial, "", 0.0);
-                double maxReward = Double.NEGATIVE_INFINITY;
-                for (Map.Entry<String, Double> entry : branches) {
-                    System.out.println("Branch " + entry.getKey() + " has reward " + entry.getValue());
-                    if (entry.getValue() > maxReward) {
-                        maxReward = entry.getValue();
-                    }
-                }
-
-                // Step 2: Collect all entries with that reward
-                List<Map.Entry<String, Double>> bestBranches = new ArrayList<>();
-                for (Map.Entry<String, Double> entry : branches) {
-                    if (entry.getValue() == maxReward) {
-                        bestBranches.add(entry);
-                    }
-                }
-
-                // Step 3: Print them
-                System.out.printf("Max reward: %.2f%n", maxReward);
-                for (Map.Entry<String, Double> entry : bestBranches) {
-                    System.out.printf("Best branch: %s with reward %.2f%n", entry.getKey(), entry.getValue());
-                }
-            } else if (i==499) {
-                System.out.println("Break");
-            } */
             // Retrieve pointing strategy UCB
             Node current = initial;
 
