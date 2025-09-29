@@ -104,7 +104,7 @@ public class IodObjective implements Objective{
         this.tracklet = tracklet;
         this.measNoise = meas_noise;
         this.sensor = sensor;
-        this.q = sensor.getSensorPosEci(date);
+        this.q = Sensor.getSensorPosEci(date, sensor.getPosition());
         this.dq = omega.crossProduct(q);
 
         // Constraining AR by semi-major axis and eccentricity

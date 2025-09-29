@@ -97,7 +97,7 @@ public class SensorTest {
      */
     @Test
     public void testGetTopoInertialFrame(){
-        Frame actual = sensor.getTopoInertialFrame(date);
+        Frame actual = sensor.getTopoInertialFrame(date, sensor.getPosition());
         Vector3D centerTopo = Vector3D.ZERO;
 
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
@@ -108,7 +108,7 @@ public class SensorTest {
                                                    -4797.994704*1e3, 
                                                    3994.302210*1e3);
 
-        System.out.println(sensor.getSensorPosEcef());
+        System.out.println(Sensor.getSensorPosEcef(sensor.getPosition()));
         double tolerance = 1e-3;
         Assert.assertEquals(expectedCenterEcef.getX(), actualCenterEcef.getX(), tolerance);
         Assert.assertEquals(expectedCenterEcef.getY(), actualCenterEcef.getY(), tolerance);
@@ -224,7 +224,7 @@ public class SensorTest {
                                     sensor.getReadoutT(), sensor.getSlewVel(), 
                                     sensor.getElevCutOff());
         
-        Vector3D actual = sensor2.getSensorPosEci(date);
+        Vector3D actual = Sensor.getSensorPosEci(date, sensor2.getPosition());
 
         double tolerance = 1.;
         Assert.assertEquals(expected.getX(), actual.getX(), tolerance);
@@ -272,7 +272,7 @@ public class SensorTest {
 
         // Position of the sensor according to Vallado Example 4-1
         Vector3D expected = new Vector3D(-1275.123419*1e3, -4797.994704*1e3, 3994.302210*1e3);
-        Vector3D actual = sensor.getSensorPosEcef();
+        Vector3D actual = Sensor.getSensorPosEcef(sensor.getPosition());
 
         // Set up ECEF frame
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);

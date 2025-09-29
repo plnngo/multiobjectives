@@ -244,7 +244,7 @@ public class Tasking {
                 startReObs = this.start.shiftedBy(j * shiftT);
 
                 // Compute station's position in ECI
-                Vector3D stationEci = this.sensor.getSensorPosEci(startReObs);
+                Vector3D stationEci = Sensor.getSensorPosEci(startReObs, this.sensor.getPosition());
 
                 // Shift right ascension
                 reObsShift = reObsRa[i] + j*shiftAngle; 
@@ -341,7 +341,7 @@ public class Tasking {
                 startReObs = this.start.shiftedBy(j * shiftT);
 
                 // Compute station's position in ECI
-                Vector3D stationEci = this.sensor.getSensorPosEci(startReObs);
+                Vector3D stationEci = Sensor.getSensorPosEci(startReObs, this.sensor.getPosition());
 
                 // Shift right ascension
                 reObsShift = reObsRa[i] + j*shiftAngle; 
@@ -425,7 +425,7 @@ public class Tasking {
 
         //Frame eci = FramesFactory.getGCRF();
         //Frame eci = FramesFactory.getEME2000();
-        Vector3D stationEci = this.sensor.getSensorPosEci(this.start);
+        Vector3D stationEci = Sensor.getSensorPosEci(this.start, this.sensor.getPosition());
 
         // Get all bodies and their position that affect visibility condition
         CelestialBody sun = CelestialBodyFactory.getSun();
@@ -832,7 +832,7 @@ public class Tasking {
                     AbsoluteDate startSlot = this.schedule.get(0).getStart();
 
                     double ra = stripe.getFirstPosField().getAngle1();
-                    Vector3D stationEci = this.sensor.getSensorPosEci(startSlot);
+                    Vector3D stationEci = Sensor.getSensorPosEci(startSlot, this.sensor.getPosition());
 
                     // Create geosynchronous sphere in eci
                     //Frame eci = FramesFactory.getGCRF();
@@ -896,7 +896,7 @@ public class Tasking {
                 AbsoluteDate startSlot = this.schedule.get(indexCurrent).getStart();
 
                 double ra = obsStripe.getFirstPosField().getAngle1();
-                Vector3D stationEci = this.sensor.getSensorPosEci(startSlot);
+                Vector3D stationEci = Sensor.getSensorPosEci(startSlot, this.sensor.getPosition());
 
                 // Create Laplace plane in topocentric inertial frame
                 Plane laplace = createLaplacePlane(eci, startSlot);
@@ -1005,7 +1005,7 @@ public class Tasking {
         if(indexCurrent + reObsJ < this.schedule.size()) {
             double ra = reObs.getFirstPosField().getAngle1();
             AbsoluteDate startSlot = this.schedule.get(indexCurrent + reObsJ).getStart();
-            Vector3D station = this.sensor.getSensorPosEci(startSlot);
+            Vector3D station = Sensor.getSensorPosEci(startSlot, this.sensor.getPosition());
             int numDecFields =  reObs.getNumDecFields();
 
             // Create geosynchronous sphere in eci

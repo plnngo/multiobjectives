@@ -620,7 +620,7 @@ public class TrackingObjective implements Objective{
                                                                          Sensor sensor) {
         
         // Topocentric frame
-        Frame topocentric = sensor.getTopoInertialFrame(epoch);
+        Frame topocentric = sensor.getTopoInertialFrame(epoch, sensor.getPosition());
 
         // Set up covariance matrix provider and add it to the propagator
         final String stmName = "stm";
@@ -1094,7 +1094,7 @@ public class TrackingObjective implements Objective{
             measEpoch = measEpoch.shiftedBy(tStep);
 
             // Transform sensor pointing direction in new topocentric inertial frame
-            Frame topoInertial = this.sensor.getTopoInertialFrame(measEpoch);
+            Frame topoInertial = this.sensor.getTopoInertialFrame(measEpoch, this.sensor.getPosition());
             AngularDirection sensorP = 
                 sensorPointing.transformReference(topoInertial, measEpoch, 
                                                   sensorPointing.getAngleType());
@@ -1301,7 +1301,7 @@ public class TrackingObjective implements Objective{
      */
     public AngularDirection setMicroActionFixedAllocAngularDirection(AbsoluteDate current, AngularDirection sensorPointing) {
 
-        Frame topoInertial = this.sensor.getTopoInertialFrame(current);
+        Frame topoInertial = this.sensor.getTopoInertialFrame(current, this.sensor.getPosition());
 
         // Output
         double maxIG = Double.NEGATIVE_INFINITY;
@@ -1426,7 +1426,7 @@ public class TrackingObjective implements Objective{
 
     private AngularDirection generateOneMeasurement(SpacecraftState predState, AbsoluteDate targetDate) {
 
-        Frame topoInertial = this.sensor.getTopoInertialFrame(targetDate);
+        Frame topoInertial = this.sensor.getTopoInertialFrame(targetDate, this.sensor.getPosition());
         Transform eciToTopo = predState.getFrame().getTransformTo(topoInertial, targetDate);
         PVCoordinates pvTopo = 
             eciToTopo.transformPVCoordinates(predState.getPVCoordinates());

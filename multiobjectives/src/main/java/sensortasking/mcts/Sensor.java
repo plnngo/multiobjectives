@@ -180,14 +180,15 @@ public class Sensor {
      * Create topocentric inertial reference frame.
      * 
      * @param date                  Date related to the topocentric frame.
+     * @param position              Geodetic point of sensor.
      * 
      * @return                      Topocentric frame.
      */
-    public Frame getTopoInertialFrame(AbsoluteDate date) {
+    public Frame getTopoInertialFrame(AbsoluteDate date, GeodeticPoint position) {
         
 
         // Get sensor station in ECI coordinates
-        Vector3D posEci = getSensorPosEci(date);
+        Vector3D posEci = getSensorPosEci(date, position);
 
         // The transform vector from ECI to topocentric frame is not the vector from ECI's origin 
         // to topocentric origin (expressed in ECI) but rather the negative
@@ -204,17 +205,17 @@ public class Sensor {
      * Transform sensor's geodetic position into Cartesian coordinates in inertial frame (J2000).
      * 
      * @param date                  Date related to the frame transformation from ECEF to J2000.
+     * @param position              Geodetic point of sensor.
      * 
      * @return                      Cartesian position of sensor in J2000.
      */
-    public Vector3D getSensorPosEci(AbsoluteDate date){
+    public static Vector3D getSensorPosEci(AbsoluteDate date, GeodeticPoint position){
 
         // Get sensor station in ECEF coordinates
-        Vector3D posEcef = getSensorPosEcef();
+        Vector3D posEcef = getSensorPosEcef(position);
 
         // Transform position from ECEF to ECI
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
-        //Frame eci = FramesFactory.getGCRF();
         Frame eci = FramesFactory.getEME2000();
         Transform ecef2eci = ecef.getTransformTo(eci, date);  
         return ecef2eci.transformPosition(posEcef);
@@ -225,7 +226,7 @@ public class Sensor {
      *  
      * @return                      Cartesian position of sensor in ECEF.
      */
-    public Vector3D getSensorPosEcef(){
+    public static Vector3D getSensorPosEcef(GeodeticPoint position){
 
         double lat = position.getLatitude();
         double lon = position.getLongitude();
