@@ -22,6 +22,7 @@ import benchtest.Car;
 import benchtest.CarTrackingObjective;
 import benchtest.Filter;
 import benchtest.RewardFunction;
+import benchtest.Satellite;
 import lombok.Getter;
 import sensortasking.stripescanning.Stripe;
 import sensortasking.stripescanning.Tasking;
@@ -123,11 +124,8 @@ public class MultiObjectiveMcts {
             for (ObservedObject obj : trackedObjects) {
                 Car car = (Car) obj;
                 Filter est = new Filter();
-                /* double simMeas = 
-                    CarTrackingObjective.generateRangeMeasurement(campaignT, car.getStateArray()); */
-                /* double simMeas = 
-                    CarTrackingObjective.generateBearingMeasurement(campaignT, car.getStateArray(), car); */
-                est.run_ckf(car.getStateArray(), car.getCov(), car.getTime(), campaignT);
+                est.run_ckf(car.getStateArray(), car.getCov(), 
+                            this.startCampaign.shiftedBy(car.getTime()), this.endCampaign);
                 Car pred = new Car(car.getIdentifier(), est.getStatePred(), 
                                    est.getCovPred(), campaignT);
                 predictedCars.add(pred);
@@ -478,7 +476,7 @@ public class MultiObjectiveMcts {
                             targetCar.getTime());
                 restore.add(copy);
             } else {
-                ObservedObject copy = new ObservedObject(target.getId(), target.getState(), 
+                ObservedObject copy = new Satellite(target.getId(), target.getState(), 
                                                      target.getCovariance(), target.getEpoch(), 
                                                      target.getFrame());
                 restore.add(copy);
@@ -660,8 +658,8 @@ public class MultiObjectiveMcts {
 
         if(objective instanceof TrackingObjective) {
             List<ObservedObject> propEnviroment = new ArrayList<ObservedObject>();
-            for(ObservedObject obj: (List<ObservedObject>)objective.propagateOutcome()) {
-                ObservedObject copy = new ObservedObject(obj.getId(), obj.getState(), 
+            for(ObservedObject obj: (List<Satellite>)objective.propagateOutcome()) {
+                ObservedObject copy = new Satellite(obj.getId(), obj.getState(), 
                                                          obj.getCovariance(), obj.getEpoch(), 
                                                          obj.getFrame());
                 propEnviroment.add(copy);
@@ -677,7 +675,7 @@ public class MultiObjectiveMcts {
                 }
                 if(!found) {
                     ObservedObject notTargeted = 
-                        new ObservedObject(idParent, leaf.getEnvironment().getStateTracking().get(parent).getState(),
+                        new Satellite(idParent, leaf.getEnvironment().getStateTracking().get(parent).getState(),
                                         leaf.getEnvironment().getStateTracking().get(parent).getCovariance(), 
                                         leaf.getEnvironment().getStateTracking().get(parent).getEpoch(), 
                                         leaf.getEnvironment().getStateTracking().get(parent).getFrame());
@@ -765,7 +763,7 @@ public class MultiObjectiveMcts {
         // restore environment
         if (orbitMode) {
             for(ObservedObject target : leaf.getEnvironment().getStateTracking()) {
-                ObservedObject copy = new ObservedObject(target.getId(), target.getState(), 
+                ObservedObject copy = new Satellite(target.getId(), target.getState(), 
                                                         target.getCovariance(), target.getEpoch(), 
                                                         target.getFrame());
                 restore.add(copy);
@@ -928,7 +926,7 @@ public class MultiObjectiveMcts {
             List<ObservedObject> fakeObjs = new ArrayList<ObservedObject>();
             if (orbitMode) {
                 for(ObservedObject obj : this.initial.getEnvironment().getStateTracking()) {
-                    ObservedObject copy = new ObservedObject(obj.getId(), obj.getState(), 
+                    ObservedObject copy = new Satellite(obj.getId(), obj.getState(), 
                                                             obj.getCovariance(), obj.getEpoch(), 
                                                             obj.getFrame());
                     fakeObjs.add(copy);
@@ -1061,7 +1059,7 @@ public class MultiObjectiveMcts {
         // Compute tracking reward
         double[] trackReward = null;
         if (orbitMode) {
-            trackReward = computeTrackReward(last);
+            //trackReward = computeTrackReward(last);
         } else {
             double tCampaign = this.endCampaign.durationFrom(this.startCampaign);
 
@@ -1088,7 +1086,7 @@ public class MultiObjectiveMcts {
         return out; */
     }
 
-    protected double[] computeTrackReward(DecisionNode last) {
+    /* protected double[] computeTrackReward(DecisionNode last) {
         
         // Compute common epoch
         List<ObservedObject> trackedObjs = last.getEnvironment().getStateTracking();
@@ -1103,7 +1101,6 @@ public class MultiObjectiveMcts {
             ObservedObject.propagateTargets(targetsInitial, this.endCampaign);
 
         // Propagate all targets from their updated final state towards common epoch
-        //List<ObservedObject> targetsUpdated = last.getEnvironment().getStateTracking();
         List<ObservedObject> targetsFinal = 
             ObservedObject.propagateTargets(trackedObjs, this.endCampaign);
 
@@ -1137,7 +1134,7 @@ public class MultiObjectiveMcts {
         }
 
         return out;
-    }
+    } */
 
     /**
      * Return number of dominating solutions with respect to the new {@code leaf} node.

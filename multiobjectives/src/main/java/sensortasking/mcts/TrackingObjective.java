@@ -73,6 +73,7 @@ import org.orekit.utils.TimeStampedPVCoordinates;
 import benchtest.Car;
 import benchtest.CarTrackingObjective;
 import benchtest.Filter;
+import benchtest.Satellite;
 import lombok.Getter;
 import sensortasking.stripescanning.Tasking;
 import tools.OptimisingVector;
@@ -576,7 +577,7 @@ public class TrackingObjective implements Objective{
                                 PositionAngleType.MEAN);
         CartesianCovariance predCartCov = 
             ObservedObject.stateCovToCartesianCov(predicted.getOrbit(), stateCov, j2000);
-        output[0] = new ObservedObject(candidate.getId(), predState, predCartCov, 
+        output[0] = new Satellite(candidate.getId(), predState, predCartCov, 
                                        predicted.getDate(), j2000);
             
         // Set up output updated
@@ -592,7 +593,7 @@ public class TrackingObjective implements Objective{
                                 PositionAngleType.MEAN);
         CartesianCovariance corrCartCov = 
             ObservedObject.stateCovToCartesianCov(updatedOrbit, updatedStateCov, j2000);
-        output[1] = new ObservedObject(candidate.getId(), corrState, corrCartCov, 
+        output[1] = new Satellite(candidate.getId(), corrState, corrCartCov, 
                                        predicted.getDate(), j2000);
         return output;
     }
@@ -709,7 +710,7 @@ public class TrackingObjective implements Objective{
                                 PositionAngleType.MEAN);
         CartesianCovariance predCartCov = 
             ObservedObject.stateCovToCartesianCov(predicted.getOrbit(), stateCov, j2000);
-        output[0] = new ObservedObject(candidate.getId(), predState, predCartCov, 
+        output[0] = new Satellite(candidate.getId(), predState, predCartCov, 
                                        predicted.getDate(), j2000);
             
         // Set up output updated
@@ -725,7 +726,7 @@ public class TrackingObjective implements Objective{
                                 PositionAngleType.MEAN);
         CartesianCovariance corrCartCov = 
             ObservedObject.stateCovToCartesianCov(updatedOrbit, updatedStateCov, j2000);
-        output[1] = new ObservedObject(candidate.getId(), corrState, corrCartCov, 
+        output[1] = new Satellite(candidate.getId(), corrState, corrCartCov, 
                                        predicted.getDate(), j2000);
 
         // Corrected covariance projected in measurement space
@@ -745,7 +746,7 @@ public class TrackingObjective implements Objective{
     }
 
 
-    protected ObservedObject[] estimateStateWithKalman(Iterable<ObservedMeasurement<?>> azElMeas,
+    /* protected ObservedObject[] estimateStateWithKalman(Iterable<ObservedMeasurement<?>> azElMeas,
                                                      ObservedObject candidate) {
 
         // Initialise output
@@ -758,13 +759,7 @@ public class TrackingObjective implements Objective{
 
         // Set initial state covariance
         RealMatrix initialP = candidate.getCovariance().getCovarianceMatrix();
-/*         for (int row=0; row<initialP.getRowDimension(); row++) {
-            double[] rowVec = initialP.getRow(row);
-            for(int col=0; col<initialP.getColumnDimension(); col++) {
-                System.out.print(rowVec[col] + " ");
-            }
-            System.out.println();
-        } */
+
        //initialP = MatrixUtils.createRealIdentityMatrix(6).scalarMultiply(0.0);
 
         // Set process noise
@@ -844,7 +839,7 @@ public class TrackingObjective implements Objective{
                                        stationHorizon, pseudoTle);
 
         return output;
-    }
+    } */
 
     /**
      * Transform angular diretion into orekit AngularAzEl object.
@@ -953,11 +948,10 @@ public class TrackingObjective implements Objective{
     @Override
     public List<ObservedObject> propagateOutcome() {
 
-
         // return copy of updated targets
         List<ObservedObject> out = new ArrayList<ObservedObject>();
         for (ObservedObject obj : this.updatedTargets) {
-            ObservedObject copy = new ObservedObject(obj.getId(), obj.getState(), 
+            ObservedObject copy = new Satellite(obj.getId(), obj.getState(), 
                                                      obj.getCovariance(), obj.getEpoch(), 
                                                      obj.getFrame());
             out.add(copy);
@@ -979,7 +973,7 @@ public class TrackingObjective implements Objective{
         // List of candidates that might be trackable
         Map<ObservedObject, Double> checkTrackable = new HashMap<ObservedObject, Double>();        
         for (ObservedObject obj : updatedTargets) {
-            ObservedObject copy = new ObservedObject(obj.getId(), obj.getState(), 
+            ObservedObject copy = new Satellite(obj.getId(), obj.getState(), 
                                                      obj.getCovariance(), obj.getEpoch(), 
                                                      obj.getFrame());
             Filter est = new Filter();
@@ -990,14 +984,14 @@ public class TrackingObjective implements Objective{
                                           copy.getState().getVelocityVector().getY(),
                                           copy.getState().getVelocityVector().getZ()};
             double[][] stateCov = copy.getCovariance().getCovarianceMatrix().getData();
-            est.run_ckf(state, stateCov, copy.getEpoch().durationFrom(this.startCampaign), tobs);
+            est.run_ckf(state, stateCov, copy.getEpoch(), this.startCampaign.shiftedBy(tobs));
             
             // Compute informtion gain
             double iG = CarTrackingObjective.computeTraceChange(est.getCovPred(), 
                                                                 est.getCovCorr());
 
             ObservedObject copyUpdated = 
-                new ObservedObject(copy.getId(), 
+                new Satellite(copy.getId(), 
                                    ObservedObject.arrayToStateVector(est.getStateCorr()), 
                                    ObservedObject.arrayToCartesianCov(est.getCovCorr()), 
                                    current.shiftedBy(tstep), copy.getFrame());
@@ -1032,25 +1026,36 @@ public class TrackingObjective implements Objective{
                                              selectedRaw.getState().getVelocityVector().getY(),
                                              selectedRaw.getState().getVelocityVector().getZ()};
         ObservedObject selected = 
-            new ObservedObject(selectedRaw.getId(),
-                               ObservedObject.arrayToStateVector(stateUpdated),
-                               selectedRaw.getCovariance(),
-                               current.shiftedBy(tstep),
-                               selectedRaw.getFrame());
+            new Satellite(selectedRaw.getId(),
+                          ObservedObject.arrayToStateVector(stateUpdated),
+                          selectedRaw.getCovariance(),
+                          current.shiftedBy(tstep),
+                          selectedRaw.getFrame());
         // Step 5: Update targets
         for (ObservedObject candidate : this.updatedTargets) {
             if (candidate.getId() == selected.getId()) {
                 candidate.setState(ObservedObject.arrayToStateVector(stateUpdated));
                 candidate.setCovariance(selectedRaw.getCovariance());
-                candidate.setEpoch(selected.getEpoch());                
+                candidate.setEpoch(selected.getEpoch()); 
+                candidate.setFrame(selectedRaw.getFrame());               
                 this.lastUpdated = selected.getId();
                 this.lastUpdatedIG = iGmax;
+
+                // Step 6: Transform into topocentric frame
+                Transform toTopo = 
+                    candidate.getFrame().getTransformTo(sensorPointing.getFrame(), candidate.getEpoch());
+                PVCoordinates pvGeo = new PVCoordinates(candidate.getState().getPositionVector(), 
+                                                        candidate.getState().getVelocityVector());
+                PVCoordinates pvTopo = toTopo.transformPVCoordinates(pvGeo);
+                Vector3D posTopo = pvTopo.getPosition();
 
                 break;
             }
         } 
         
         // Compute pointing angle
+        // Measurement
+        
         return null;
     }
     /**
@@ -1070,7 +1075,7 @@ public class TrackingObjective implements Objective{
         // List of candidates that might be trackable
         List<ObservedObject> checkTrackable = new ArrayList<ObservedObject>();        
         for (ObservedObject obj : updatedTargets) {
-            ObservedObject copy = new ObservedObject(obj.getId(), obj.getState(), 
+            ObservedObject copy = new Satellite(obj.getId(), obj.getState(), 
                                                      obj.getCovariance(), obj.getEpoch(), 
                                                      obj.getFrame());
             checkTrackable.add(copy);

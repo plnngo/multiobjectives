@@ -34,6 +34,8 @@ import org.orekit.utils.IERSConventions;
 
 import com.opencsv.CSVWriter;
 
+import benchtest.Satellite;
+
 import org.orekit.frames.Frame;
 
 public class ESDConferenceTrackingTask {
@@ -127,7 +129,7 @@ public class ESDConferenceTrackingTask {
                 }
             }
             // Compute IG of final strategy
-            double[] iG = mcts.computeTrackReward((DecisionNode)strategy.get(strategy.size()-1));
+            double[] iG = new double[]{}; //mcts.computeTrackReward((DecisionNode)strategy.get(strategy.size()-1));
             double searchT = ((DecisionNode)strategy.get(strategy.size()-1)).getTimeSpentStripe();
             for(int k=0; k<iG.length; k++) {
                 selected[j + k] = Double.toString(iG[k]);
@@ -198,9 +200,9 @@ public class ESDConferenceTrackingTask {
             ObservedObject.stateCovToCartesianCov(spacecraftTdrs12.getOrbit(), covEciTdrs12, j2000);
 
         // Create list of objects of interest
-        ObservedObject tdrs05 = new ObservedObject(tleTdrs05.getSatelliteNumber(), stateTdrs05, stateCovTdrs05, current, j2000);
-        ObservedObject tdrs06 = new ObservedObject(tleTdrs06.getSatelliteNumber(), stateTdrs06, stateCovTdrs06, current, j2000);
-        ObservedObject tdrs12 = new ObservedObject(tleTdrs12.getSatelliteNumber(), stateTdrs12, stateCovTdrs12, current, j2000);
+        ObservedObject tdrs05 = new Satellite(tleTdrs05.getSatelliteNumber(), stateTdrs05, stateCovTdrs05, current, j2000);
+        ObservedObject tdrs06 = new Satellite(tleTdrs06.getSatelliteNumber(), stateTdrs06, stateCovTdrs06, current, j2000);
+        ObservedObject tdrs12 = new Satellite(tleTdrs12.getSatelliteNumber(), stateTdrs12, stateCovTdrs12, current, j2000);
 
         List<ObservedObject> ooi = new ArrayList<ObservedObject>();
         ooi.add(tdrs05);

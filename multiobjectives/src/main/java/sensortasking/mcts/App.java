@@ -69,6 +69,8 @@ import org.orekit.utils.Constants;
 import org.orekit.utils.IERSConventions;
 import org.orekit.utils.PVCoordinates;
 
+import benchtest.Satellite;
+
 /**
  * Hello world!
  *
@@ -124,7 +126,7 @@ public class App {
         StateCovariance covEciTdrs06 = new StateCovariance(covMatrixTdrs06, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
         CartesianCovariance stateCovTdrs06 =
             ObservedObject.stateCovToCartesianCov(new CartesianOrbit(new PVCoordinates(), j2000, current, Constants.WGS84_EARTH_MU), covEciTdrs06, j2000);
-        ObservedObject tdrs06 = new ObservedObject((long)22314, stateTdrs06, stateCovTdrs06, current, j2000);
+        ObservedObject tdrs06 = new Satellite((long)22314, stateTdrs06, stateCovTdrs06, current, j2000);
 
         double[][] covTdrs12 = new double[][]{{1.089421296e+01, -1.230485775e-03, -7.039752463e-05,  6.071024929e-03, -4.337845954e-05, -2.508471831e-06}, 
                                               {-1.230485775e-03,  1.089376735e+01, -7.727588323e-05, -4.256149661e-05,  6.035841690e-03, -3.687197998e-06}, 
@@ -136,7 +138,7 @@ public class App {
         StateCovariance covEciTdrs12 = new StateCovariance(covMatrixTdrs12, current, j2000, OrbitType.CARTESIAN, PositionAngleType.MEAN);
         CartesianCovariance stateCovTdrs12 =
             ObservedObject.stateCovToCartesianCov(new CartesianOrbit(new PVCoordinates(), j2000, current, Constants.WGS84_EARTH_MU), covEciTdrs12, j2000);
-        ObservedObject tdrs12 = new ObservedObject((long)39504, stateTdrs06, stateCovTdrs12, current, j2000);
+        ObservedObject tdrs12 = new Satellite((long)39504, stateTdrs06, stateCovTdrs12, current, j2000);
 
         double distance = TrackingObjective.computeKullbackLeiblerDivergence(tdrs06, tdrs12);
         System.out.println(distance);
