@@ -283,12 +283,13 @@ public class MultiObjectiveMcts {
                 }
                 //System.out.println("After expansion leaf epoch: " + leaf.getEpoch().toString());
                 expandable = true;
-                List<Node> simulated = simulate(leaf, endCampaign);
-                if (simulated.size() != 0) {
-                    backpropagate(leaf, simulated.get(simulated.size()-1));
+                Node simulatedLeaf = simulate(leaf, endCampaign);
+                backpropagate(leaf, simulatedLeaf);
+                /* if (!Objects.isNull(simulatedLeaf)) {
+                    backpropagate(leaf, simulatedLeaf);
                 } else {
                     backpropagate(leaf, null);
-                }
+                } */
                 children = current.getChildren();
             } 
         }
@@ -411,12 +412,13 @@ public class MultiObjectiveMcts {
                     } 
                 }
                 expandable = true;
-                List<Node> simulated = simulate(leaf, endCampaign);
-                if (simulated.size() > 1) {
-                    backpropagate(leaf, simulated.get(simulated.size()-1));
+                Node simulatedLeaf = simulate(leaf, endCampaign);
+                backpropagate(leaf, simulatedLeaf);
+/*                 if (simulatedLeaf.size() > 1) {
+                    backpropagate(leaf, simulatedLeaf.get(simulatedLeaf.size()-1));
                 } else {
                     backpropagate(leaf, null);
-                }
+                } */
                 return true;
             } 
         }
@@ -633,10 +635,12 @@ public class MultiObjectiveMcts {
             List<ObservedObject> propEnviroment = new ArrayList<ObservedObject>();
             for(ObservedObject obj: (List<Satellite>)objective.propagateOutcome()) {
                 ObservedObject copy = new Satellite(obj.getId(), obj.getState(), 
-                                                         obj.getCovariance(), obj.getEpoch(), 
-                                                         obj.getFrame());
+                                                    obj.getCovariance(), obj.getEpoch(), 
+                                                    obj.getFrame());
                 propEnviroment.add(copy);
             }
+
+            // Check if list of targets in parental node contains same objects as list of targets in child node
             for(int parent=0; parent<leaf.getEnvironment().getStateTracking().size(); parent++) {
                 long idParent = leaf.getEnvironment().getStateTracking().get(parent).getId();
                 boolean found = false;
@@ -644,6 +648,7 @@ public class MultiObjectiveMcts {
                     if (idParent == ((ObservedObject)propEnviroment.get(child))
                                                                    .getId()) {
                         found = true;
+                        break;
                     }
                 }
                 if(!found) {
@@ -726,11 +731,10 @@ public class MultiObjectiveMcts {
      * 
      * @param leaf              Current leaf node of the decision tree.
      * @param campaignEndDate   End of observation campaign.
-     * @return                  List of nodes that have been simulated during roll-out.
+     * @return                  Last node that has been simulated during roll-out.
      */
-    public List<Node> simulate(DecisionNode leaf, AbsoluteDate campaignEndDate) {
+    public Node simulate(DecisionNode leaf, AbsoluteDate campaignEndDate) {
 
-        //List<ObservedObject> restore = leaf.getEnvironment().getStateTracking();
         List<ObservedObject> restore = new ArrayList<>();
 
         // restore environment
@@ -749,28 +753,25 @@ public class MultiObjectiveMcts {
             }
         }
         
-        // Declare output
-        List<Node> episode = new ArrayList<Node>(); // TODO: not necessary to store in an array because node holds all the descendants
-        //episode.add(leaf);
-
         DecisionNode current = leaf;
+        DecisionNode next = leaf;
         AbsoluteDate currentEndMeasEpoch = current.getEpoch();
 
         while(currentEndMeasEpoch.compareTo(campaignEndDate) <= 0) {
 
-            episode.add(current);
-            current = expand(current, true); 
+            next = expand(current, true); 
 
-            if (Objects.isNull(current)) {
-                return episode;
+            if (Objects.isNull(next)) {
+                return current;
             }         
-            currentEndMeasEpoch = current.getEpoch();
+            currentEndMeasEpoch = next.getEpoch();
+            current = next;
         }
       
         leaf.clearChildren();  
         leaf.getEnvironment().setStateTracking(restore);   // TODO: not necessary  
 
-        return episode;
+        return current;
     }
 
     /**
@@ -1031,12 +1032,11 @@ public class MultiObjectiveMcts {
 
         // Compute tracking reward
         double[] trackReward = null;
+        double tCampaign = this.endCampaign.durationFrom(this.startCampaign);
         if (orbitMode) {
-            //trackReward = computeTrackReward(last);
-        } else {
-            double tCampaign = this.endCampaign.durationFrom(this.startCampaign);
-
-            // Reward measured as regret
+            TrackingObjective.computeTrackReward(last, leaf, this.initial, tCampaign, 
+                                                    discount, this.sensor, this.reward);
+        } else { 
             CarTrackingObjective.computeTrackReward(last, leaf, this.initial, tCampaign, 
                                                     discount, this.sensor, this.reward);
         }

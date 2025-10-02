@@ -65,6 +65,7 @@ import org.orekit.utils.TimeStampedPVCoordinates;
 import benchtest.CarTrackingObjective;
 import benchtest.Filter;
 import benchtest.OrbitRangeAngularMeasurementModel;
+import benchtest.RewardFunction;
 import benchtest.Satellite;
 import lombok.Getter;
 import sensortasking.stripescanning.Tasking;
@@ -898,9 +899,10 @@ public class TrackingObjective implements Objective{
             }
         }
         
-        AbsoluteDate[] interval = 
+        /* AbsoluteDate[] interval = 
             new AbsoluteDate[]{current, lastUpdateEpoch.shiftedBy(sensor.getExposureT()/2 
-                                                                    + sensor.getReadoutT())};
+                                                                    + sensor.getReadoutT())}; */
+        AbsoluteDate[] interval = new AbsoluteDate[]{current, lastUpdateEpoch};
 
         return interval;
     }
@@ -968,7 +970,7 @@ public class TrackingObjective implements Objective{
             ObservedObject copy = new Satellite(obj.getId(), obj.getState(), 
                                                      obj.getCovariance(), obj.getEpoch(), 
                                                      obj.getFrame());
-            Filter est = new Filter();
+            
             double[] state = new double[]{copy.getState().getPositionVector().getX(),
                                           copy.getState().getPositionVector().getY(),
                                           copy.getState().getPositionVector().getZ(),
@@ -976,6 +978,7 @@ public class TrackingObjective implements Objective{
                                           copy.getState().getVelocityVector().getY(),
                                           copy.getState().getVelocityVector().getZ()};
             double[][] stateCov = copy.getCovariance().getCovarianceMatrix().getData();
+            Filter est = new Filter();
             est.run_ckf(state, stateCov, copy.getEpoch(), this.startCampaign.shiftedBy(tobs));
             
             // Compute informtion gain
@@ -984,9 +987,9 @@ public class TrackingObjective implements Objective{
 
             ObservedObject copyUpdated = 
                 new Satellite(copy.getId(), 
-                                   ObservedObject.arrayToStateVector(est.getStateCorr()), 
-                                   ObservedObject.arrayToCartesianCov(est.getCovCorr()), 
-                                   current.shiftedBy(tstep), copy.getFrame());
+                              ObservedObject.arrayToStateVector(est.getStateCorr()), 
+                              ObservedObject.arrayToCartesianCov(est.getCovCorr()), 
+                              current.shiftedBy(tstep), copy.getFrame());
             checkTrackable.put(copyUpdated, iG);
         }
 
@@ -1010,28 +1013,22 @@ public class TrackingObjective implements Objective{
         // Step 3: Pick one randomly
         ObservedObject selectedRaw = bestCandidates.get(rand.nextInt(bestCandidates.size()));
 
-         // Step 4: Construct the selected Car object
+         // Step 4: Extract state vector of the selected Car object
         double[] stateUpdated = new double[]{selectedRaw.getState().getPositionVector().getX(),
                                              selectedRaw.getState().getPositionVector().getY(), 
                                              selectedRaw.getState().getPositionVector().getZ(),
                                              selectedRaw.getState().getVelocityVector().getX(),
                                              selectedRaw.getState().getVelocityVector().getY(),
                                              selectedRaw.getState().getVelocityVector().getZ()};
-        ObservedObject selected = 
-            new Satellite(selectedRaw.getId(),
-                          ObservedObject.arrayToStateVector(stateUpdated),
-                          selectedRaw.getCovariance(),
-                          current.shiftedBy(tstep),
-                          selectedRaw.getFrame());
 
         // Step 5: Update targets
         for (ObservedObject candidate : this.updatedTargets) {
-            if (candidate.getId() == selected.getId()) {
+            if (candidate.getId() == selectedRaw.getId()) {
                 candidate.setState(ObservedObject.arrayToStateVector(stateUpdated));
                 candidate.setCovariance(selectedRaw.getCovariance());
-                candidate.setEpoch(selected.getEpoch()); 
+                candidate.setEpoch(current.shiftedBy(tstep)); 
                 candidate.setFrame(selectedRaw.getFrame());               
-                this.lastUpdated = selected.getId();
+                this.lastUpdated = selectedRaw.getId();
                 this.lastUpdatedIG = iGmax;
 
                 // Step 6: Transform into topocentric frame
@@ -1438,5 +1435,12 @@ public class TrackingObjective implements Objective{
             new AngularDirection(topoInertial, new double[]{angle1, angle2}, 
                                  AngleType.RADEC, range);
         return measurement;
+    }
+
+    public static void computeTrackReward(DecisionNode last, DecisionNode leaf, 
+                                          DecisionNode initial, double tCampaign,
+                                          double discount, Sensor sensor, 
+                                          RewardFunction reward) {
+        
     }
 }

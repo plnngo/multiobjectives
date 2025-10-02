@@ -49,20 +49,20 @@ public class Satellite extends ObservedObject implements OrdinaryDifferentialEqu
 
     private static double[] int_stm(double[] X) {
 
-        // X = [x, y, vx, vy, phi (4x4 matrix flattened in column-major order)]
+        // X = [x, y, z, vx, vy, vz phi (6x6 matrix flattened in column-major order)]
 
-        int stateSize = 4;
-        int stmSize = 16; // 4x4 STM
+        int stateSize = dim;
+        int stmSize = dim*dim; // 6x6 STM
         double[] dX = new double[stateSize + stmSize];
 
         // Define the constant velocity system matrix A
         double[][] A = twoBodyDynamics(X);
 
         // Extract phi matrix from X (column-major to 2D array)
-        double[][] phi = new double[4][4];
-        for (int col = 0; col < 4; col++) {
-            for (int row = 0; row < 4; row++) {
-                phi[row][col] = X[4 + col * 4 + row];
+        double[][] phi = new double[dim][dim];
+        for (int col = 0; col < dim; col++) {
+            for (int row = 0; row < dim; row++) {
+                phi[row][col] = X[dim + col * dim + row];
             }
         }
 
@@ -70,20 +70,20 @@ public class Satellite extends ObservedObject implements OrdinaryDifferentialEqu
         dX = computeTwoBodyDerivative(A, X, dX);
         
         // Compute dphi = A * phi
-        double[][] dphi = new double[4][4];
-        for (int i = 0; i < 4; i++) {
-            for (int j = 0; j < 4; j++) {
+        double[][] dphi = new double[dim][dim];
+        for (int i = 0; i < dim; i++) {
+            for (int j = 0; j < dim; j++) {
                 dphi[i][j] = 0;
-                for (int k = 0; k < 4; k++) {
+                for (int k = 0; k < dim; k++) {
                     dphi[i][j] += A[i][k] * phi[k][j];
                 }
             }
         }
 
         // Flatten dphi (column-major) into dX
-        for (int col = 0; col < 4; col++) {
-            for (int row = 0; row < 4; row++) {
-                dX[4 + col * 4 + row] = dphi[row][col];
+        for (int col = 0; col < dim; col++) {
+            for (int row = 0; row < dim; row++) {
+                dX[dim + col * dim + row] = dphi[row][col];
             }
         }
         return dX;
@@ -93,11 +93,21 @@ public class Satellite extends ObservedObject implements OrdinaryDifferentialEqu
 
     private static double[] computeTwoBodyDerivative(double[][] A, double[] X, double[] dX) {
 
+        // Initialise output
+        double[] out = new double[dX.length];
+
         // Compute powers of range
         double r = FastMath.sqrt(X[0]*X[0] + X[1]*X[1] + X[2]*X[2]);
         double r3 = r * r * r;
 
-        return new double[]{X[3], X[4], X[5], -X[0]*mu/r3, -X[1]*mu/r3, -X[2]*mu/r3};
+        out[0] = X[3];
+        out[1] = X[4];
+        out[2] = X[5];
+        out[3] = -X[0]*mu/r3;
+        out[4] = -X[1]*mu/r3;
+        out[5] = -X[2]*mu/r3;
+
+        return out;
     }
 
     private static double[][] twoBodyDynamics(double[] X) {

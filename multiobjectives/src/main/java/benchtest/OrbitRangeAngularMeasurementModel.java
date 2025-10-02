@@ -50,7 +50,7 @@ public class OrbitRangeAngularMeasurementModel {
         double H33 = posZ / r;
 
         // Measurement Jacobian Hk_til (2x4)
-        double[][] Hk_til = new double[2][4];
+        double[][] Hk_til = new double[Gk.length][X.length];
         Hk_til[0] = new double[]{H11, H12, 0.0, 0.0, 0.0, 0.0};
         Hk_til[1] = new double[]{H21, H22, H23, 0.0, 0.0, 0.0};
         Hk_til[2] = new double[]{H31, H32, H33, 0.0, 0.0, 0.0};

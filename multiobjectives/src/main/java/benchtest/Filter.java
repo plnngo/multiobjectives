@@ -12,10 +12,14 @@ import org.hipparchus.ode.ODEState;
 import org.hipparchus.ode.ODEStateAndDerivative;
 import org.hipparchus.ode.nonstiff.ClassicalRungeKuttaIntegrator;
 import org.hipparchus.util.FastMath;
+import org.orekit.frames.Frame;
+import org.orekit.frames.FramesFactory;
+import org.orekit.time.AbsoluteDate;
 
 import benchtest.LinearRangeMeasurementModel.MeasurementModel;
 import lombok.Getter;
 import sensortasking.mcts.App;
+import sensortasking.mcts.ObservedObject;
 
 @Getter
 public class Filter {
@@ -32,11 +36,14 @@ public class Filter {
     static double Q = 1E-25;      //;1E-5
 
     /** Measurement noise. */
-    public static double[][] rkArray = {{FastMath.pow(1 * FastMath.PI/(180*3600), 2), 0.}, 
-                                        {0., FastMath.pow(1E-3, 2)}};
+    public static double[][] rkArray = {{FastMath.pow(1 * FastMath.PI/(180*3600), 2), 0., 0.}, 
+                                        {0., FastMath.pow(1 * FastMath.PI/(180*3600), 2), 0.},
+                                        {0., 0., 1e-6}};
     public static RealMatrix Rk = new Array2DRowRealMatrix(rkArray);
 
     double epsilon = 1e-7;
+
+    final Frame j2000 = FramesFactory.getEME2000();
 
     /**
      * Conventional Kalman Filter with zero innovation.
@@ -46,7 +53,7 @@ public class Filter {
      * @param t0
      * @param t_obs
      */
-    public void run_ckf(double[] X0_ref, double[][] P_pre, double t0, double t_obs) {
+    public void run_ckf(double[] X0_ref, double[][] P_pre, AbsoluteDate t0, AbsoluteDate t_obs) {
 
         RealMatrix P0 = new Array2DRowRealMatrix(P_pre);
         RealMatrix Rk_mat = Rk;
@@ -72,22 +79,22 @@ public class Filter {
         double[] ones_arr = flattenRowMajor(ones.getData());
         double[] Xref_Stm0 = ArrayUtils.addAll(X0_ref, ones_arr);
 
-        Car carA_0 = new Car('f', X0_ref, P_pre, t0);
-        ExpandableODE expandable = new ExpandableODE(carA_0);
+        ObservedObject obj_0 = new Satellite(0, ObservedObject.arrayToStateVector(X0_ref), 
+                                             ObservedObject.arrayToCartesianCov(P_pre),
+                                             t0, j2000);
+        //('f', X0_ref, P_pre, t0);
+        ExpandableODE expandable = new ExpandableODE(obj_0);
         RealMatrix Phik;
         double[] Xref = new double[n];
-        if(t0 == t_obs) {
+        if(t0.equals(t_obs)) {
             Phik = ones;
             this.statePred = X0_ref.clone();
             Xref = X0_ref.clone();
         } else {
             ODEIntegrator integrator = new ClassicalRungeKuttaIntegrator(0.01);
-            ODEState initialState = new ODEState(t0, Xref_Stm0);
-            ODEStateAndDerivative finalState = integrator.integrate(expandable, initialState, t_obs);
-            if (FastMath.abs(t_obs-finalState.getTime())>1e-2) {
-                throw new IllegalArgumentException("Did not propagate the state to the observation" 
-                                                    + "epoch");
-            }
+            ODEState initialState = new ODEState(0., Xref_Stm0);
+            ODEStateAndDerivative finalState = integrator.integrate(expandable, initialState, 
+                                                                    t_obs.durationFrom(t0));
 
             // Extract propagated state
             double[] y = finalState.getPrimaryState();
@@ -101,7 +108,7 @@ public class Filter {
             this.statePred = Xref.clone();
 
             // Extract phi matrix from X (column-major to 2D array)
-            double[][] Phik_arr = new double[4][4];
+            double[][] Phik_arr = new double[n][n];
             for (int col = 0; col < n; col++) {
                 for (int row = 0; row < n; row++) {
                     Phik_arr[row][col] = y[n + col * n + row];
@@ -110,7 +117,7 @@ public class Filter {
             Phik = new Array2DRowRealMatrix(Phik_arr).transpose();
         }
 
-        double[][] gamma = computeGamma(t0, t_obs);
+        double[][] gamma = computeGamma(t_obs.durationFrom(t0));
         RealMatrix Gamma = new Array2DRowRealMatrix(gamma);
 
         // Predicted correction 
@@ -125,8 +132,8 @@ public class Filter {
         this.covPred = Pk_bar.getData();
 
         // Compute system noise mapping matrix
-        benchtest.LinearRangeBearingMeasurementModel.MeasurementModel measModel = 
-            LinearRangeBearingMeasurementModel.generateHk(Xref);
+        OrbitRangeAngularMeasurementModel.MeasurementModel measModel = 
+            OrbitRangeAngularMeasurementModel.generateHk(Xref);
         //MeasurementModel measModel = LinearRangeMeasurementModel.generateHk(Xref); 
         /* benchtest.LinearBearingMeasurementModel.MeasurementModel measModel = 
             LinearBearingMeasurementModel.generateHk(Xref); */
@@ -167,7 +174,7 @@ public class Filter {
      * @param t_obs
      * @param obs_data
      */
-    public void run_ckf(double[] X0_ref, double[][] P_pre, double t0, double t_obs, double obs_data) {
+/*     public void run_ckf(double[] X0_ref, double[][] P_pre, AbsoluteDate t0, AbsoluteDate t_obs, double obs_data) {
 
         //System.out.println(new ArrayRealVector(X0_ref) + " time: " + t_obs);
 
@@ -233,7 +240,7 @@ public class Filter {
             Phik = new Array2DRowRealMatrix(Phik_arr).transpose();
         }
 
-        double[][] gamma = computeGamma(t0, t_obs);
+        double[][] gamma = computeGamma(t_obs.durationFrom(t0));
         RealMatrix Gamma = new Array2DRowRealMatrix(gamma);
 
         // Predicted correction 
@@ -253,15 +260,12 @@ public class Filter {
             LinearBearingMeasurementModel.generateHk(Xref);
         double innov = obs_data - measModel.Gk;
         double[] hk_til = measModel.Hk_til;
-/*         System.out.println("Innovation: " + innov);
-        System.out.println(obs_data);
-        System.out.println(measModel.Gk); */
+
         RealMatrix Hk_til = new Array2DRowRealMatrix(hk_til).transpose();
 
         // Kalman gain
         RealMatrix S = Hk_til.multiply(Pk_bar).multiplyTransposed(Hk_til).add(Rk_mat);
-        /* System.out.println("S covariance:");
-        App.printCovariance(S); */
+
         RealMatrix Kk = Pk_bar.multiplyTransposed(Hk_til).multiply(MatrixUtils.inverse(S));
 
         // Correction
@@ -270,10 +274,7 @@ public class Filter {
         RealVector xhat_vec = new ArrayRealVector(xhat);
         RealVector Xref_out = Xref_vec.add(xhat_vec);
         this.stateCorr = Xref_out.toArray();
-/*         if (FastMath.abs(Xref_out.getEntry(3))>0.00001) {
-            throw new IllegalArgumentException("Object is moving with non-zero velocity along "
-                                                    + "Y axis");
-        } */
+
 
         // Joseph-form covariance update 
         RealMatrix kalmanCorr = ones.subtract(Kk.multiply(Hk_til));
@@ -282,7 +283,7 @@ public class Filter {
                                      .multiplyTransposed(kalmanCorr)
                                      .add(Kk.multiply(Rk_mat).multiplyTransposed(Kk));
         this.covCorr = P_out.getData();
-    }
+    } */
 
     public static double[] flattenRowMajor(double[][] matrix) {
         int rows = matrix.length;
@@ -298,19 +299,20 @@ public class Filter {
         return flat;
     }
 
-    public static double[][] computeGamma(double t_pre, double t_cur) {
-        double dt = t_cur - t_pre;
+    public static double[][] computeGamma(double dt) {
 
-        double[][] Gamma = new double[4][2];
-        double halfDtSquared = 0.5 * dt * dt;
+        double[][] Gamma = new double[6][3];
+        double halfDt2 = 0.5 * dt * dt;
 
-        // Top 2x2 block: (dt^2 / 2) * I
-        Gamma[0][0] = halfDtSquared;
-        Gamma[1][1] = halfDtSquared;
+        // Top 3x3 block: (dt^2 / 2) * I
+        Gamma[0][0] = halfDt2;
+        Gamma[1][1] = halfDt2;
+        Gamma[2][2] = halfDt2;
 
         // Bottom 2x2 block: dt * I
-        Gamma[2][0] = dt;
-        Gamma[3][1] = dt;
+        Gamma[3][0] = dt;
+        Gamma[4][1] = dt;
+        Gamma[5][2] = dt;
 
         return Gamma;
     }

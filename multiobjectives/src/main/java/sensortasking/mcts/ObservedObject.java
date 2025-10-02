@@ -2,6 +2,7 @@ package sensortasking.mcts;
 
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
 import org.hipparchus.linear.RealMatrix;
+import org.hipparchus.ode.OrdinaryDifferentialEquation;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
 import org.orekit.frames.Frame;
@@ -25,7 +26,7 @@ import java.util.ArrayList;
 import lombok.Getter;
 
 @Getter
-public class ObservedObject {
+public abstract class ObservedObject implements OrdinaryDifferentialEquation{
 
     /** Objects ID, can be Norad ID. */
     private long id;
@@ -149,7 +150,7 @@ public class ObservedObject {
         return output;
     }
 
-    public static List<ObservedObject> propagateTargets(List<ObservedObject> objs, 
+    /* public static List<ObservedObject> propagateTargets(List<ObservedObject> objs, 
                                                         AbsoluteDate epoch) {
 
         // Initialise output                                                    
@@ -189,5 +190,11 @@ public class ObservedObject {
         }
         return out;
 
-    }
+    } */
+
+    @Override
+    public abstract int getDimension();
+
+    @Override
+    public abstract double[] computeDerivatives(double t, double[] y);
 }

@@ -409,7 +409,8 @@ public class CarTrackingObjective implements Objective{
      */
     public static void computeTrackReward(DecisionNode last, DecisionNode leaf, 
                                           DecisionNode initial, double tCampaign, 
-                                          double discount, Sensor sensor, RewardFunction selectedReward) {
+                                          double discount, Sensor sensor, 
+                                          RewardFunction selectedReward) {
 
         double accDiscountedR = 0.;
 

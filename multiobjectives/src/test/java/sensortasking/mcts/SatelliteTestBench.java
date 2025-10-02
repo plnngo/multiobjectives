@@ -83,9 +83,9 @@ public class SatelliteTestBench {
         List<String> objectives = new ArrayList<String>(Arrays.asList( "TRACK"));
         MultiObjectiveMcts mcts = 
             new MultiObjectiveMcts(root, objectives, root.getEpoch(), 
-                                   root.getEpoch().shiftedBy(10. * 60.), "Origin", ooi, 
+                                   root.getEpoch().shiftedBy(1. * 60.), "Origin", ooi, 
                                    null, sensor, reward, true);
-        List<Node> strategy = mcts.run(1000);
+        List<Node> strategy = mcts.run(10);
 
     }
     
