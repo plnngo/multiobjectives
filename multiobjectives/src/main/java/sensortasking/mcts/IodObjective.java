@@ -31,12 +31,13 @@ import org.orekit.time.AbsoluteDate;
 import org.orekit.utils.Constants;
 import org.orekit.utils.PVCoordinates;
 
+import benchtest.Satellite;
 import tools.GaussianMixtureModel;
 import tools.MatrixTools;
 
 
 @SuppressWarnings("rawtypes")
-public class IodObjective implements Objective{
+public class IodObjective extends Objective<Satellite>{
 
     /** Tracklet consisting of angles [0], [1] in [rad] and their respective derivatives [2], [3] 
      * in [rad/sec]*/

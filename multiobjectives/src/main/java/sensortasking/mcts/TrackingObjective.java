@@ -73,7 +73,7 @@ import tools.OptimisingVector;
 
 @SuppressWarnings("rawtypes")
 @Getter
-public class TrackingObjective implements Objective{
+public class TrackingObjective extends Objective<Satellite>{
 
     /** List of targets of interest with latest state update. */
     List<ObservedObject> updatedTargets = new ArrayList<ObservedObject>();
@@ -940,12 +940,12 @@ public class TrackingObjective implements Objective{
     }
 
     @Override
-    public List<ObservedObject> propagateOutcome() {
+    public List<Satellite> propagateOutcome() {
 
         // return copy of updated targets
-        List<ObservedObject> out = new ArrayList<ObservedObject>();
+        List<Satellite> out = new ArrayList<Satellite>();
         for (ObservedObject obj : this.updatedTargets) {
-            ObservedObject copy = new Satellite(obj.getId(), obj.getState(), 
+            Satellite copy = new Satellite(obj.getId(), obj.getState(), 
                                                      obj.getCovariance(), obj.getEpoch(), 
                                                      obj.getFrame());
             out.add(copy);

@@ -15,7 +15,7 @@ import sensortasking.stripescanning.Stripe;
 
 @SuppressWarnings("rawtypes")
 @Getter
-public class SearchObjective implements Objective{
+public class SearchObjective extends Objective<Integer>{
 
     TopocentricFrame stationHorizon;
 
