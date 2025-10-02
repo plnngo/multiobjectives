@@ -1,27 +1,16 @@
 package sensortasking.mcts;
 
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
-import org.hipparchus.linear.RealMatrix;
 import org.hipparchus.ode.OrdinaryDifferentialEquation;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
 import org.orekit.frames.Frame;
-import org.orekit.orbits.CartesianOrbit;
 import org.orekit.orbits.Orbit;
-import org.orekit.orbits.OrbitType;
-import org.orekit.orbits.PositionAngleType;
-import org.orekit.propagation.MatricesHarvester;
 import org.orekit.propagation.SpacecraftState;
 import org.orekit.propagation.StateCovariance;
-import org.orekit.propagation.analytical.KeplerianPropagator;
 import org.orekit.propagation.analytical.tle.TLE;
 import org.orekit.time.AbsoluteDate;
-import org.orekit.utils.Constants;
-import org.orekit.utils.PVCoordinates;
 import org.orekit.utils.TimeStampedPVCoordinates;
-
-import java.util.List;
-import java.util.ArrayList;
 
 import lombok.Getter;
 
