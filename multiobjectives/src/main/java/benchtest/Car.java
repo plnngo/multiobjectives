@@ -10,7 +10,6 @@ import org.hipparchus.ode.ExpandableODE;
 import org.hipparchus.ode.ODEIntegrator;
 import org.hipparchus.ode.ODEState;
 import org.hipparchus.ode.ODEStateAndDerivative;
-import org.hipparchus.ode.OrdinaryDifferentialEquation;
 import org.hipparchus.ode.nonstiff.ClassicalRungeKuttaIntegrator;
 import org.hipparchus.util.FastMath;
 import org.orekit.frames.FramesFactory;
@@ -22,7 +21,7 @@ import sensortasking.mcts.ObservedObject;
 
 @Getter
 @Setter
-public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
+public class Car extends ObservedObject{
 
     private char identifier;
     
@@ -264,5 +263,71 @@ public class Car extends ObservedObject implements OrdinaryDifferentialEquation{
         }
         
         return out;
+    }
+
+    public static Car propagateCar(Car initialCar, double tCampaign) {
+        RealMatrix P0 = new Array2DRowRealMatrix(initialCar.getCov());
+        double[] y = propagateStateAndSTM(tCampaign, initialCar.getStateArray(), initialCar);
+        int n = initialCar.getStateArray().length;
+        double[] Xref = new double[n];
+
+/*         for (int i=0; i<n; i++) {
+
+            // Extract state vector
+            double rounded = FastMath.rint(y[i] / epsilon) * epsilon;
+            Xref[i] = rounded;
+        } */
+    
+        // Extract phi matrix from X (column-major to 2D array)
+        double[][] Phik_arr = new double[4][4];
+        for (int col = 0; col < n; col++) {
+            for (int row = 0; row < n; row++) {
+                Phik_arr[row][col] = y[n + col * n + row];
+            }
+        }
+        // Compute propagated uncertainty
+        RealMatrix Phik = new Array2DRowRealMatrix(Phik_arr).transpose();
+
+        double[][] gamma = Filter.computeGamma(tCampaign-initialCar.getTime());
+        RealMatrix Gamma = new Array2DRowRealMatrix(gamma);
+        RealMatrix mappedUnmodelAcc =  Gamma.scalarMultiply(Filter.Q).multiplyTransposed(Gamma);
+
+        RealMatrix Pk_bar = Phik.multiply(P0).multiplyTransposed(Phik)
+                                .add(mappedUnmodelAcc);
+        Car propInit = 
+            new Car(initialCar.getIdentifier(), Xref, Pk_bar.getData(), tCampaign);
+        return propInit;
+    }
+
+    private static double[] propagateStateAndSTM(double tobs, double[] initialState, Car car) {
+        int n = initialState.length;
+
+        // Combine initial state and STM (identity matrix)
+        double[][] identity = new double[n][n];
+        for (int col=0; col<n; col++) {
+            for (int row=0; row<n; row++) {
+                if(row==col) {
+                    identity[row][col] = 1.;
+                } else {
+                    identity[row][col] = 0;
+                }
+            }
+        }
+        RealMatrix ones = new Array2DRowRealMatrix(identity);
+        double[] ones_arr = Filter.flattenRowMajor(ones.getData());
+        double[] Xref_Stm0 = ArrayUtils.addAll(initialState, ones_arr);
+        double[] y = new double[Xref_Stm0.length];
+
+        ExpandableODE expandable = new ExpandableODE(car);
+        ODEIntegrator integrator = new ClassicalRungeKuttaIntegrator(0.01);
+        ODEState initial = new ODEState(car.getTime(), Xref_Stm0);
+
+        if(car.getTime() == tobs) {
+            y = Xref_Stm0;
+        } else {
+            ODEStateAndDerivative finalState = integrator.integrate(expandable, initial, tobs);
+            y = finalState.getPrimaryState();
+        }
+        return y;
     }
 }

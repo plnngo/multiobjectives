@@ -34,7 +34,7 @@ import sensortasking.mcts.Sensor;
 
 @SuppressWarnings("rawtypes")
 @Getter
-public class CarTrackingObjective implements Objective{
+public class CarTrackingObjective extends Objective<Car>{
 
     List<Car> updatedTargets = new ArrayList<Car>();
 
@@ -324,7 +324,7 @@ public class CarTrackingObjective implements Objective{
         List<Car> targetsPredicted = new ArrayList<Car>();
         for(ObservedObject init : targetsInitial) {
             Car initialCar = (Car)init;
-            Car propInit = propagateCar(initialCar, tCampaign);
+            Car propInit = Car.propagateCar(initialCar, tCampaign);
             targetsPredicted.add(propInit);
         }
 
@@ -333,7 +333,7 @@ public class CarTrackingObjective implements Objective{
         List<Car> targetsFinal = new ArrayList<Car>();
         for(ObservedObject finalTarget : trackedObjs) {
             Car finalCar = (Car)finalTarget;
-            Car propFinal = propagateCar(finalCar, tCampaign);
+            Car propFinal = Car.propagateCar(finalCar, tCampaign);
             targetsFinal.add(propFinal);
         }
 
@@ -373,12 +373,12 @@ public class CarTrackingObjective implements Objective{
         int n = initialCar.getStateArray().length;
         double[] Xref = new double[n];
 
-        for (int i=0; i<n; i++) {
+/*         for (int i=0; i<n; i++) {
 
             // Extract state vector
             double rounded = FastMath.rint(y[i] / epsilon) * epsilon;
             Xref[i] = rounded;
-        }
+        } */
     
         // Extract phi matrix from X (column-major to 2D array)
         double[][] Phik_arr = new double[4][4];
