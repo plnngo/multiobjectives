@@ -1,6 +1,13 @@
 package benchtest;
 
-import org.hipparchus.ode.OrdinaryDifferentialEquation;
+import org.apache.commons.lang3.ArrayUtils;
+import org.hipparchus.linear.Array2DRowRealMatrix;
+import org.hipparchus.linear.RealMatrix;
+import org.hipparchus.ode.ExpandableODE;
+import org.hipparchus.ode.ODEIntegrator;
+import org.hipparchus.ode.ODEState;
+import org.hipparchus.ode.ODEStateAndDerivative;
+import org.hipparchus.ode.nonstiff.ClassicalRungeKuttaIntegrator;
 import org.hipparchus.util.FastMath;
 import org.orekit.files.ccsds.ndm.cdm.StateVector;
 import org.orekit.files.ccsds.ndm.odm.CartesianCovariance;
@@ -10,7 +17,7 @@ import org.orekit.utils.Constants;
 
 import sensortasking.mcts.ObservedObject;
 
-public class Satellite extends ObservedObject implements OrdinaryDifferentialEquation{
+public class Satellite extends ObservedObject{
 
     private long identifier;
     
@@ -145,5 +152,76 @@ public class Satellite extends ObservedObject implements OrdinaryDifferentialEqu
     public double[] computeDerivatives(double t, double[] state) {
         return int_stm(state);
     }
+
+    public static Satellite propagateSatellite(Satellite initialSat, AbsoluteDate start, AbsoluteDate end) {
+        RealMatrix P0 = 
+            new Array2DRowRealMatrix(initialSat.getCovariance().getCovarianceMatrix().getData());
+        double[] initStateVec = new double[]{initialSat.getState().getPositionVector().getX(),
+                                             initialSat.getState().getPositionVector().getY(),
+                                             initialSat.getState().getPositionVector().getZ(),
+                                             initialSat.getState().getVelocityVector().getX(),
+                                             initialSat.getState().getVelocityVector().getY(),
+                                             initialSat.getState().getVelocityVector().getZ()};
+
+        double[] y = propagateStateAndSTM(start, end, initStateVec, initialSat);
+        int n = initStateVec.length;
+        double[] Xref = new double[n];
     
+        // Extract phi matrix from X (column-major to 2D array)
+        double[][] Phik_arr = new double[4][4];
+        for (int col = 0; col < n; col++) {
+            for (int row = 0; row < n; row++) {
+                Phik_arr[row][col] = y[n + col * n + row];
+            }
+        }
+        // Compute propagated uncertainty
+        RealMatrix Phik = new Array2DRowRealMatrix(Phik_arr).transpose();
+
+        double[][] gamma = Filter.computeGamma(end.durationFrom(start));
+        RealMatrix Gamma = new Array2DRowRealMatrix(gamma);
+        RealMatrix mappedUnmodelAcc =  Gamma.scalarMultiply(Filter.Q).multiplyTransposed(Gamma);
+
+        RealMatrix Pk_bar = Phik.multiply(P0).multiplyTransposed(Phik)
+                                .add(mappedUnmodelAcc);
+        Satellite propInit = new Satellite(initialSat.getId(), 
+                                           ObservedObject.arrayToStateVector(Xref), 
+                                           ObservedObject.arrayToCartesianCov(Pk_bar.getData()), 
+                                           end,
+                                           initialSat.getFrame());
+        return propInit;
+    }
+
+    private static double[] propagateStateAndSTM(AbsoluteDate start, AbsoluteDate end, 
+                                                 double[] initState, Satellite sat) {
+        int n = initState.length;
+
+        // Combine initial state and STM (identity matrix)
+        double[][] identity = new double[n][n];
+        for (int col=0; col<n; col++) {
+            for (int row=0; row<n; row++) {
+                if(row==col) {
+                    identity[row][col] = 1.;
+                } else {
+                    identity[row][col] = 0;
+                }
+            }
+        }
+        RealMatrix ones = new Array2DRowRealMatrix(identity);
+        double[] ones_arr = Filter.flattenRowMajor(ones.getData());
+        double[] Xref_Stm0 = ArrayUtils.addAll(initState, ones_arr);
+        double[] y = new double[Xref_Stm0.length];
+
+        ExpandableODE expandable = new ExpandableODE(sat);
+        ODEIntegrator integrator = new ClassicalRungeKuttaIntegrator(0.01);
+        ODEState initial = new ODEState(0., Xref_Stm0);
+
+        if(end.durationFrom(start) < 1e-16) {
+            y = Xref_Stm0;
+        } else {
+            ODEStateAndDerivative finalState = integrator.integrate(expandable, initial, 
+                                                                    end.durationFrom(start));
+            y = finalState.getPrimaryState();
+        }
+        return y;
+    }
 }
