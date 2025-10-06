@@ -31,6 +31,7 @@ import sensortasking.mcts.Node;
 import sensortasking.mcts.Objective;
 import sensortasking.mcts.ObservedObject;
 import sensortasking.mcts.Sensor;
+import sensortasking.mcts.TrackingObjective;
 
 @SuppressWarnings("rawtypes")
 @Getter
@@ -93,7 +94,7 @@ public class CarTrackingObjective extends Objective<Car>{
             est.run_ckf(state, copy.getCov(), obj.getEpoch(), current.shiftedBy(tstep));
 
             // Compute information gain
-            double iG = computeTraceChange(est.covPred, est.covCorr);
+            double iG = TrackingObjective.computeTraceChange(est.covPred, est.covCorr);
             Car copyUpdated = new Car(copy.getIdentifier(), est.stateCorr, est.covCorr, tobs); 
 
             checkTrackable.put(copyUpdated, iG);
@@ -156,20 +157,6 @@ public class CarTrackingObjective extends Objective<Car>{
                                                       AngleType.RADEC, range);
         angle.setDate(this.start.shiftedBy(tobs));
         return angle;
-    }
-
-    public static double computeTraceChange(double[][] covPrior, double[][] covPost) {
-
-        // Retrieve covariances
-        RealMatrix covP = new Array2DRowRealMatrix(covPrior);
-        RealMatrix covQ = new Array2DRowRealMatrix(covPost);
-
-/*         App.printCovariance(covP);
-        System.out.println("Prior: " + covP.getTrace());
-        App.printCovariance(covQ);
-        System.out.println("Post:" + covQ.getTrace()); */
-        double change = covP.getTrace() - covQ.getTrace();
-        return change;
     }
 
     protected static double computeKLDivergence(double[] statePrior, 
@@ -353,7 +340,7 @@ public class CarTrackingObjective extends Objective<Car>{
                     j++;
                 } else {
                     // Same ID found
-                    reward += CarTrackingObjective
+                    reward += TrackingObjective
                                 .computeTraceChange(targetsPredicted.get(i).getCov(), 
                                                     targetsFinal.get(j).getCov());                        
                     // No need to continue searching in targetFinals
@@ -531,7 +518,7 @@ public class CarTrackingObjective extends Objective<Car>{
                         break;
                     }
                 }
-                regret += CarTrackingObjective.computeTraceChange(predCovNoMeasSibling, 
+                regret += TrackingObjective.computeTraceChange(predCovNoMeasSibling, 
                                                                   predCovSibling);
             }
         }

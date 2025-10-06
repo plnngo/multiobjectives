@@ -982,7 +982,7 @@ public class TrackingObjective extends Objective<Satellite>{
             est.run_ckf(state, stateCov, copy.getEpoch(), this.startCampaign.shiftedBy(tobs));
             
             // Compute informtion gain
-            double iG = CarTrackingObjective.computeTraceChange(est.getCovPred(), 
+            double iG = TrackingObjective.computeTraceChange(est.getCovPred(), 
                                                                 est.getCovCorr());
 
             ObservedObject copyUpdated = 
@@ -1437,10 +1437,13 @@ public class TrackingObjective extends Objective<Satellite>{
         return measurement;
     }
 
-    public static void computeTrackReward(DecisionNode last, DecisionNode leaf, 
-                                          DecisionNode initial, double tCampaign,
-                                          double discount, Sensor sensor, 
-                                          RewardFunction reward) {
-        
+    public static double computeTraceChange(double[][] covPrior, double[][] covPost) {
+
+        // Retrieve covariances
+        RealMatrix covP = new Array2DRowRealMatrix(covPrior);
+        RealMatrix covQ = new Array2DRowRealMatrix(covPost);
+
+        double change = covP.getTrace() - covQ.getTrace();
+        return change;
     }
 }

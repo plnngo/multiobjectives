@@ -12,6 +12,7 @@ import sensortasking.mcts.ChanceNode;
 import sensortasking.mcts.DecisionNode;
 import sensortasking.mcts.ObservedObject;
 import sensortasking.mcts.Sensor;
+import sensortasking.mcts.TrackingObjective;
 
 public class CarRewardFunction extends TrackingRewardFunction<Car>{
 
@@ -55,7 +56,7 @@ public class CarRewardFunction extends TrackingRewardFunction<Car>{
                     j++;
                 } else {
                     // Same ID found
-                    reward += CarTrackingObjective
+                    reward += TrackingObjective
                                 .computeTraceChange(targetsPredicted.get(i).getCov(), 
                                                     targetsFinal.get(j).getCov());                        
                     // No need to continue searching in targetFinals
@@ -144,7 +145,7 @@ public class CarRewardFunction extends TrackingRewardFunction<Car>{
                         break;
                     }
                 }
-                regret += CarTrackingObjective.computeTraceChange(predCovNoMeasSibling, 
+                regret += TrackingObjective.computeTraceChange(predCovNoMeasSibling, 
                                                                   predCovSibling);
             }
         }
