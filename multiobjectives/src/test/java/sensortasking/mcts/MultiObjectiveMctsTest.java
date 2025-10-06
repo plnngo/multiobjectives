@@ -904,9 +904,10 @@ public class MultiObjectiveMctsTest {
 
                 //System.out.println("Next node");
                 ChanceNode parentChance = (ChanceNode)parent;
-                if (parentChance.getMacro().getClass().getSimpleName().equals("SearchObjective")) {
+                Objective<?> macro = parentChance.getMacro();
+                if (macro instanceof SearchObjective) {
 
-                    List<AngularDirection> tasks = ((SearchObjective)parentChance.getMacro()).getScheduleGeocentric();
+                    List<AngularDirection> tasks = ((SearchObjective)macro).getScheduleGeocentric();
                     for(AngularDirection task: tasks) {
                         AbsoluteDate epoch = task.getDate();
                         double[] raRange = new double[]{task.getAngle1() - fov.getWidth()/2, 

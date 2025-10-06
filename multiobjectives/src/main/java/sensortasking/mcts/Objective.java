@@ -22,20 +22,17 @@ public abstract class Objective<T> {
     // Abstract method: must be implemented by subclasses
     public abstract List<T> propagateOutcome();
 
-    public void computeTrackReward(T object, DecisionNode last, DecisionNode leaf, 
+    public static void computeTrackReward(boolean orbitMode, DecisionNode last, DecisionNode leaf, 
                                      DecisionNode initial, double tCampaign, 
                                      double discount, Sensor sensor, 
                                      RewardFunction selectedReward) {
         double accDiscountedR = 0.;
         TrackingRewardFunction rewardFunc;
-        if (object instanceof Car) {
+        if (!orbitMode) {
             rewardFunc = new CarRewardFunction();
-        } else if (object instanceof Satellite) {
-            rewardFunc = new SatelliteRewardFunction();
         } else {
-            throw new Error("Tracking reward cannot be computed. "
-                                +"Unkown Object type, neither Car nor Satellite.");
-        }
+            rewardFunc = new SatelliteRewardFunction();
+        } 
 
         if (selectedReward.equals(RewardFunction.REWARD_WRT_SIMULATED_END)) {
             accDiscountedR = rewardFunc.computeRewardWrtSimEnd(last, initial, tCampaign);
