@@ -14,6 +14,21 @@ public class Fov {
     /** Width or diameter in [rad] of FOV. */
     private double width;
 
+    /** Azimuth range [rad]. */ 
+    public double azMin = Double.NaN;
+    public double azMax = Double.NaN;
+    
+    /** Elevation range [rad]. */ 
+    public double elMin = Double.NaN;
+    public double elMax = Double.NaN;
+    
+    /** Center of the FoV. */
+    public double azCenter = Double.NaN;
+    public double elCenter = Double.NaN;
+
+    /** Optional: unit vector in 3D. */
+    public double[] centerVec = new double[3]; // [x, y, z]
+
     /**
      * Simple constructor.
      * 
@@ -28,6 +43,29 @@ public class Fov {
         this.width = width;
     }
 
+    /**
+     * Construct a rectangular FOV from angular locations.
+     * 
+     * @param azMin             Minimum azimuth angle [rad].
+     * @param azMax             Maximum azimuth angle [rad].
+     * @param elMin             Minimum elevation angle [rad].
+     * @param elMax             Maxmim elevation angle [rad].
+     */
+    public Fov(double azMin, double azMax, double elMin, double elMax){
+        this.azMin = azMin;
+        this.azMax = azMax;
+        this.elMin = elMin;
+        this.elMax = elMax;
+        this.azCenter = (azMin + azMax) / 2.0;
+        this.elCenter = (elMin + elMax) / 2.0;
+
+        this.height = elMax - elMin;
+        this.width = azMax - azMin;
+        this.type = Type.RECTANGULAR;
+        this.centerVec = computeUnitVector(azCenter, elCenter);
+
+    }
+
     /** Field of view type. */
     public enum Type {
         /** Circular field of view. */
@@ -35,5 +73,19 @@ public class Fov {
 
         /** Rectangular field of. */
         RECTANGULAR
+    }
+
+    /**
+     * Comoute unit pointing direction towards (az, el).
+     * 
+     * @param az    
+     * @param el
+     * @return
+     */
+    private double[] computeUnitVector(double az, double el) {
+        double x = Math.cos(el) * Math.cos(az);
+        double y = Math.cos(el) * Math.sin(az);
+        double z = Math.sin(el);
+        return new double[] {x, y, z};
     }
 }
