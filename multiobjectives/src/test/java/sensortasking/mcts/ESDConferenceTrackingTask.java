@@ -184,6 +184,12 @@ public class ESDConferenceTrackingTask {
         StateVector stateTdrs06 = ObservedObject.spacecraftStateToStateVector(spacecraftTdrs06, j2000);
         StateVector stateTdrs12 = ObservedObject.spacecraftStateToStateVector(spacecraftTdrs12, j2000);
 
+        
+        System.out.println("posX " + stateTdrs12.getPositionVector().getX() + " velX " + stateTdrs12.getVelocityVector().getX());
+        System.out.println("posY " + stateTdrs12.getPositionVector().getY() + " velY " + stateTdrs12.getVelocityVector().getY());
+        System.out.println("posZ " + stateTdrs12.getPositionVector().getZ() + " velZ " + stateTdrs12.getVelocityVector().getZ());
+
+
         RealMatrix covMatrixTdrs05 = new DiagonalMatrix(new double[]{1e6, 1e6, 1e6, 1., 1., 1.});
         RealMatrix covMatrixTdrs06 = new DiagonalMatrix(new double[]{1e6, 1e6, 1e6, 1., 1., 1.});
         RealMatrix covMatrixTdrs12 = new DiagonalMatrix(new double[]{1e6, 1e6, 1e6, 1., 1., 1.});

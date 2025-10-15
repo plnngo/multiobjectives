@@ -45,7 +45,7 @@ public class MultiObjectiveMcts {
 
     /** Tuning parameter fur UCB. */
     //static double C = 1.e50;
-    static double C = 10000;
+    static double C = FastMath.sqrt(2); // C = 10000;
 
     /** Discount factor. */
     final double discount = 0.;
@@ -173,12 +173,14 @@ public class MultiObjectiveMcts {
                         String objective = ((ChanceNode) currentNode).getMacro().getClass().getSimpleName();
                         if (objective.equals("CarTrackingObjective")) {
                             char id = ((CarTrackingObjective)((ChanceNode) currentNode).getMacro())
-                                                                                        .getLastUpdated();
+                                                                                       .getLastUpdated();
 
                             System.out.print(id + " ");
                             
-                        } else {
-                            System.out.print( " S ");
+                        } else if (objective.equals("TrackingObjective")) {
+                            long id = ((TrackingObjective)((ChanceNode) currentNode).getMacro())
+                                                                                    .getLastUpdated();
+                            System.out.print(id + " - ");
                         }
                     } else {
                         continue;
@@ -538,11 +540,10 @@ public class MultiObjectiveMcts {
 
                 if (Objects.isNull(pointing)) {
                     // No candidate to track but try search
-                    indexSelectedObjective = 2;
+                    //indexSelectedObjective = 2;
                     pointing = null;
-                } else {
-                    break;
                 }
+                break;
             case 2:
                 searchPossible = true;
                 // make sure that tree does not get expanded by the same node that already exist among siblings
@@ -1033,13 +1034,9 @@ public class MultiObjectiveMcts {
         // Compute tracking reward
         double[] trackReward = null;
         double tCampaign = this.endCampaign.durationFrom(this.startCampaign);
-        if (orbitMode) {
-            TrackingObjective.computeTrackReward(last, leaf, this.initial, tCampaign, 
-                                                    discount, this.sensor, this.reward);
-        } else { 
-            CarTrackingObjective.computeTrackReward(last, leaf, this.initial, tCampaign, 
-                                                    discount, this.sensor, this.reward);
-        }
+        Objective.computeTrackReward(orbitMode, last, leaf, this.initial, tCampaign, 
+                                     discount, this.sensor, this.reward);
+        
         
         // Compute searching reward
 /*         double searchReward = computeSearchReward(last, leaf); //TODO: function errornous because rSearch sometimes not zero

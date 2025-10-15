@@ -16,7 +16,7 @@ public class OrbitRangeAngularMeasurementModel {
 
     /**
      * 
-     * @param X         State vector in topocentric frame.
+     * @param X         State vector.
      * @return          MeasurementModel containing observation matrix and simulated measurement.
      */
     public static MeasurementModel generateHk(double[] X) {
