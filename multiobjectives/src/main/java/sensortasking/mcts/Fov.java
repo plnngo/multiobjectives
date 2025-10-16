@@ -1,5 +1,7 @@
 package sensortasking.mcts;
 
+import org.hipparchus.util.FastMath;
+
 import lombok.Getter;
 
 @Getter
@@ -28,6 +30,9 @@ public class Fov {
 
     /** Optional: unit vector in 3D. */
     public double[] centerVec = new double[3]; // [x, y, z]
+
+    /** FOV corners. */
+     public double[][] corners;     // 4 corners x 3 dim vectors in x,y,z
 
     /**
      * Simple constructor.
@@ -64,6 +69,14 @@ public class Fov {
         this.type = Type.RECTANGULAR;
         this.centerVec = computeUnitVector(azCenter, elCenter);
 
+         // corners in order (az,el): LL, LR, UR, UL
+        this.corners = new double[][]{
+            computeUnitVector(azMin, elMin),
+            computeUnitVector(azMax, elMin),
+            computeUnitVector(azMax, elMax),
+            computeUnitVector(azMin, elMax)
+        };
+
     }
 
     /** Field of view type. */
@@ -83,9 +96,9 @@ public class Fov {
      * @return
      */
     private double[] computeUnitVector(double az, double el) {
-        double x = Math.cos(el) * Math.cos(az);
-        double y = Math.cos(el) * Math.sin(az);
-        double z = Math.sin(el);
+        double x = FastMath.cos(el) * FastMath.cos(az);
+        double y = FastMath.cos(el) * FastMath.sin(az);
+        double z = FastMath.sin(el);
         return new double[] {x, y, z};
     }
 }
