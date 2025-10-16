@@ -22,6 +22,7 @@ import org.orekit.frames.Frame;
 import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
+import org.orekit.propagation.analytical.tle.TLE;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.time.TimeScalesFactory;
 import org.orekit.utils.Constants;
@@ -29,8 +30,15 @@ import org.orekit.utils.IERSConventions;
 
 import benchtest.RewardFunction;
 import benchtest.Satellite;
+import data.TleLoader;
 
 public class SatelliteTestBench {
+
+    Sensor sensor;
+
+    TopocentricFrame topohorizon;
+    AbsoluteDate date;
+
     @Before
     public void init() {
         // Load orekit data
@@ -39,33 +47,34 @@ public class SatelliteTestBench {
         File orekitData = new File(workingDir + orekitDataDir);
         DataProvidersManager manager = DataContext.getDefault().getDataProvidersManager();
         manager.addProvider(new DirectoryCrawler(orekitData));
-    }
 
-    @Test
-    public void testBenchTracking() throws IOException{
-
-        long start = System.currentTimeMillis();
-
-        // Date
-        AbsoluteDate date = new AbsoluteDate(2025, 3, 24, 22, 1, 2.62, TimeScalesFactory.getUTC());
-
-       // Set up fake sensor
+        // Set up fake sensor
         GeodeticPoint pos = new GeodeticPoint(FastMath.toRadians(6.),   // Geodetic latitude
                                               FastMath.toRadians(-37.),   // Longitude
                                               0.);              // in [m]
         Fov fov = new Fov(Fov.Type.RECTANGULAR, FastMath.toRadians(0.25), FastMath.toRadians(0.25));
-        Sensor sensor = new Sensor("Origin", fov, pos, 8., 7., 
-                                    FastMath.toRadians(1.)/1., 7., FastMath.toRadians(5.));
+        sensor = new Sensor("Origin", fov, pos, 8., 7., 
+                                 FastMath.toRadians(1.)/1., 7., FastMath.toRadians(5.));
         
         // Set up general frames
         Frame ecef = FramesFactory.getITRF(IERSConventions.IERS_2010, true);
-        Frame j2000 = FramesFactory.getEME2000();
+        
 
         // Set up topocentric sencor frame
         BodyShape earth = new OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
                                                Constants.WGS84_EARTH_FLATTENING,
                                                ecef);
-        TopocentricFrame topohorizon = new TopocentricFrame(earth, pos, "TDRS Station");
+        topohorizon = new TopocentricFrame(earth, pos, "TDRS Station");
+
+        date = new AbsoluteDate(2025, 3, 24, 22, 1, 2.62, TimeScalesFactory.getUTC());
+    }
+
+    @Test
+    public void testBenchTracking() throws IOException{
+
+        long start = System.currentTimeMillis();      
+
+        Frame j2000 = FramesFactory.getEME2000();
         Transform horizonToEci = topohorizon.getTransformTo(j2000, date);  // date has to be the measurement epoch
         Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
         Transform eciToTopo = new Transform(date, coordinatesStationEci.negate());
@@ -176,4 +185,16 @@ public class SatelliteTestBench {
         }
     }
     
+    @Test
+    public void testBenchSearching() throws IOException {
+
+        // Parse spacetrack entries into list of TLEs
+        File tleFile = new File( System.getProperty("user.dir") + "\\src\\main\\java\\data\\Catalogue_16_10_2025.txt");
+        List<TLE> tles = TleLoader.parse(tleFile);
+
+        for(TLE tle: tles) {
+            System.out.println(tle.getLine1());
+            System.out.println(tle.getLine2());
+        }
+    }
 }

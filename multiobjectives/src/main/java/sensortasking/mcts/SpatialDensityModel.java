@@ -286,34 +286,34 @@ public class SpatialDensityModel {
     public void writeDataLineByLine(String filePath) { 
     // first create file object for file placed at location 
     // specified by filepath 
-    File file = new File(filePath); 
-    try { 
-        // create FileWriter object with file as parameter 
-        FileWriter outputfile = new FileWriter(file); 
-  
-        // create CSVWriter object filewriter object as parameter 
-        CSVWriter writer = new CSVWriter(outputfile); 
-  
-        // adding header to csv 
-        String[] header = { "Row/ elevation patch", "Col/ Azimuth Patch", "Zeroed" }; 
-        writer.writeNext(header); 
-  
-        // add data to csv 
-        for (int r=0; r<this.densityModel.length; r++){
-            for (int c=0; c<this.densityModel[0].length; c++){
-                String[] data = {Integer.toString(r), Integer.toString(c), 
-                                 Integer.toString(this.densityModel[r][c])};
-                writer.writeNext(data);
-            }
+        File file = new File(filePath); 
+        try { 
+            // create FileWriter object with file as parameter 
+            FileWriter outputfile = new FileWriter(file); 
+    
+            // create CSVWriter object filewriter object as parameter 
+            CSVWriter writer = new CSVWriter(outputfile); 
+    
+            // adding header to csv 
+            String[] header = { "Row/ elevation patch", "Col/ Azimuth Patch", "Zeroed" }; 
+            writer.writeNext(header); 
+    
+            // add data to csv 
+            for (int r=0; r<this.densityModel.length; r++){
+                for (int c=0; c<this.densityModel[0].length; c++){
+                    String[] data = {Integer.toString(r), Integer.toString(c), 
+                                    Integer.toString(this.densityModel[r][c])};
+                    writer.writeNext(data);
+                }
 
-        }  
-        // closing writer connection 
-        writer.close(); 
+            }  
+            // closing writer connection 
+            writer.close(); 
+        } 
+        catch (IOException e) { 
+            // TODO Auto-generated catch block 
+            e.printStackTrace(); 
+        } 
     } 
-    catch (IOException e) { 
-        // TODO Auto-generated catch block 
-        e.printStackTrace(); 
-    } 
-} 
     
 }
