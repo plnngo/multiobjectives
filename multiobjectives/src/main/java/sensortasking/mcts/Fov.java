@@ -89,7 +89,7 @@ public class Fov {
     }
 
     /**
-     * Comoute unit pointing direction towards (az, el).
+     * Compute unit pointing direction towards (az, el).
      * 
      * @param az    
      * @param el
