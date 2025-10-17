@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Random;
 
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
+import org.hipparchus.ode.events.Action;
 import org.hipparchus.util.FastMath;
 import org.junit.Before;
 import org.junit.Test;
@@ -18,11 +19,17 @@ import org.orekit.bodies.OneAxisEllipsoid;
 import org.orekit.data.DataContext;
 import org.orekit.data.DataProvidersManager;
 import org.orekit.data.DirectoryCrawler;
+import org.orekit.errors.OrekitException;
 import org.orekit.frames.Frame;
 import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
+import org.orekit.propagation.Propagator;
 import org.orekit.propagation.analytical.tle.TLE;
+import org.orekit.propagation.analytical.tle.TLEPropagator;
+import org.orekit.propagation.events.ElevationDetector;
+import org.orekit.propagation.events.EventDetector;
+import org.orekit.propagation.events.EventsLogger;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.time.TimeScalesFactory;
 import org.orekit.utils.Constants;
@@ -37,7 +44,10 @@ public class SatelliteTestBench {
     Sensor sensor;
 
     TopocentricFrame topohorizon;
-    AbsoluteDate date;
+
+    AbsoluteDate startSim;
+
+    AbsoluteDate endSim;
 
     @Before
     public void init() {
@@ -66,7 +76,9 @@ public class SatelliteTestBench {
                                                ecef);
         topohorizon = new TopocentricFrame(earth, pos, "TDRS Station");
 
-        date = new AbsoluteDate(2025, 3, 24, 22, 1, 2.62, TimeScalesFactory.getUTC());
+        startSim = new AbsoluteDate(2025, 3, 24, 22, 1, 2.62, TimeScalesFactory.getUTC());
+
+        endSim = startSim.shiftedBy(20. * 60.);
     }
 
     @Test
@@ -75,9 +87,9 @@ public class SatelliteTestBench {
         long start = System.currentTimeMillis();      
 
         Frame j2000 = FramesFactory.getEME2000();
-        Transform horizonToEci = topohorizon.getTransformTo(j2000, date);  // date has to be the measurement epoch
+        Transform horizonToEci = topohorizon.getTransformTo(j2000, startSim);  // date has to be the measurement epoch
         Vector3D coordinatesStationEci = horizonToEci.transformPosition(Vector3D.ZERO);
-        Transform eciToTopo = new Transform(date, coordinatesStationEci.negate());
+        Transform eciToTopo = new Transform(startSim, coordinatesStationEci.negate());
         Frame topocentric = new Frame(j2000, eciToTopo, "Topocentric", true);
 
         // Set up initial pointning
@@ -88,17 +100,17 @@ public class SatelliteTestBench {
         RewardFunction reward = RewardFunction.IMMEDIATE_REWARD;
 
         // Set up targets
-        List<ObservedObject> ooi = ESDConferenceTrackingTask.generateListOfCandidates(date);
+        List<ObservedObject> ooi = ESDConferenceTrackingTask.generateListOfCandidates(startSim);
         
         // Set up root node
         PropoagatedEnvironment env = new PropoagatedEnvironment(ooi, new ArrayList<Integer>());
-        Node root = new DecisionNode(1., 1, initPointing, date, env, 0, 0, 0.);
+        Node root = new DecisionNode(1., 1, initPointing, startSim, env, 0, 0, 0.);
 
         // Set up MCTS
         List<String> objectives = new ArrayList<String>(Arrays.asList( "TRACK"));
         MultiObjectiveMcts mcts = 
             new MultiObjectiveMcts(root, objectives, root.getEpoch(), 
-                                   root.getEpoch().shiftedBy(20. * 60.), "Origin", ooi, 
+                                   endSim, "Origin", ooi, 
                                    null, sensor, reward, true);
         //List<Node> strategy = mcts.run(1240);
         List<Node> strategy = mcts.run(100);
@@ -189,12 +201,53 @@ public class SatelliteTestBench {
     public void testBenchSearching() throws IOException {
 
         // Parse spacetrack entries into list of TLEs
-        File tleFile = new File( System.getProperty("user.dir") + "\\src\\main\\java\\data\\Catalogue_16_10_2025.txt");
+        File tleFile = new File( System.getProperty("user.dir") 
+                                    + "\\src\\main\\java\\data\\Catalogue_16_10_2025.txt");
         List<TLE> tles = TleLoader.parse(tleFile);
 
-        for(TLE tle: tles) {
-            System.out.println(tle.getLine1());
-            System.out.println(tle.getLine2());
+        // Set up event logger
+        EventsLogger logger = new EventsLogger();
+
+        // Set up propagators
+        final List<Propagator> propagators = new ArrayList<>();
+        for (TLE entry : tles) {
+            try {
+                TLEPropagator prop = TLEPropagator.selectExtrapolator(entry);
+
+                // Set field of regard detector as event detector
+                double maxcheck  = 60.0;
+                double threshold =  0.001;
+                double elevation = FastMath.toRadians(5.);
+                EventDetector forVisibility =
+                    new ElevationDetector(maxcheck, threshold, topohorizon).
+                    withConstantElevation(elevation).
+                    withHandler((s, detector, increasing) -> {
+                                        System.out.println(" Visibility on " +
+                                                        entry.getSatelliteNumber() +
+                                                        (increasing ? " begins at " : " ends at ") +
+                                                        s.getDate());
+                                        return increasing ? Action.CONTINUE : Action.STOP;
+                                    });
+                prop.addEventDetector(logger.monitorDetector(forVisibility));
+                propagators.add(prop);
+            } catch (OrekitException e) {
+                System.out.println(e.getMessage() + " skip object " + entry.getSatelliteNumber());
+                continue;
+            }  
         }
+        int counter = 0;
+        for (Propagator prop : propagators) {
+            try {
+                prop.propagate(startSim, endSim);
+                counter++;
+            } catch (OrekitException e) {
+                System.out.println("Propagation failed for one object: " + e.getMessage());
+            }
+        }
+        System.out.println("Number of TLEs: " + tles.size());
+
+        System.out.println("counter: " + counter);
+
+        System.out.println(logger.getLoggedEvents().size());
     }
 }
