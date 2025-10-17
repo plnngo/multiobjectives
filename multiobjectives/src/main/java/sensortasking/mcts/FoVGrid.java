@@ -33,6 +33,17 @@ public class FoVGrid {
         }
     }
 
+    /**
+     * Generate discretised region of interest mapped on field of regard.
+     * 
+     * @param region            Discretised region of interest.
+     */
+    public FoVGrid(List<Fov> region) {
+        for(Fov patch : region) {
+            this.cells.add(patch);
+        }
+    }
+
     public static void main(String[] args) {
         double deltaEl = FastMath.toRadians(5.); // elevation step
         double azRef = FastMath.toRadians(5.);   // reference azimuth step at horizon
@@ -66,5 +77,23 @@ public class FoVGrid {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Find the FoV cell containing the given azimuth and elevation.
+     *
+     * @param az                Azimuth [rad], in [0, 2π)
+     * @param el                Elevation [rad], in [0, π/2]
+     * 
+     * @return                  The Fov cell containing (az, el), or null if outside range.
+     */
+    public Fov getCell(double az, double el) {
+        for (Fov cell : cells) {
+            if (az >= cell.azMin && az < cell.azMax &&
+                el >= cell.elMin && el < cell.elMax) {
+                return cell;
+            }
+        }
+        return null;
     }
 }

@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 
@@ -27,6 +28,8 @@ import org.orekit.frames.FramesFactory;
 import org.orekit.frames.TopocentricFrame;
 import org.orekit.frames.Transform;
 import org.orekit.propagation.Propagator;
+import org.orekit.propagation.PropagatorsParallelizer;
+import org.orekit.propagation.SpacecraftState;
 import org.orekit.propagation.analytical.tle.TLE;
 import org.orekit.propagation.analytical.tle.TLEPropagator;
 import org.orekit.propagation.events.ElevationDetector;
@@ -209,7 +212,7 @@ public class SatelliteTestBench {
         List<TLE> tles = TleLoader.parse(tleFile);
 
         // Map satellite number → its event logger
-        Map<Integer, EventsLogger> allEvents = new HashMap<>();
+        Map<Propagator, EventsLogger> allEvents = new HashMap<>();
 
         // Set up propagators
         final List<Propagator> propagators = new ArrayList<>();
@@ -238,7 +241,7 @@ public class SatelliteTestBench {
                 
                 // Store both propagator and logger
                 propagators.add(prop);
-                allEvents.put(entry.getSatelliteNumber(), logger);
+                allEvents.put(prop, logger);
             } catch (OrekitException e) {
                 System.out.println(e.getMessage() + " skip object " + entry.getSatelliteNumber());
                 continue;
@@ -254,17 +257,17 @@ public class SatelliteTestBench {
         }
         System.out.println("Number of TLEs: " + tles.size());
 
-       // After propagation, inspect logs
-        int counter = 0;
-
         // Remove all entries where number of logged events < 1 or > 2
         allEvents.entrySet().removeIf(e -> {
             int n = e.getValue().getLoggedEvents().size();
             return n < 1 || n > 2;
         });
 
-        for (Map.Entry<Integer, EventsLogger> satLog : allEvents.entrySet()) {
-            int satId = satLog.getKey();
+        List<Propagator> allProp = new ArrayList<Propagator>(allEvents.keySet());
+/*         for (Map.Entry<Propagator, EventsLogger> satLog : allEvents.entrySet()) {
+            allProp.add(satLog.getKey());
+
+            int satId = ((TLEPropagator)satLog.getKey()).getTLE().getSatelliteNumber();
             EventsLogger logger = satLog.getValue();
 
             List<LoggedEvent> events = logger.getLoggedEvents();
@@ -278,7 +281,88 @@ public class SatelliteTestBench {
             }
         }
 
-        System.out.println("Total number of valid events: " + counter);
+        System.out.println("Total number of valid events: " + counter); */
+
+        // Build FoV grid
+        double deltaEl = FastMath.toRadians(2.); //2° elevation step
+        double azRef = FastMath.toRadians(2.);   // reference azimuth step at horizon
+        FoVGrid grid = new FoVGrid(deltaEl, azRef);
+
+        // Initialize all cells as empty
+        boolean[] occupied = new boolean[grid.cells.size()];
+
+        // Initialize output: objectDensity
+        List<Fov> density = new ArrayList<Fov>();
+
+        // Propagate the interesting candiates in parallel
+        PropagatorsParallelizer parallProp = 
+            new PropagatorsParallelizer(allProp, interpolators -> {});
+        double stepT = 5 * 60.;         // 5min time step
+        List<List<SpacecraftState>> allStates = new ArrayList<List<SpacecraftState>>();
+        for (AbsoluteDate extrapDate = startSim;
+            extrapDate.compareTo(endSim) <= 0;
+            extrapDate = extrapDate.shiftedBy(stepT))  {
+                
+                AbsoluteDate targetDate = extrapDate.shiftedBy(stepT);
+                
+                // Propagate all orbits to target date and safe propagated state in allStates
+                List<SpacecraftState> states = parallProp.propagate(extrapDate, targetDate);
+                allStates.add(states);
+
+                for (SpacecraftState state : states) {
+                    Transform toTopo = state.getFrame().getTransformTo(topohorizon, state.getDate());
+                    Vector3D satTopo = toTopo.transformPosition(state.getPVCoordinates().getPosition());
+
+                    double az = topohorizon.getAzimuth(satTopo, topohorizon, targetDate);
+                    double el = topohorizon.getElevation(satTopo, topohorizon, targetDate);
+
+                    // Normalize azimuth to [0, 2π)
+                    if (az < 0) az += 2 * FastMath.PI;
+
+                    // Find cell
+                    Fov cell = grid.getCell(az, el);
+                    if (cell != null) {
+                        int idx = grid.cells.indexOf(cell);
+                        occupied[idx] = true;
+                        density.add(cell);
+                    }
+                }
+                
+        }
+        // Write output for this time step
+        String filename = String.format("fov_grid_%s.csv", endSim.toString().replace(':', '_'));
+        try (FileWriter writer = new FileWriter(filename)) {
+            writer.write(
+                "azMin,azMax,elMin,elMax,azCenter,elCenter," +
+                "x,y,z," +
+                "x1,y1,z1,x2,y2,z2,x3,y3,z3,x4,y4,z4,occupied\n"
+            );
+
+            for (int i = 0; i < grid.cells.size(); i++) {
+                Fov cell = grid.cells.get(i);
+                writer.write(String.format(Locale.US,
+                    "%.6f,%.6f,%.6f,%.6f,%.6f,%.6f," +  // angles
+                    "%.6f,%.6f,%.6f," +                 // center
+                    "%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%d%n", // corners + occupied
+                    cell.azMin, cell.azMax, cell.elMin, cell.elMax,
+                    cell.azCenter, cell.elCenter,
+                    cell.centerVec[0], cell.centerVec[1], cell.centerVec[2],
+                    cell.corners[0][0], cell.corners[0][1], cell.corners[0][2],
+                    cell.corners[1][0], cell.corners[1][1], cell.corners[1][2],
+                    cell.corners[2][0], cell.corners[2][1], cell.corners[2][2],
+                    cell.corners[3][0], cell.corners[3][1], cell.corners[3][2],
+                    occupied[i] ? 1 : 0
+                ));
+            }
+
+            System.out.println("FoV occupancy file written: " + filename);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // Generate discretised region of interest (density map)
+        FoVGrid roi = new FoVGrid(density);
+
     }
 
 }
