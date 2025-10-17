@@ -5,7 +5,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 import org.hipparchus.geometry.euclidean.threed.Vector3D;
@@ -30,6 +32,7 @@ import org.orekit.propagation.analytical.tle.TLEPropagator;
 import org.orekit.propagation.events.ElevationDetector;
 import org.orekit.propagation.events.EventDetector;
 import org.orekit.propagation.events.EventsLogger;
+import org.orekit.propagation.events.EventsLogger.LoggedEvent;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.time.TimeScalesFactory;
 import org.orekit.utils.Constants;
@@ -205,14 +208,17 @@ public class SatelliteTestBench {
                                     + "\\src\\main\\java\\data\\Catalogue_16_10_2025.txt");
         List<TLE> tles = TleLoader.parse(tleFile);
 
-        // Set up event logger
-        EventsLogger logger = new EventsLogger();
+        // Map satellite number → its event logger
+        Map<Integer, EventsLogger> allEvents = new HashMap<>();
 
         // Set up propagators
         final List<Propagator> propagators = new ArrayList<>();
         for (TLE entry : tles) {
             try {
                 TLEPropagator prop = TLEPropagator.selectExtrapolator(entry);
+
+                // Set up event logger for each individual propagator
+                EventsLogger logger = new EventsLogger();
 
                 // Set field of regard detector as event detector
                 double maxcheck  = 60.0;
@@ -222,32 +228,57 @@ public class SatelliteTestBench {
                     new ElevationDetector(maxcheck, threshold, topohorizon).
                     withConstantElevation(elevation).
                     withHandler((s, detector, increasing) -> {
-                                        System.out.println(" Visibility on " +
-                                                        entry.getSatelliteNumber() +
-                                                        (increasing ? " begins at " : " ends at ") +
-                                                        s.getDate());
-                                        return increasing ? Action.CONTINUE : Action.STOP;
-                                    });
+                                /* System.out.println(" Visibility on " +
+                                    entry.getSatelliteNumber() +
+                                    (increasing ? " begins at " : " ends at ") +
+                                    s.getDate()); */
+                                return Action.CONTINUE; // Keep propagating after both rise and set
+                            });
                 prop.addEventDetector(logger.monitorDetector(forVisibility));
+                
+                // Store both propagator and logger
                 propagators.add(prop);
+                allEvents.put(entry.getSatelliteNumber(), logger);
             } catch (OrekitException e) {
                 System.out.println(e.getMessage() + " skip object " + entry.getSatelliteNumber());
                 continue;
             }  
         }
-        int counter = 0;
         for (Propagator prop : propagators) {
             try {
                 prop.propagate(startSim, endSim);
-                counter++;
+                
             } catch (OrekitException e) {
                 System.out.println("Propagation failed for one object: " + e.getMessage());
             }
         }
         System.out.println("Number of TLEs: " + tles.size());
 
-        System.out.println("counter: " + counter);
+       // After propagation, inspect logs
+        int counter = 0;
 
-        System.out.println(logger.getLoggedEvents().size());
+        // Remove all entries where number of logged events < 1 or > 2
+        allEvents.entrySet().removeIf(e -> {
+            int n = e.getValue().getLoggedEvents().size();
+            return n < 1 || n > 2;
+        });
+
+        for (Map.Entry<Integer, EventsLogger> satLog : allEvents.entrySet()) {
+            int satId = satLog.getKey();
+            EventsLogger logger = satLog.getValue();
+
+            List<LoggedEvent> events = logger.getLoggedEvents();
+            System.out.println("Satellite " + satId + " produced " + events.size() + " events.");
+            counter += events.size();
+
+            for (LoggedEvent ev : events) {
+                AbsoluteDate date = ev.getState().getDate();
+                boolean rising = ev.isIncreasing();
+                System.out.println("  " + (rising ? "Rise" : "Set") + " at " + date);
+            }
+        }
+
+        System.out.println("Total number of valid events: " + counter);
     }
+
 }
