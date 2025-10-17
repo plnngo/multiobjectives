@@ -203,8 +203,16 @@ public class SatelliteTestBench {
         }
     }
     
+    /**
+     * Reads in a .txt of TLEs as apriori information on spatial density. 
+     * Maps this density into the discretised FOR of the sensor.
+     * Writes a .csv containing all the cells of the discretised FOR including
+     * the cells that are occupied by space objects.
+     * 
+     * @throws IOException
+     */
     @Test
-    public void testBenchSearching() throws IOException {
+    public void spatialDensityOnDiscretisedFOR() throws IOException {
 
         // Parse spacetrack entries into list of TLEs
         File tleFile = new File( System.getProperty("user.dir") 
@@ -365,4 +373,50 @@ public class SatelliteTestBench {
 
     }
 
+    @Test
+    public void testMicroActionSearch() throws IOException {
+
+        // Parse discretised region of interest 
+        File forFile = new File( System.getProperty("user.dir") 
+                                    + "\\src\\main\\java\\data\\fov_grid.csv");
+        List<Fov> roi = FoVGrid.parseFoVGrid(forFile.getAbsolutePath());
+        FoVGrid roiGrid = new FoVGrid(roi);
+
+        // Initialise global variables
+        int visitMin = Integer.MAX_VALUE;
+        double PdetMax = -Double.MAX_VALUE;
+        
+        // Candidate cells
+        List<Fov> candidates = new ArrayList<Fov>();
+
+        // Scan through each cell
+        for (Fov cell : roiGrid.getCells()) {
+            if (cell.getVisitCount() < visitMin) {
+                // clear candidates, add cell, update visitMin
+                candidates.clear();
+                visitMin = cell.getVisitCount();
+            } else if (cell.getVisitCount() > visitMin) {
+                continue;
+            }
+
+            // visit count <= visitMin
+            double Pdet = 0.;           // TODO: compute chance for detection
+            if (Pdet < PdetMax) {
+                candidates.clear();
+                continue;
+            } else if (Pdet > PdetMax) {
+                PdetMax = Pdet;
+                candidates.clear();
+            }
+            candidates.add(cell);
+        }
+
+        // Randomly sample a candidate from list of candidates
+        Random rand = new Random();
+        if (!candidates.isEmpty()) {
+            Fov randomCell = candidates.get(rand.nextInt(candidates.size()));
+            System.out.println("Randomly selected FOV: az " + randomCell.getAzCenter() 
+                                + " and elev " + randomCell.getElCenter());
+        }
+    }
 }

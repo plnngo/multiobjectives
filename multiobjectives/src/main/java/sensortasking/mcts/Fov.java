@@ -32,7 +32,13 @@ public class Fov {
     public double[] centerVec = new double[3]; // [x, y, z]
 
     /** FOV corners. */
-     public double[][] corners;     // 4 corners x 3 dim vectors in x,y,z
+    public double[][] corners;     // 4 corners x 3 dim vectors in x,y,z
+
+    /** Chance of detection. */
+    public double chanceOfDetect = 0.;
+
+    /** Counter on how often this cell has been visited. */
+    public int visitCount = 0;
 
     /**
      * Simple constructor.
