@@ -374,7 +374,7 @@ public class SatelliteTestBench {
     }
 
     @Test
-    public void testMicroActionSearch() throws IOException {
+    public void testMicroActionSearch(AbsoluteDate current) throws IOException {
 
         // Parse discretised region of interest 
         File forFile = new File( System.getProperty("user.dir") 

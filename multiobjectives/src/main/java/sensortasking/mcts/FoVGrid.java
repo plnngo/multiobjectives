@@ -10,8 +10,14 @@ import java.util.List;
 import java.util.Locale;
 
 import org.hipparchus.util.FastMath;
+import org.orekit.bodies.CelestialBodyFactory;
+import org.orekit.frames.TopocentricFrame;
+import org.orekit.frames.Transform;
+import org.orekit.time.AbsoluteDate;
+import org.orekit.utils.PVCoordinates;
 
 import lombok.Getter;
+import sensortasking.stripescanning.Tasking;
 
 @Getter
 public class FoVGrid {
@@ -145,5 +151,27 @@ public class FoVGrid {
             }
         }
         return null;
+    }
+
+    protected static void computeCompositeRewardGrid(FoVGrid grid,
+                                                     TopocentricFrame sensorFrame,
+                                                     PVCoordinates sensorPV,
+                                                     AbsoluteDate current,
+                                                     double rMin,
+                                                     double rMax,
+                                                     int nBins,
+                                                     Transform sensorToInertial) {
+
+        // Precompute Sun and Moon directions once per timestep
+        AngularDirection sunDir = 
+            Tasking.getBodyDir(sensorFrame, current, CelestialBodyFactory.getSun());
+        AngularDirection moonDir = 
+            Tasking.getBodyDir(sensorFrame, current, CelestialBodyFactory.getMoon());
+
+        // Parallelize over all FoV cells
+        grid.cells.parallelStream().forEach(fov -> {
+            Fov.computeFoVCellReward(fov, sensorFrame, sensorPV, current,
+                                     sunDir, moonDir, rMin, rMax, nBins, sensorToInertial);
+        });
     }
 }

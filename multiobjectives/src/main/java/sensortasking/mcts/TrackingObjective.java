@@ -62,10 +62,8 @@ import org.orekit.utils.IERSConventions;
 import org.orekit.utils.PVCoordinates;
 import org.orekit.utils.TimeStampedPVCoordinates;
 
-import benchtest.CarTrackingObjective;
 import benchtest.Filter;
 import benchtest.OrbitRangeAngularMeasurementModel;
-import benchtest.RewardFunction;
 import benchtest.Satellite;
 import lombok.Getter;
 import sensortasking.stripescanning.Tasking;
@@ -122,7 +120,7 @@ public class TrackingObjective extends Objective<Satellite>{
                                 FramesFactory.getITRF(IERSConventions.IERS_2010, true));
 
     /** Minimal angular distance between Moon and sensor pointing direction. */
-    double minMoonDist = FastMath.toRadians(20.);
+    static double minMoonDist = FastMath.toRadians(20.);
 
     private double sensorApartureRadius;
 
